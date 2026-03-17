@@ -1,0 +1,15 @@
+-- Merging decision tree log ---
+manifest
+ADDED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\feature\feature-pianoroll\src\main\AndroidManifest.xml:1:39-95
+INJECTED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\feature\feature-pianoroll\src\main\AndroidManifest.xml:1:39-95
+	package
+		ADDED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\feature\feature-pianoroll\src\main\AndroidManifest.xml:1:49-92
+		INJECTED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\feature\feature-pianoroll\src\main\AndroidManifest.xml
+uses-sdk
+INJECTED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\feature\feature-pianoroll\src\main\AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\feature\feature-pianoroll\src\main\AndroidManifest.xml
+INJECTED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\feature\feature-pianoroll\src\main\AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\feature\feature-pianoroll\src\main\AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\feature\feature-pianoroll\src\main\AndroidManifest.xml
