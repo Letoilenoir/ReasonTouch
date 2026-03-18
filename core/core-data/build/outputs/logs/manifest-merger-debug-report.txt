@@ -1,9 +1,8 @@
 -- Merging decision tree log ---
 manifest
-ADDED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\core\core-data\src\main\AndroidManifest.xml:1:39-87
-INJECTED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\core\core-data\src\main\AndroidManifest.xml:1:39-87
+ADDED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\core\core-data\src\main\AndroidManifest.xml:1:39-51
+INJECTED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\core\core-data\src\main\AndroidManifest.xml:1:39-51
 	package
-		ADDED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\core\core-data\src\main\AndroidManifest.xml:1:49-84
 		INJECTED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\core\core-data\src\main\AndroidManifest.xml
 uses-sdk
 INJECTED from C:\Users\Andy Meakin\AndroidStudioProjects\ReasonTouch\core\core-data\src\main\AndroidManifest.xml reason: use-sdk injection requested
