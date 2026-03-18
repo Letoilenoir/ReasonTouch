@@ -15,6 +15,9 @@ data class Session(
     val timeSignatureNumerator: Int = 4,
     val timeSignatureDenominator: Int = 4,
     val totalBars: Int = 4,
+    val defaultStrumSpeed: String = "NATURAL",
+    val strumSimulationEnabled: Boolean = true,
+    val gmProgram: Int = 26,        // Acoustic Steel default
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
