@@ -52,7 +52,7 @@ fun ReasonTouchApp() {
             composable(Screen.Chords.route) { backStackEntry ->
                 val sessionId = backStackEntry.arguments
                     ?.getString("sessionId") ?: return@composable
-                ChordsPlaceholderScreen(sessionId = sessionId)
+                com.reasontouch.feature.chords.ChordScreen(sessionId = sessionId)
             }
 
             // Piano Roll screen
@@ -94,3 +94,4 @@ fun ReasonTouchApp() {
         }
     }
 }
+

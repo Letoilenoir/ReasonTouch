@@ -1,0 +1,485 @@
+package com.reasontouch.feature.chords
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.reasontouch.core.data.ChordEvent
+import com.reasontouch.core.midi.StepState
+
+private val BG       = Color(0xFF1A1A1E)
+private val RACK     = Color(0xFF222228)
+private val PANEL    = Color(0xFF2A2A32)
+private val BORDER   = Color(0xFF3A3A45)
+private val ACCENT   = Color(0xFFE84040)
+private val ACCENT2  = Color(0xFFFF6B35)
+private val GREEN    = Color(0xFF3DDC84)
+private val TEXT     = Color(0xFFC8C8D4)
+private val TEXT_DIM = Color(0xFF666675)
+private val DOWN_COL = Color(0xFF1A3A5A)
+private val UP_COL   = Color(0xFF2A1A3A)
+
+@Composable
+fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) {
+    var showSettings by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.fillMaxSize().background(BG)) {
+        ChordToolbar(showSettings = showSettings, onToggleSettings = { showSettings = !showSettings })
+        AnimatedContent(
+            targetState = showSettings,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            modifier = Modifier.weight(1f)
+        ) { isSettings ->
+            if (isSettings) SettingsPanel(viewModel = viewModel)
+            else ChordPanel(viewModel = viewModel)
+        }
+    }
+}
+
+@Composable
+fun ChordToolbar(showSettings: Boolean, onToggleSettings: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(48.dp).background(RACK).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = if (showSettings) "SETTINGS" else "CHORD GENERATOR",
+            color = ACCENT, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace, letterSpacing = 2.sp
+        )
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(if (showSettings) ACCENT else PANEL)
+                .border(1.dp, if (showSettings) ACCENT else BORDER, RoundedCornerShape(4.dp))
+                .clickable(onClick = onToggleSettings)
+                .padding(horizontal = 14.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = if (showSettings) "X  CLOSE" else "SETTINGS",
+                color = if (showSettings) Color.White else TEXT_DIM,
+                fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace, letterSpacing = 1.sp
+            )
+        }
+    }
+    Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(ACCENT))
+}
+
+@Composable
+fun ChordPanel(viewModel: ChordViewModel) {
+    val selectedCategory   by viewModel.selectedCategory.collectAsState()
+    val selectedChord      by viewModel.selectedChord.collectAsState()
+    val selectedPosition   by viewModel.selectedPosition.collectAsState()
+    val filteredChords     by viewModel.filteredChords.collectAsState()
+    val availablePositions by viewModel.availablePositions.collectAsState()
+    val stepStates         by viewModel.stepStates.collectAsState()
+    val progression        by viewModel.progression.collectAsState()
+    val statusMessage      by viewModel.statusMessage.collectAsState()
+
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+        item {
+            SectionLabel("CATEGORY")
+            CategoryFilter(
+                categories = GuitarVoicings.categories.keys.toList(),
+                selected = selectedCategory,
+                onSelect = viewModel::selectCategory
+            )
+            SectionLabel("CHORD")
+            ChordGrid(chords = filteredChords, selected = selectedChord, onSelect = viewModel::selectChord)
+            if (availablePositions.size > 1) {
+                SectionLabel("VOICING / POSITION")
+                PositionSelector(positions = availablePositions, selected = selectedPosition, onSelect = viewModel::selectPosition)
+            }
+            SectionLabel("PATTERN")
+            PatternGrid(steps = stepStates, onCycleStep = viewModel::cycleStep)
+            SectionLabel("PRESETS")
+            PresetPatterns(onApply = viewModel::applyPreset)
+            statusMessage?.let { msg ->
+                Text(text = msg, color = ACCENT2, fontSize = 12.sp, fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            AddBarButton(chordName = "$selectedChord $selectedPosition", onClick = viewModel::addBar)
+        }
+        if (progression.isNotEmpty()) {
+            item { SectionLabel("PROGRESSION") }
+            items(progression) { bar ->
+                ProgressionBarCard(chord = bar, onRemove = { viewModel.removeBar(bar) })
+            }
+            item { ClearButton(onClick = viewModel::clearProgression) }
+        }
+    }
+}
+
+@Composable
+fun SectionLabel(text: String) {
+    Text(text = text, color = TEXT_DIM, fontSize = 10.sp, fontFamily = FontFamily.Monospace,
+        letterSpacing = 2.sp, modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp))
+}
+
+@Composable
+fun CategoryFilter(categories: List<String>, selected: String, onSelect: (String) -> Unit) {
+    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        items(categories) { cat ->
+            val isSelected = cat == selected
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(if (isSelected) ACCENT else PANEL)
+                    .border(1.dp, if (isSelected) ACCENT else BORDER, RoundedCornerShape(20.dp))
+                    .clickable { onSelect(cat) }
+                    .padding(horizontal = 14.dp, vertical = 7.dp)
+            ) {
+                Text(text = cat, color = if (isSelected) Color.White else TEXT_DIM,
+                    fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ChordGrid(chords: List<String>, selected: String, onSelect: (String) -> Unit) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        chords.forEach { chord ->
+            val isSelected = chord == selected
+            val bgColor = when {
+                isSelected -> ACCENT
+                chord.contains("m") && !chord.contains("maj") && !chord.contains("dim") -> Color(0xFF1A2A4A)
+                chord.contains("7")   -> Color(0xFF2A1A2A)
+                chord.contains("sus") -> Color(0xFF1A2A1A)
+                chord.contains("dim") -> Color(0xFF2A1A1A)
+                chord.contains("aug") -> Color(0xFF2A2A1A)
+                chord.endsWith("5")   -> Color(0xFF1A1A2A)
+                else -> PANEL
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(bgColor)
+                    .border(1.dp, if (isSelected) ACCENT else BORDER, RoundedCornerShape(4.dp))
+                    .clickable { onSelect(chord) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = chord, color = if (isSelected) Color.White else TEXT,
+                    fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+            }
+        }
+    }
+}
+
+@Composable
+fun PositionSelector(positions: List<String>, selected: String, onSelect: (String) -> Unit) {
+    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        items(positions) { pos ->
+            val isSelected = pos == selected
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (isSelected) Color(0xFF1A3A5A) else PANEL)
+                    .border(1.dp, if (isSelected) Color(0xFF38BDF8) else BORDER, RoundedCornerShape(4.dp))
+                    .clickable { onSelect(pos) }
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                Text(text = pos, color = if (isSelected) Color(0xFF38BDF8) else TEXT_DIM,
+                    fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+            }
+        }
+    }
+}
+
+@Composable
+fun PatternGrid(steps: List<StepState>, onCycleStep: (Int) -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            listOf("B1","B2","B3","B4").forEach { label ->
+                Text(text = label, color = TEXT_DIM, fontSize = 9.sp, fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.weight(1f), textAlign = TextAlign.Start)
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            (0 until 4).forEach { beat ->
+                Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    (0 until 4).forEach { sub ->
+                        StepButton(state = steps[beat * 4 + sub], onClick = { onCycleStep(beat * 4 + sub) }, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StepLegendItem(color = Color(0xFF38BDF8), label = "D = Down")
+            StepLegendItem(color = Color(0xFFA78BFA), label = "U = Up")
+            StepLegendItem(color = BORDER, label = ". = Off")
+        }
+    }
+}
+
+@Composable
+fun StepButton(state: StepState, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val (bg, fg, label) = when (state) {
+        StepState.DOWN -> Triple(DOWN_COL, Color(0xFF38BDF8), "D")
+        StepState.UP   -> Triple(UP_COL,   Color(0xFFA78BFA), "U")
+        StepState.OFF  -> Triple(RACK,     TEXT_DIM,          ".")
+    }
+    Box(
+        modifier = modifier.height(40.dp).clip(RoundedCornerShape(3.dp)).background(bg)
+            .border(1.dp, if (state == StepState.OFF) BORDER else fg, RoundedCornerShape(3.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = label, color = fg, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+    }
+}
+
+@Composable
+fun StepLegendItem(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(8.dp).background(color, RoundedCornerShape(2.dp)))
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(text = label, color = TEXT_DIM, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+    }
+}
+
+@Composable
+fun PresetPatterns(onApply: (StepPattern) -> Unit) {
+    StrumPatterns.groups.forEach { (groupName, patterns) ->
+        Text(text = groupName.uppercase(), color = TEXT_DIM, fontSize = 9.sp,
+            fontFamily = FontFamily.Monospace, letterSpacing = 2.sp,
+            modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 3.dp))
+        LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(patterns.entries.toList()) { (name, pattern) ->
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(PANEL)
+                        .border(1.dp, BORDER, RoundedCornerShape(4.dp))
+                        .clickable { onApply(pattern) }
+                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                ) {
+                    Text(text = name, color = TEXT, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AddBarButton(chordName: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+            .clip(RoundedCornerShape(4.dp)).background(ACCENT)
+            .clickable(onClick = onClick).padding(vertical = 14.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = "+ ADD BAR  $chordName", color = Color.White, fontSize = 14.sp,
+            fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
+    }
+}
+
+@Composable
+fun ProgressionBarCard(chord: ChordEvent, onRemove: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 3.dp)
+            .clip(RoundedCornerShape(4.dp)).background(RACK)
+            .border(1.dp, BORDER, RoundedCornerShape(4.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = "${chord.barIndex + 1}", color = ACCENT2, fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace, modifier = Modifier.width(24.dp))
+        Text(text = chord.chordName.uppercase(), color = TEXT, fontSize = 14.sp,
+            fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
+            modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Box(
+            modifier = Modifier.clip(RoundedCornerShape(3.dp)).background(Color(0xFF3A1A1A))
+                .clickable(onClick = onRemove).padding(horizontal = 10.dp, vertical = 4.dp)
+        ) {
+            Text(text = "X", color = ACCENT, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+        }
+    }
+}
+
+@Composable
+fun ClearButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(4.dp)).background(Color(0xFF2A1A1A))
+            .border(1.dp, ACCENT, RoundedCornerShape(4.dp))
+            .clickable(onClick = onClick).padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = "CLEAR PROGRESSION", color = ACCENT, fontSize = 13.sp,
+            fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
+    }
+}
+
+@Composable
+fun SettingsPanel(viewModel: ChordViewModel) {
+    val strumEnabled by viewModel.strumEnabled.collectAsState()
+    val strumSpeed   by viewModel.strumSpeed.collectAsState()
+    val instrument   by viewModel.instrument.collectAsState()
+    val barDuration  by viewModel.barDuration.collectAsState()
+    val tempo        by viewModel.tempo.collectAsState()
+
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+        item {
+            SectionLabel("TEMPO & BAR DURATION")
+            SettingsRow(label = "Tempo") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    StepperButton("<") { viewModel.setTempo(tempo - 1) }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "$tempo BPM", color = ACCENT2, fontSize = 14.sp,
+                        fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    StepperButton(">") { viewModel.setTempo(tempo + 1) }
+                }
+            }
+            SettingsRow(label = "Bar Duration") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    StepperButton("<") { viewModel.setBarDuration(barDuration - 0.5) }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "$barDuration beats", color = ACCENT2, fontSize = 14.sp,
+                        fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    StepperButton(">") { viewModel.setBarDuration(barDuration + 0.5) }
+                }
+            }
+            SectionLabel("STRUM SPEED")
+            SettingsRow(label = "Strum Simulation") {
+                Switch(
+                    checked = strumEnabled,
+                    onCheckedChange = viewModel::setStrumEnabled,
+                    colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = ACCENT)
+                )
+            }
+            if (strumEnabled) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+                    STRUM_SPEED_PRESETS.forEach { preset ->
+                        val isSelected = strumSpeed == preset.beatsPerString
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(if (isSelected) Color(0xFF1A2A1A) else RACK)
+                                .border(1.dp, if (isSelected) GREEN else BORDER, RoundedCornerShape(4.dp))
+                                .clickable { viewModel.setStrumSpeed(preset.beatsPerString) }
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = preset.label, color = if (isSelected) GREEN else TEXT,
+                                    fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                Text(text = preset.description, color = TEXT_DIM,
+                                    fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                            }
+                            if (isSelected) {
+                                Text(text = "OK", color = GREEN, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+                            }
+                        }
+                    }
+                }
+            }
+            SectionLabel("GUITAR SOUND (GM PROGRAM)")
+            Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+                GM_GUITARS.chunked(2).forEach { pair ->
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        pair.forEach { gm ->
+                            val isSelected = instrument.program == gm.program
+                            Box(
+                                modifier = Modifier.weight(1f).padding(vertical = 3.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(if (isSelected) Color(0xFF1A2A3A) else RACK)
+                                    .border(1.dp, if (isSelected) Color(0xFF38BDF8) else BORDER, RoundedCornerShape(4.dp))
+                                    .clickable { viewModel.setInstrument(gm) }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                            ) {
+                                Column {
+                                    Text(text = gm.label, color = if (isSelected) Color(0xFF38BDF8) else TEXT,
+                                        fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                    Text(text = "GM ${gm.program + 1}", color = TEXT_DIM,
+                                        fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                                }
+                            }
+                        }
+                        if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SettingsRow(label: String, content: @Composable () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(4.dp)).background(RACK)
+            .border(1.dp, BORDER, RoundedCornerShape(4.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(text = label, color = TEXT, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+        content()
+    }
+}
+
+@Composable
+fun StepperButton(label: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.size(32.dp).clip(RoundedCornerShape(4.dp)).background(PANEL)
+            .border(1.dp, BORDER, RoundedCornerShape(4.dp)).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = label, color = TEXT, fontSize = 14.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+    }
+}
