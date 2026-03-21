@@ -39,7 +39,7 @@ fun ReasonTouchApp() {
             startDestination = Screen.SessionList.route,
             modifier = Modifier.weight(1f)
         ) {
-            // Session list — no transport bar
+            // Session list ï¿½ no transport bar
             composable(Screen.SessionList.route) {
                 SessionListScreen(
                     onSessionSelected = { sessionId ->
@@ -59,7 +59,7 @@ fun ReasonTouchApp() {
             composable(Screen.PianoRoll.route) { backStackEntry ->
                 val sessionId = backStackEntry.arguments
                     ?.getString("sessionId") ?: return@composable
-                PianoRollPlaceholderScreen(sessionId = sessionId)
+                com.reasontouch.feature.pianoroll.PianoRollScreen(sessionId = sessionId)
             }
         }
 
