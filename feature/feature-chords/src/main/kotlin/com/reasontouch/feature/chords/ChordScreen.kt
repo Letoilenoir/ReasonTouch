@@ -62,9 +62,18 @@ private val UP_COL   = Color(0xFF2A1A3A)
 
 @Composable
 fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) {
-    var showSettings by remember { mutableStateOf(false) }
+    var showSettings   by remember { mutableStateOf(false) }
+    var showSendDialog by remember { mutableStateOf(false) }
+    val progression    by viewModel.progression.collectAsState()
+    val tracks         by viewModel.tracks.collectAsState()
+
     Column(modifier = Modifier.fillMaxSize().background(BG)) {
-        ChordToolbar(showSettings = showSettings, onToggleSettings = { showSettings = !showSettings })
+        ChordToolbar(
+            showSettings   = showSettings,
+            onToggleSettings = { showSettings = !showSettings },
+            onSendToRoll   = { showSendDialog = true },
+            hasBars        = progression.isNotEmpty()
+        )
         AnimatedContent(
             targetState = showSettings,
             transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -74,10 +83,26 @@ fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) 
             else ChordPanel(viewModel = viewModel)
         }
     }
+
+    if (showSendDialog) {
+        SendToPianoRollDialog(
+            tracks = tracks,
+            onConfirm = { trackIndex, useStrum ->
+                viewModel.sendToPianoRoll(trackIndex, useStrum) {}
+                showSendDialog = false
+            },
+            onDismiss = { showSendDialog = false }
+        )
+    }
 }
 
 @Composable
-fun ChordToolbar(showSettings: Boolean, onToggleSettings: () -> Unit) {
+fun ChordToolbar(
+    showSettings: Boolean,
+    onToggleSettings: () -> Unit,
+    onSendToRoll: () -> Unit,
+    hasBars: Boolean
+) {
     Row(
         modifier = Modifier.fillMaxWidth().height(48.dp).background(RACK).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -88,20 +113,41 @@ fun ChordToolbar(showSettings: Boolean, onToggleSettings: () -> Unit) {
             color = ACCENT, fontSize = 14.sp, fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace, letterSpacing = 2.sp
         )
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
-                .background(if (showSettings) ACCENT else PANEL)
-                .border(1.dp, if (showSettings) ACCENT else BORDER, RoundedCornerShape(4.dp))
-                .clickable(onClick = onToggleSettings)
-                .padding(horizontal = 14.dp, vertical = 6.dp)
-        ) {
-            Text(
-                text = if (showSettings) "X  CLOSE" else "SETTINGS",
-                color = if (showSettings) Color.White else TEXT_DIM,
-                fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace, letterSpacing = 1.sp
-            )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Send to Piano Roll — only shown when there are bars
+            if (hasBars && !showSettings) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFF1A3A2A))
+                        .border(1.dp, Color(0xFF3DDC84), RoundedCornerShape(4.dp))
+                        .clickable(onClick = onSendToRoll)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "→ ROLL",
+                        color = Color(0xFF3DDC84),
+                        fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+            // Settings toggle
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (showSettings) ACCENT else PANEL)
+                    .border(1.dp, if (showSettings) ACCENT else BORDER, RoundedCornerShape(4.dp))
+                    .clickable(onClick = onToggleSettings)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = if (showSettings) "X CLOSE" else "SETTINGS",
+                    color = if (showSettings) Color.White else TEXT_DIM,
+                    fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace, letterSpacing = 1.sp
+                )
+            }
         }
     }
     Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(ACCENT))
@@ -117,32 +163,59 @@ fun ChordPanel(viewModel: ChordViewModel) {
     val stepStates         by viewModel.stepStates.collectAsState()
     val progression        by viewModel.progression.collectAsState()
     val statusMessage      by viewModel.statusMessage.collectAsState()
+    val tracks             by viewModel.tracks.collectAsState()
 
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 8.dp, bottom = 120.dp)) {
+
+        item { SectionLabel("CATEGORY") }
         item {
-            SectionLabel("CATEGORY")
             CategoryFilter(
                 categories = GuitarVoicings.categories.keys.toList(),
                 selected = selectedCategory,
                 onSelect = viewModel::selectCategory
             )
-            SectionLabel("CHORD")
-            ChordGrid(chords = filteredChords, selected = selectedChord, onSelect = viewModel::selectChord)
-            if (availablePositions.size > 1) {
-                SectionLabel("VOICING / POSITION")
-                PositionSelector(positions = availablePositions, selected = selectedPosition, onSelect = viewModel::selectPosition)
-            }
-            SectionLabel("PATTERN")
-            PatternGrid(steps = stepStates, onCycleStep = viewModel::cycleStep)
-            SectionLabel("PRESETS")
-            PresetPatterns(onApply = viewModel::applyPreset)
-            statusMessage?.let { msg ->
-                Text(text = msg, color = ACCENT2, fontSize = 12.sp, fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            AddBarButton(chordName = "$selectedChord $selectedPosition", onClick = viewModel::addBar)
         }
+
+        item { SectionLabel("CHORD") }
+        item {
+            ChordGrid(chords = filteredChords, selected = selectedChord, onSelect = viewModel::selectChord)
+        }
+
+        if (availablePositions.size > 1) {
+            item { SectionLabel("VOICING / POSITION") }
+            item {
+                PositionSelector(
+                    positions = availablePositions,
+                    selected = selectedPosition,
+                    onSelect = viewModel::selectPosition
+                )
+            }
+        }
+
+        item { SectionLabel("PATTERN") }
+        item { PatternGrid(steps = stepStates, onCycleStep = viewModel::cycleStep) }
+
+        item { SectionLabel("PRESETS") }
+        item { PresetPatterns(onApply = viewModel::applyPreset) }
+
+        statusMessage?.let { msg ->
+            item {
+                Text(
+                    text = msg, color = ACCENT2, fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(8.dp)) }
+        item {
+            AddBarButton(
+                chordName = "$selectedChord $selectedPosition",
+                onClick = viewModel::addBar
+            )
+        }
+
         if (progression.isNotEmpty()) {
             item { SectionLabel("PROGRESSION") }
             items(progression) { bar ->
@@ -151,6 +224,7 @@ fun ChordPanel(viewModel: ChordViewModel) {
             item { ClearButton(onClick = viewModel::clearProgression) }
         }
     }
+
 }
 
 @Composable
@@ -370,7 +444,7 @@ fun SettingsPanel(viewModel: ChordViewModel) {
     val barDuration  by viewModel.barDuration.collectAsState()
     val tempo        by viewModel.tempo.collectAsState()
 
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 8.dp, bottom = 120.dp)) {
         item {
             SectionLabel("TEMPO & BAR DURATION")
             SettingsRow(label = "Tempo") {
@@ -482,4 +556,211 @@ fun StepperButton(label: String, onClick: () -> Unit) {
     ) {
         Text(text = label, color = TEXT, fontSize = 14.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
     }
+}
+// ── Send to Piano Roll button ─────────────────────────────────────────────────
+@Composable
+fun SendToPianoRollButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(Color(0xFF1A3A2A))
+            .border(1.dp, Color(0xFF3DDC84), RoundedCornerShape(4.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "→  SEND TO PIANO ROLL",
+            color = Color(0xFF3DDC84),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 1.sp
+        )
+    }
+}
+
+// ── Send to Piano Roll dialog ─────────────────────────────────────────────────
+@Composable
+fun SendToPianoRollDialog(
+    tracks: List<com.reasontouch.core.data.MidiTrack>,
+    onConfirm: (trackIndex: Int, useStrum: Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selectedTrack by remember { mutableStateOf(0) }
+    var useStrum by remember { mutableStateOf(false) }
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF222228),
+        titleContentColor = Color(0xFF3DDC84),
+        textContentColor = Color(0xFFC8C8D4),
+        title = {
+            Text(
+                text = "SEND TO PIANO ROLL",
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp,
+                fontSize = 14.sp
+            )
+        },
+        text = {
+            Column {
+                // Mode selection
+                Text(
+                    text = "MODE",
+                    color = Color(0xFF666675),
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Block mode
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (!useStrum) Color(0xFF1A2A3A) else Color(0xFF222228))
+                            .border(
+                                1.dp,
+                                if (!useStrum) Color(0xFF38BDF8) else Color(0xFF3A3A45),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .clickable { useStrum = false }
+                            .padding(horizontal = 10.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "BLOCK",
+                                color = if (!useStrum) Color(0xFF38BDF8) else Color(0xFF666675),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "All notes together",
+                                color = Color(0xFF666675),
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                    // Strum mode
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (useStrum) Color(0xFF1A2A1A) else Color(0xFF222228))
+                            .border(
+                                1.dp,
+                                if (useStrum) Color(0xFF3DDC84) else Color(0xFF3A3A45),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .clickable { useStrum = true }
+                            .padding(horizontal = 10.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "STRUM",
+                                color = if (useStrum) Color(0xFF3DDC84) else Color(0xFF666675),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "Apply pattern timing",
+                                color = Color(0xFF666675),
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Track selection
+                Text(
+                    text = "TARGET TRACK",
+                    color = Color(0xFF666675),
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                tracks.forEachIndexed { i, track ->
+                    val trackColor = Color(when (i % 8) {
+                        0 -> 0xFFE84040L; 1 -> 0xFF3DDC84L; 2 -> 0xFF38BDF8L
+                        3 -> 0xFFA78BFAL; 4 -> 0xFFFF6B35L; 5 -> 0xFFF5C518L
+                        6 -> 0xFFF472B6L; else -> 0xFF94A3B8L
+                    })
+                    val isSelected = i == selectedTrack
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (isSelected) Color(0xFF28283A) else Color(0xFF1A1A1E))
+                            .border(
+                                1.dp,
+                                if (isSelected) trackColor else Color(0xFF3A3A45),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .clickable { selectedTrack = i }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(3.dp)
+                                .height(20.dp)
+                                .background(trackColor, RoundedCornerShape(2.dp))
+                        )
+                        Text(
+                            text = track.name,
+                            color = if (isSelected) trackColor else Color(0xFF666675),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.Button(
+                onClick = { onConfirm(selectedTrack, useStrum) },
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF3DDC84)
+                )
+            ) {
+                Text(
+                    text = "SEND",
+                    color = Color(0xFF1A1A1E),
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text(
+                    text = "CANCEL",
+                    color = Color(0xFF666675),
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+    )
 }

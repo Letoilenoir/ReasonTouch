@@ -4,8 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.reasontouch.core.data.ChordEvent
+import com.reasontouch.core.data.NoteEvent
 import com.reasontouch.core.data.SessionRepository
-import com.reasontouch.core.midi.MidiProgressionBar
 import com.reasontouch.core.midi.StepState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,15 +26,19 @@ class ChordViewModel @Inject constructor(
 
     private val sessionId: String = checkNotNull(savedStateHandle["sessionId"])
 
-    // -- Session -----------------------------------------------------------
+    // ── Session ───────────────────────────────────────────────────────────
     val session = repository.getSession(sessionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    // -- Chord progression from Room ----------------------------------------
+    // ── Tracks ────────────────────────────────────────────────────────────
+    val tracks = repository.getTracksForSession(sessionId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // ── Chord progression from Room ────────────────────────────────────────
     val progression = repository.getChordsForSession(sessionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // -- Chord selection ----------------------------------------------------
+    // ── Chord selection ────────────────────────────────────────────────────
     private val _selectedChord    = MutableStateFlow("E")
     private val _selectedPosition = MutableStateFlow("Open")
     private val _selectedCategory = MutableStateFlow("All")
@@ -51,11 +55,11 @@ class ChordViewModel @Inject constructor(
         .map { cat -> GuitarVoicings.categories[cat] ?: GuitarVoicings.voicings.keys.toList() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, GuitarVoicings.voicings.keys.toList())
 
-    // -- Step sequencer -----------------------------------------------------
+    // ── Step sequencer ─────────────────────────────────────────────────────
     private val _stepStates = MutableStateFlow(List(16) { StepState.OFF })
     val stepStates: StateFlow<List<StepState>> = _stepStates.asStateFlow()
 
-    // -- Settings -----------------------------------------------------------
+    // ── Settings ───────────────────────────────────────────────────────────
     private val _tempo        = MutableStateFlow(120)
     private val _barDuration  = MutableStateFlow(4.0)
     private val _strumSpeed   = MutableStateFlow(0.02)
@@ -68,11 +72,11 @@ class ChordViewModel @Inject constructor(
     val strumEnabled: StateFlow<Boolean>      = _strumEnabled.asStateFlow()
     val instrument:   StateFlow<GmInstrument> = _instrument.asStateFlow()
 
-    // -- Status -------------------------------------------------------------
+    // ── Status ─────────────────────────────────────────────────────────────
     private val _statusMessage = MutableStateFlow<String?>(null)
     val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
 
-    // -- Actions ------------------------------------------------------------
+    // ── Actions ────────────────────────────────────────────────────────────
     fun selectCategory(cat: String) { _selectedCategory.value = cat }
 
     fun selectChord(name: String) {
@@ -95,10 +99,10 @@ class ChordViewModel @Inject constructor(
 
     fun applyPreset(pattern: StepPattern) { _stepStates.value = pattern.steps }
 
-    fun setTempo(bpm: Int)            { _tempo.value = bpm.coerceIn(20, 300) }
-    fun setBarDuration(beats: Double) { _barDuration.value = beats.coerceIn(0.5, 32.0) }
-    fun setStrumSpeed(v: Double)      { _strumSpeed.value = v.coerceAtLeast(0.0) }
-    fun setStrumEnabled(v: Boolean)   { _strumEnabled.value = v }
+    fun setTempo(bpm: Int)             { _tempo.value = bpm.coerceIn(20, 300) }
+    fun setBarDuration(beats: Double)  { _barDuration.value = beats.coerceIn(0.5, 32.0) }
+    fun setStrumSpeed(v: Double)       { _strumSpeed.value = v.coerceAtLeast(0.0) }
+    fun setStrumEnabled(v: Boolean)    { _strumEnabled.value = v }
     fun setInstrument(v: GmInstrument){ _instrument.value = v }
 
     fun addBar() {
@@ -143,23 +147,108 @@ class ChordViewModel @Inject constructor(
 
     fun clearStatus() { _statusMessage.value = null }
 
-    // -- Build MidiProgressionBars for export/playback ----------------------
-    fun buildMidiBars(): List<MidiProgressionBar> {
-        return progression.value.map { chord ->
-            val notes = chord.midiNotes.split(",").mapIndexed { i, s ->
-                s.trim().toIntOrNull()
-            }.let { parsed ->
-                Array<Int?>(6) { i -> parsed.getOrNull(i) }
+    // ── Send progression to piano roll ─────────────────────────────────────
+    fun sendToPianoRoll(
+        targetTrackIndex: Int,
+        useStrum: Boolean,
+        onComplete: () -> Unit
+    ) {
+        viewModelScope.launch {
+            val trackList = tracks.value
+            val targetTrack = trackList.getOrNull(targetTrackIndex) ?: return@launch
+            val bars = progression.value
+            if (bars.isEmpty()) {
+                _statusMessage.value = "No progression to send"
+                return@launch
             }
-            MidiProgressionBar(
-                chordName    = chord.chordName,
-                notes        = notes,
-                steps        = _stepStates.value,
-                durationBeats = _barDuration.value,
-                tempoBpm     = _tempo.value,
-                strumSpeed   = if (_strumEnabled.value) _strumSpeed.value else 0.0,
-                gmProgram    = _instrument.value.program
-            )
+
+            val beatsPerBar    = _barDuration.value
+            val strumSpeedVal  = if (useStrum && _strumEnabled.value) _strumSpeed.value else 0.0
+
+            bars.forEachIndexed { barIdx, chord ->
+                val startBeat  = (barIdx * beatsPerBar).toFloat()
+                val midiNotes  = chord.midiNotes.split(",").mapNotNull { it.trim().toIntOrNull() }
+                val notesPairs = midiNotes.mapIndexed { i, midi -> Pair(i, midi) }
+
+                if (!useStrum || strumSpeedVal == 0.0) {
+                    // Block — all notes at same position
+                    notesPairs.forEach { (_, midi) ->
+                        val pitch = (108 - midi).coerceIn(0, 87)
+                        repository.saveNote(
+                            NoteEvent(
+                                id       = UUID.randomUUID().toString(),
+                                trackId  = targetTrack.id,
+                                pitch    = pitch,
+                                beat     = startBeat,
+                                duration = beatsPerBar.toFloat(),
+                                velocity = 90
+                            )
+                        )
+                    }
+                } else {
+                    // Strummed — apply step pattern timing
+                    val stepStates    = _stepStates.value
+                    val beatsPerStep  = beatsPerBar / 16.0
+                    val activeSteps   = stepStates.mapIndexedNotNull { i, s ->
+                        if (s != StepState.OFF) Pair(i, s) else null
+                    }
+
+                    if (activeSteps.isEmpty()) {
+                        // No pattern — fall back to block
+                        notesPairs.forEach { (_, midi) ->
+                            val pitch = (108 - midi).coerceIn(0, 87)
+                            repository.saveNote(
+                                NoteEvent(
+                                    id       = UUID.randomUUID().toString(),
+                                    trackId  = targetTrack.id,
+                                    pitch    = pitch,
+                                    beat     = startBeat,
+                                    duration = beatsPerBar.toFloat(),
+                                    velocity = 90
+                                )
+                            )
+                        }
+                    } else {
+                        activeSteps.forEach { (stepIdx, stepState) ->
+                            val stepBeat   = startBeat + (stepIdx * beatsPerStep).toFloat()
+                            val strOrder   = if (stepState == StepState.DOWN) notesPairs else notesPairs.reversed()
+                            val noteDur    = (beatsPerStep * 0.95).toFloat().coerceAtLeast(0.0625f)
+                            val vel        = if (stepState == StepState.DOWN) 100 else 80
+
+                            strOrder.forEachIndexed { strIdx, (_, midi) ->
+                                val offset = (strIdx * strumSpeedVal).toFloat()
+                                val pitch  = (108 - midi).coerceIn(0, 87)
+                                repository.saveNote(
+                                    NoteEvent(
+                                        id       = UUID.randomUUID().toString(),
+                                        trackId  = targetTrack.id,
+                                        pitch    = pitch,
+                                        beat     = (stepBeat + offset).coerceAtLeast(0f),
+                                        duration = noteDur,
+                                        velocity = vel
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            _statusMessage.value = "Sent to ${targetTrack.name}"
+            onComplete()
         }
+    }
+
+    // ── Build MidiProgressionBars for export/playback ──────────────────────
+    fun buildMidiBars() = progression.value.map { chord ->
+        val notes = chord.midiNotes.split(",").mapNotNull { it.trim().toIntOrNull() }
+        com.reasontouch.core.midi.MidiProgressionBar(
+            chordName     = chord.chordName,
+            notes         = Array<Int?>(6) { i -> notes.getOrNull(i) },
+            steps         = _stepStates.value,
+            durationBeats = _barDuration.value,
+            tempoBpm      = _tempo.value,
+            strumSpeed    = if (_strumEnabled.value) _strumSpeed.value else 0.0,
+            gmProgram     = _instrument.value.program
+        )
     }
 }
