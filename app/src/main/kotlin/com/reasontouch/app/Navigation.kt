@@ -9,20 +9,3 @@ sealed class Screen(val route: String) {
         fun createRoute(sessionId: String) = "piano_roll/$sessionId"
     }
 }
-
-sealed class BottomNavItem(
-    val route: String,
-    val label: String,
-    val icon: String
-) {
-    object Chords : BottomNavItem(
-        route = "chords",
-        label = "CHORDS",
-        icon = "music_note"
-    )
-    object PianoRoll : BottomNavItem(
-        route = "piano_roll",
-        label = "ARRANGE",
-        icon = "piano"
-    )
-}

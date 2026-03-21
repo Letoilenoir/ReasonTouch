@@ -35,7 +35,6 @@ android {
     }
 
     kotlinOptions { jvmTarget = "17" }
-
     buildFeatures { compose = true }
 }
 
@@ -54,6 +53,7 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
 
+    implementation(project(":core:core-data"))
     implementation(project(":feature:feature-chords"))
     implementation(project(":feature:feature-pianoroll"))
     implementation(project(":feature:feature-export"))
@@ -66,6 +66,3 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
-
-
-
