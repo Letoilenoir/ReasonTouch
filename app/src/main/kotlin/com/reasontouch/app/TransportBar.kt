@@ -10,10 +10,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,6 +25,7 @@ fun TransportBar(
     onPlay: () -> Unit,
     onStop: () -> Unit,
     onRewind: () -> Unit,
+    onExport: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -40,29 +37,23 @@ fun TransportBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Rewind
-        TransportButton(label = "?", onClick = onRewind)
-
-        // Play/Pause
+        TransportButton(label = "REW", onClick = onRewind)
         TransportButton(
-            label = if (isPlaying) "?" else "?",
+            label = if (isPlaying) "PAUSE" else "PLAY",
             onClick = onPlay,
             active = isPlaying,
             activeColor = Color(0xFF3DDC84)
         )
-
-        // Stop
-        TransportButton(label = "?", onClick = onStop)
-
-        // BPM display
+        TransportButton(label = "STOP", onClick = onStop)
         Text(
             text = "$bpm BPM",
             color = Color(0xFFFF6B35),
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
-            modifier = Modifier.padding(start = 8.dp)
+            modifier = Modifier.weight(1f).padding(start = 4.dp)
         )
+        TransportButton(label = "MIDI", onClick = onExport)
     }
 }
 
@@ -81,12 +72,14 @@ fun TransportButton(
         ),
         modifier = Modifier.height(34.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            horizontal = 10.dp, vertical = 0.dp
+            horizontal = 8.dp, vertical = 0.dp
         )
     ) {
         Text(
             text = label,
-            fontSize = 14.sp
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
         )
     }
 }

@@ -1,5 +1,6 @@
 package com.reasontouch.app
 
+import android.app.Application
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,23 +12,29 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.reasontouch.core.data.SessionRepository
+import com.reasontouch.feature.export.ExportDialog
+import com.reasontouch.feature.export.ExportViewModel
 
 @Composable
-fun ReasonTouchApp() {
-    val navController = rememberNavController()
+fun ReasonTouchApp(repository: SessionRepository) {
+    val navController     = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route ?: ""
+    val currentRoute      = navBackStackEntry?.destination?.route ?: ""
+    val application       = LocalContext.current.applicationContext as Application
 
-    var bpm by remember { mutableStateOf(120) }
-    var isPlaying by remember { mutableStateOf(false) }
+    var bpm        by remember { mutableStateOf(120) }
+    var isPlaying  by remember { mutableStateOf(false) }
+    var showExport by remember { mutableStateOf(false) }
 
-    // Determine if we should show transport and bottom nav
-    val showChrome = currentRoute.startsWith("chords/") ||
-                     currentRoute.startsWith("piano_roll/")
+    val showChrome       = currentRoute.startsWith("chords/") || currentRoute.startsWith("piano_roll/")
+    val currentSessionId = navBackStackEntry?.arguments?.getString("sessionId") ?: ""
 
     Column(
         modifier = Modifier
@@ -35,11 +42,10 @@ fun ReasonTouchApp() {
             .windowInsetsPadding(WindowInsets.systemBars)
     ) {
         NavHost(
-            navController = navController,
+            navController    = navController,
             startDestination = Screen.SessionList.route,
-            modifier = Modifier.weight(1f)
+            modifier         = Modifier.weight(1f)
         ) {
-            // Session list � no transport bar
             composable(Screen.SessionList.route) {
                 SessionListScreen(
                     onSessionSelected = { sessionId ->
@@ -47,51 +53,57 @@ fun ReasonTouchApp() {
                     }
                 )
             }
-
-            // Chords screen
             composable(Screen.Chords.route) { backStackEntry ->
-                val sessionId = backStackEntry.arguments
-                    ?.getString("sessionId") ?: return@composable
+                val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
                 com.reasontouch.feature.chords.ChordScreen(sessionId = sessionId)
             }
-
-            // Piano Roll screen
             composable(Screen.PianoRoll.route) { backStackEntry ->
-                val sessionId = backStackEntry.arguments
-                    ?.getString("sessionId") ?: return@composable
+                val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
                 com.reasontouch.feature.pianoroll.PianoRollScreen(sessionId = sessionId)
             }
         }
 
-        // Transport and bottom nav only show when inside a session
         if (showChrome) {
             TransportBar(
-                bpm = bpm,
+                bpm      = bpm,
                 isPlaying = isPlaying,
-                onPlay = { isPlaying = !isPlaying },
-                onStop = { isPlaying = false },
-                onRewind = { isPlaying = false }
+                onPlay   = { isPlaying = !isPlaying },
+                onStop   = { isPlaying = false },
+                onRewind = { isPlaying = false },
+                onExport = { showExport = true }
             )
             BottomNav(
-                currentRoute = currentRoute,
-                onChordsClick = {
-                    val sessionId = navBackStackEntry?.arguments?.getString("sessionId")
-                        ?: return@BottomNav
+                currentRoute     = currentRoute,
+                onChordsClick    = {
+                    val sessionId = navBackStackEntry?.arguments?.getString("sessionId") ?: return@BottomNav
                     navController.navigate(Screen.Chords.createRoute(sessionId)) {
-                        launchSingleTop = true
-                        restoreState = true
+                        launchSingleTop = true; restoreState = true
                     }
                 },
                 onPianoRollClick = {
-                    val sessionId = navBackStackEntry?.arguments?.getString("sessionId")
-                        ?: return@BottomNav
+                    val sessionId = navBackStackEntry?.arguments?.getString("sessionId") ?: return@BottomNav
                     navController.navigate(Screen.PianoRoll.createRoute(sessionId)) {
-                        launchSingleTop = true
-                        restoreState = true
+                        launchSingleTop = true; restoreState = true
                     }
                 }
             )
         }
     }
-}
 
+    if (showExport && currentSessionId.isNotEmpty()) {
+        val exportVm: ExportViewModel = viewModel(
+            key     = "export_$currentSessionId",
+            factory = ExportViewModel.Factory(
+                sessionId   = currentSessionId,
+                repository  = repository,
+                application = application
+            )
+        )
+        ExportDialog(
+            sessionId   = currentSessionId,
+            sessionName = "Session",
+            onDismiss   = { showExport = false },
+            viewModel   = exportVm
+        )
+    }
+}
