@@ -3,12 +3,17 @@ package com.reasontouch.feature.pianoroll
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.reasontouch.core.audio.SynthEngine
+import com.reasontouch.core.audio.SynthVoice
 import com.reasontouch.core.data.ChordEvent
 import com.reasontouch.core.data.MidiTrack
 import com.reasontouch.core.data.NoteEvent
 import com.reasontouch.core.data.Session
 import com.reasontouch.core.data.SessionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,82 +26,62 @@ import javax.inject.Inject
 @HiltViewModel
 class PianoRollViewModel @Inject constructor(
     private val repository: SessionRepository,
+    private val synthEngine: SynthEngine,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val sessionId: String = checkNotNull(savedStateHandle["sessionId"])
 
-    // ── Session ───────────────────────────────────────────────────────────
     val session: StateFlow<Session?> = repository.getSession(sessionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    // ── Tracks ────────────────────────────────────────────────────────────
     val tracks: StateFlow<List<MidiTrack>> = repository.getTracksForSession(sessionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    // ── Chord progression (read-only, shown as ghost lane) ────────────────
     val chords: StateFlow<List<ChordEvent>> = repository.getChordsForSession(sessionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // ── Active track ──────────────────────────────────────────────────────
     private val _activeTrackIndex = MutableStateFlow(0)
     val activeTrackIndex: StateFlow<Int> = _activeTrackIndex.asStateFlow()
-
-    // ── Notes per track (cached for active track) ─────────────────────────
     private val _activeNotes = MutableStateFlow<List<NoteEvent>>(emptyList())
     val activeNotes: StateFlow<List<NoteEvent>> = _activeNotes.asStateFlow()
-
-    // ── All notes for ghost rendering ─────────────────────────────────────
     private val _allNotes = MutableStateFlow<Map<String, List<NoteEvent>>>(emptyMap())
     val allNotes: StateFlow<Map<String, List<NoteEvent>>> = _allNotes.asStateFlow()
 
-    // ── Playback ──────────────────────────────────────────────────────────
-    private val _isPlaying = MutableStateFlow(false)
+    private val _isPlaying    = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
-
     private val _playheadBeat = MutableStateFlow(0f)
     val playheadBeat: StateFlow<Float> = _playheadBeat.asStateFlow()
+    private var playbackJob: Job? = null
 
-    // ── Loop ──────────────────────────────────────────────────────────────
     private val _loopEnabled = MutableStateFlow(false)
     val loopEnabled: StateFlow<Boolean> = _loopEnabled.asStateFlow()
-
     private val _loopStart = MutableStateFlow(0f)
     val loopStart: StateFlow<Float> = _loopStart.asStateFlow()
-
     private val _loopEnd = MutableStateFlow(4f)
     val loopEnd: StateFlow<Float> = _loopEnd.asStateFlow()
 
-    // ── Tool ──────────────────────────────────────────────────────────────
     enum class Tool { DRAW, SELECT, ERASE }
     private val _currentTool = MutableStateFlow(Tool.DRAW)
     val currentTool: StateFlow<Tool> = _currentTool.asStateFlow()
 
-    // ── Snap ──────────────────────────────────────────────────────────────
     val snapValues = listOf(1f, 0.5f, 0.25f, 0.125f, 0.0625f)
     val snapLabels = listOf("1/4","1/8","1/16","1/32","1/64")
     private val _snapIndex = MutableStateFlow(2)
     val snapIndex: StateFlow<Int> = _snapIndex.asStateFlow()
 
-    // ── Selected notes ────────────────────────────────────────────────────
     private val _selectedNoteIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedNoteIds: StateFlow<Set<String>> = _selectedNoteIds.asStateFlow()
 
-    // ── BPM ───────────────────────────────────────────────────────────────
     private val _bpm = MutableStateFlow(120)
     val bpm: StateFlow<Int> = _bpm.asStateFlow()
 
-    init {
-        loadTracksAndNotes()
-    }
+    init { loadTracksAndNotes() }
 
     private fun loadTracksAndNotes() {
         viewModelScope.launch {
             tracks.collect { trackList ->
                 val notesMap = mutableMapOf<String, List<NoteEvent>>()
                 trackList.forEach { track ->
-                    val notes = repository.getNotesForTrackOnce(track.id)
-                    notesMap[track.id] = notes
+                    notesMap[track.id] = repository.getNotesForTrackOnce(track.id)
                 }
                 _allNotes.value = notesMap
                 updateActiveNotes()
@@ -105,36 +90,68 @@ class PianoRollViewModel @Inject constructor(
     }
 
     private fun updateActiveNotes() {
-        val trackList = tracks.value
-        val activeTrack = trackList.getOrNull(_activeTrackIndex.value) ?: return
+        val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
         _activeNotes.value = _allNotes.value[activeTrack.id] ?: emptyList()
     }
 
-    fun setActiveTrack(index: Int) {
-        _activeTrackIndex.value = index
-        updateActiveNotes()
+    fun setActiveTrack(index: Int) { _activeTrackIndex.value = index; updateActiveNotes() }
+    fun setTool(tool: Tool)        { _currentTool.value = tool }
+    fun setSnapIndex(index: Int)   { _snapIndex.value = index }
+    fun toggleLoop()               { _loopEnabled.value = !_loopEnabled.value }
+    fun setLoopStart(beat: Float)  { _loopStart.value = beat.coerceIn(0f, _loopEnd.value - snapValues[_snapIndex.value]) }
+    fun setLoopEnd(beat: Float)    { _loopEnd.value = beat.coerceIn(_loopStart.value + snapValues[_snapIndex.value], 16f) }
+    fun setPlayhead(beat: Float)   { _playheadBeat.value = beat.coerceIn(0f, 16f) }
+    fun setBpm(bpm: Int)           { _bpm.value = bpm.coerceIn(20, 300) }
+
+    fun play(bpm: Int) {
+        if (_isPlaying.value) return
+        _isPlaying.value = true
+        val startBeat    = _playheadBeat.value
+        val beatDurMs    = 60000.0 / bpm.toDouble()
+        val startTime    = System.currentTimeMillis()
+        val endBeat      = if (_loopEnabled.value) _loopEnd.value else 16f
+        val allNotesList = _allNotes.value
+
+        playbackJob = viewModelScope.launch(Dispatchers.Main) {
+            tracks.value.forEach { track ->
+                if (track.muted) return@forEach
+                val notes = allNotesList[track.id] ?: emptyList()
+                val voice = SynthVoice.fromString(track.voice)
+                notes.filter { it.beat >= startBeat }.forEach { note ->
+                    val delayMs = ((note.beat - startBeat) * beatDurMs).toLong()
+                    val durSec  = (note.duration * beatDurMs / 1000.0).toFloat()
+                    launch(Dispatchers.IO) {
+                        delay(delayMs)
+                        if (_isPlaying.value) {
+                            val midi = (108 - note.pitch).coerceIn(0, 127)
+                            synthEngine.playNote(midi, durSec, note.velocity, voice)
+                        }
+                    }
+                }
+            }
+            while (_isPlaying.value) {
+                val elapsed     = System.currentTimeMillis() - startTime
+                val currentBeat = startBeat + (elapsed / beatDurMs).toFloat()
+                when {
+                    currentBeat >= endBeat && _loopEnabled.value -> _playheadBeat.value = _loopStart.value
+                    currentBeat >= endBeat -> { _playheadBeat.value = endBeat; _isPlaying.value = false; break }
+                    else -> _playheadBeat.value = currentBeat
+                }
+                delay(16)
+            }
+        }
     }
 
-    fun setTool(tool: Tool) { _currentTool.value = tool }
-    fun setSnapIndex(index: Int) { _snapIndex.value = index }
-    fun toggleLoop() { _loopEnabled.value = !_loopEnabled.value }
-    fun setLoopStart(beat: Float) { _loopStart.value = beat.coerceIn(0f, _loopEnd.value - snapValues[_snapIndex.value]) }
-    fun setLoopEnd(beat: Float) { _loopEnd.value = beat.coerceIn(_loopStart.value + snapValues[_snapIndex.value], 16f) }
-    fun setPlayhead(beat: Float) { _playheadBeat.value = beat.coerceIn(0f, 16f) }
-    fun setBpm(bpm: Int) { _bpm.value = bpm.coerceIn(20, 300) }
+    fun stop()   { playbackJob?.cancel(); playbackJob = null; _isPlaying.value = false }
+    fun rewind() { stop(); _playheadBeat.value = 0f }
 
     fun addNote(pitch: Int, beat: Float, duration: Float, velocity: Int = 100) {
-        val trackList = tracks.value
-        val activeTrack = trackList.getOrNull(_activeTrackIndex.value) ?: return
-        val snap = snapValues[_snapIndex.value]
-        val snappedBeat = (Math.round(beat / snap) * snap)
+        val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
+        val snap        = snapValues[_snapIndex.value]
         val note = NoteEvent(
-            id = UUID.randomUUID().toString(),
-            trackId = activeTrack.id,
-            pitch = pitch,
-            beat = snappedBeat,
-            duration = duration.coerceAtLeast(snap),
-            velocity = velocity
+            id = UUID.randomUUID().toString(), trackId = activeTrack.id,
+            pitch = pitch, beat = (Math.round(beat / snap) * snap),
+            duration = duration.coerceAtLeast(snap), velocity = velocity
         )
         viewModelScope.launch {
             repository.saveNote(note)
@@ -145,25 +162,10 @@ class PianoRollViewModel @Inject constructor(
         }
     }
 
-    fun updateNote(note: NoteEvent) {
-        viewModelScope.launch {
-            repository.updateNote(note)
-            val trackList = tracks.value
-            val activeTrack = trackList.getOrNull(_activeTrackIndex.value) ?: return@launch
-            val current = _allNotes.value.toMutableMap()
-            current[activeTrack.id] = (current[activeTrack.id] ?: emptyList()).map {
-                if (it.id == note.id) note else it
-            }
-            _allNotes.value = current
-            updateActiveNotes()
-        }
-    }
-
     fun deleteNote(noteId: String) {
         viewModelScope.launch {
             repository.deleteNoteById(noteId)
-            val trackList = tracks.value
-            val activeTrack = trackList.getOrNull(_activeTrackIndex.value) ?: return@launch
+            val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return@launch
             val current = _allNotes.value.toMutableMap()
             current[activeTrack.id] = (current[activeTrack.id] ?: emptyList()).filter { it.id != noteId }
             _allNotes.value = current
@@ -171,12 +173,12 @@ class PianoRollViewModel @Inject constructor(
         }
     }
 
-    fun selectNote(noteId: String) {
-        _selectedNoteIds.value = setOf(noteId)
-    }
+    fun selectNote(noteId: String) { _selectedNoteIds.value = setOf(noteId) }
+    fun clearSelection()           { _selectedNoteIds.value = emptySet() }
 
-    fun clearSelection() {
-        _selectedNoteIds.value = emptySet()
+    fun auditionNote(pitch: Int, velocity: Int = 100) {
+        val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
+        synthEngine.playNote((108 - pitch).coerceIn(0, 127), 0.4f, velocity, SynthVoice.fromString(activeTrack.voice))
     }
 
     fun bounceDown(sourceIndices: List<Int>, destIndex: Int, clearSources: Boolean) {

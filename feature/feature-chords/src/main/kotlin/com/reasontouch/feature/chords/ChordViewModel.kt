@@ -7,6 +7,8 @@ import com.reasontouch.core.data.ChordEvent
 import com.reasontouch.core.data.NoteEvent
 import com.reasontouch.core.data.SessionRepository
 import com.reasontouch.core.midi.StepState
+import com.reasontouch.core.audio.SynthEngine
+import com.reasontouch.core.audio.SynthVoice
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,6 +23,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ChordViewModel @Inject constructor(
     private val repository: SessionRepository,
+    private val synthEngine: SynthEngine,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -82,7 +85,9 @@ class ChordViewModel @Inject constructor(
     fun selectChord(name: String) {
         _selectedChord.value = name
         val positions = GuitarVoicings.voicings[name]?.keys?.toList() ?: return
-        _selectedPosition.value = positions.firstOrNull() ?: ""
+        val pos = positions.firstOrNull() ?: ""
+        _selectedPosition.value = pos
+        auditionChord(name, pos)
     }
 
     fun selectPosition(pos: String) { _selectedPosition.value = pos }
@@ -146,6 +151,18 @@ class ChordViewModel @Inject constructor(
     }
 
     fun clearStatus() { _statusMessage.value = null }
+
+    fun auditionChord(chordName: String, position: String) {
+        val notes = GuitarVoicings.voicings[chordName]?.get(position) ?: return
+        val midiNotes = notes.filterNotNull()
+        val voice = SynthVoice.fromString(_instrument.value.label
+            .replace(" ", "_").uppercase()
+            .let { if (it.contains("NYLON") || it.contains("STEEL")) "SAW"
+                   else if (it.contains("JAZZ")) "SINE"
+                   else "SAW" })
+        val strumDelay = if (_strumEnabled.value) (_strumSpeed.value * 1000).toLong() else 0L
+        synthEngine.playChord(midiNotes, 0.5f, 90, voice, strumDelay)
+    }
 
     // ── Send progression to piano roll ─────────────────────────────────────
     fun sendToPianoRoll(

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -29,7 +28,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -42,7 +40,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.reasontouch.core.data.MidiTrack
 import com.reasontouch.core.data.NoteEvent
 import kotlin.math.abs
-import kotlin.math.roundToInt
+import androidx.compose.foundation.layout.padding
+
 
 private val BG       = Color(0xFF1A1A1E)
 private val RACK     = Color(0xFF222228)
@@ -72,42 +71,36 @@ fun PianoRollScreen(
     val loopStart    by viewModel.loopStart.collectAsState()
     val loopEnd      by viewModel.loopEnd.collectAsState()
     val playheadBeat by viewModel.playheadBeat.collectAsState()
-
+    val isPlaying    by viewModel.isPlaying.collectAsState()
     val snapValue = viewModel.snapValues[snapIndex]
     val activeTrack = tracks.getOrNull(activeIndex)
 
     Column(modifier = Modifier.fillMaxSize().background(BG)) {
 
-        // ── Toolbar ───────────────────────────────────────────────────────
         PianoRollToolbar(
             currentTool  = currentTool,
             snapIndex    = snapIndex,
             snapLabels   = viewModel.snapLabels,
             loopEnabled  = loopEnabled,
+            isPlaying    = isPlaying,
             onTool       = viewModel::setTool,
             onSnapCycle  = { viewModel.setSnapIndex((snapIndex + 1) % viewModel.snapValues.size) },
-            onLoopToggle = viewModel::toggleLoop
+            onLoopToggle = viewModel::toggleLoop,
+            onPlay       = { viewModel.play(120) },
+            onStop       = viewModel::stop,
+            onRewind     = viewModel::rewind
         )
 
-        // ── Track selector ────────────────────────────────────────────────
         TrackSelector(
             tracks      = tracks,
             activeIndex = activeIndex,
             onSelect    = viewModel::setActiveTrack
         )
 
-        // ── Main grid area ────────────────────────────────────────────────
         Row(modifier = Modifier.weight(1f)) {
+            PianoKeys(state = state, modifier = Modifier.width(state.keyWidth.dp).fillMaxHeight())
 
-            // Piano keys
-            PianoKeys(
-                state  = state,
-                modifier = Modifier.width(state.keyWidth.dp).fillMaxHeight()
-            )
-
-            // Grid canvas
             val textMeasurer = rememberTextMeasurer()
-
             Canvas(
                 modifier = Modifier
                     .weight(1f)
@@ -117,59 +110,54 @@ fun PianoRollScreen(
                             handleGridTap(offset, state, currentTool, snapValue, activeTrack, viewModel, activeNotes)
                         }
                     }
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                state.scrollX = (state.scrollX - dragAmount.x).coerceAtLeast(0f)
-                                state.scrollY = (state.scrollY - dragAmount.y).coerceAtLeast(0f)
-                                state.clampScroll(state.gridWidth, state.gridHeight)
-                            }
-                        )
+                    .pointerInput(currentTool, activeTrack) {
+                        if (currentTool == PianoRollViewModel.Tool.ERASE) {
+                            detectDragGestures(
+                                onDragStart = { offset ->
+                                    handleGridTap(offset, state, currentTool, snapValue, activeTrack, viewModel, activeNotes)
+                                },
+                                onDrag = { change, _ ->
+                                    change.consume()
+                                    handleGridTap(change.position, state, currentTool, snapValue, activeTrack, viewModel, activeNotes)
+                                }
+                            )
+                        } else {
+                            detectDragGestures(
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    state.scrollX = (state.scrollX - dragAmount.x).coerceAtLeast(0f)
+                                    state.scrollY = (state.scrollY - dragAmount.y).coerceAtLeast(0f)
+                                    state.clampScroll(state.gridWidth, state.gridHeight)
+                                }
+                            )
+                        }
                     }
             ) {
                 state.gridWidth  = size.width
                 state.gridHeight = size.height
-
-                // Row backgrounds
                 drawRowBackgrounds(state)
-
-                // Vertical grid lines
                 drawGridLines(state, snapValue)
-
-                // Ruler
                 drawRuler(state, textMeasurer)
-
-                // Loop region
                 if (loopEnabled) drawLoopRegion(state, loopStart, loopEnd)
-
-                // Ghost notes from other tracks
                 tracks.forEachIndexed { i, track ->
                     if (i != activeIndex) {
                         val notes = allNotes[track.id] ?: emptyList()
                         drawNotes(state, notes, state.trackColor(i), ghost = true)
                     }
                 }
-
-                // Active track notes
                 if (activeTrack != null) {
-                    val color = state.trackColor(activeIndex)
-                    drawNotes(state, activeNotes, color, ghost = false, selectedIds = selectedIds)
+                    drawNotes(state, activeNotes, state.trackColor(activeIndex), ghost = false, selectedIds = selectedIds)
                 }
-
-                // Playhead
                 drawPlayhead(state, playheadBeat)
             }
         }
 
-        // ── Velocity strip ────────────────────────────────────────────────
         VelocityStrip(
-            notes  = activeNotes,
-            state  = state,
+            notes    = activeNotes,
+            state    = state,
             modifier = Modifier.fillMaxWidth().height(56.dp).background(RACK)
         )
 
-        // ── Status bar ────────────────────────────────────────────────────
         StatusBar(
             noteCount   = activeNotes.size,
             trackName   = activeTrack?.name ?: "",
@@ -181,7 +169,7 @@ fun PianoRollScreen(
     }
 }
 
-// ── Grid drawing functions ────────────────────────────────────────────────────
+// ── Grid drawing ──────────────────────────────────────────────────────────────
 
 fun DrawScope.drawRowBackgrounds(state: PianoRollState) {
     for (p in 0 until state.totalNotes) {
@@ -214,13 +202,13 @@ fun DrawScope.drawGridLines(state: PianoRollState, snapValue: Float) {
 fun DrawScope.drawRuler(state: PianoRollState, textMeasurer: androidx.compose.ui.text.TextMeasurer) {
     drawRect(color = Color(0xFF1A1A22), topLeft = Offset(0f, 0f), size = Size(size.width, state.headerHeight))
     drawRect(color = Color(0xFF2A2A35), topLeft = Offset(0f, state.headerHeight - 1), size = Size(size.width, 1f))
-
     for (bar in 1..state.totalBars) {
         val x = state.beatToX(((bar - 1) * state.beatsPerBar).toFloat())
         if (x < -80f || x > size.width) continue
         val measured = textMeasurer.measure(
-            text = "$bar",
-            style = TextStyle(color = Color(0xFFE84040), fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            text  = "$bar",
+            style = TextStyle(color = Color(0xFFE84040), fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
         )
         drawText(measured, topLeft = Offset(x + 4f, state.headerHeight - 16f))
         for (beat in 1 until state.beatsPerBar) {
@@ -237,24 +225,16 @@ fun DrawScope.drawLoopRegion(state: PianoRollState, loopStart: Float, loopEnd: F
     val rx = state.beatToX(loopEnd)
     val clampedLx = lx.coerceAtLeast(0f)
     val clampedRx = rx.coerceAtMost(size.width)
-
     drawRect(color = Color(0x263DDC84), topLeft = Offset(clampedLx, 0f), size = Size(clampedRx - clampedLx, state.headerHeight))
     drawRect(color = Color(0x103DDC84), topLeft = Offset(clampedLx, state.headerHeight), size = Size(clampedRx - clampedLx, size.height))
-
-    // L handle
     if (lx > -12f && lx < size.width + 12f) {
         drawRect(color = Color(0xFF3DDC84), topLeft = Offset(lx - 1f, 0f), size = Size(2f, state.headerHeight))
-        val path = Path().apply {
-            moveTo(lx, 2f); lineTo(lx + 13f, 2f); lineTo(lx + 13f, 13f); lineTo(lx, 13f); close()
-        }
+        val path = Path().apply { moveTo(lx, 2f); lineTo(lx + 13f, 2f); lineTo(lx + 13f, 13f); lineTo(lx, 13f); close() }
         drawPath(path, color = Color(0xFF3DDC84))
     }
-    // R handle
     if (rx > -12f && rx < size.width + 12f) {
         drawRect(color = Color(0xFF3DDC84), topLeft = Offset(rx - 1f, 0f), size = Size(2f, state.headerHeight))
-        val path = Path().apply {
-            moveTo(rx, 2f); lineTo(rx - 13f, 2f); lineTo(rx - 13f, 13f); lineTo(rx, 13f); close()
-        }
+        val path = Path().apply { moveTo(rx, 2f); lineTo(rx - 13f, 2f); lineTo(rx - 13f, 13f); lineTo(rx, 13f); close() }
         drawPath(path, color = Color(0xFF3DDC84))
     }
 }
@@ -272,22 +252,10 @@ fun DrawScope.drawNotes(
         val y = state.pitchToY(note.pitch)
         val w = maxOf(4f, note.duration * state.pixelsPerBeat - 1f)
         if (x + w < 0 || x > size.width || y + state.noteHeight < 0 || y > size.height) return@forEach
-
-        val alpha = if (ghost) 0.2f else 1f
-        val selected = note.id in selectedIds
-
-        val noteColor = if (selected) Color(0xFFFF6B35) else baseColor
-
-        drawRect(
-            color = noteColor.copy(alpha = alpha * 0.9f),
-            topLeft = Offset(x, y),
-            size = Size(w, state.noteHeight - 2f)
-        )
-        drawRect(
-            color = Color.White.copy(alpha = alpha * 0.15f),
-            topLeft = Offset(x, y),
-            size = Size(w, 3f)
-        )
+        val alpha     = if (ghost) 0.2f else 1f
+        val noteColor = if (note.id in selectedIds) Color(0xFFFF6B35) else baseColor
+        drawRect(color = noteColor.copy(alpha = alpha * 0.9f), topLeft = Offset(x, y), size = Size(w, state.noteHeight - 2f))
+        drawRect(color = Color.White.copy(alpha = alpha * 0.15f), topLeft = Offset(x, y), size = Size(w, 3f))
     }
 }
 
@@ -295,13 +263,12 @@ fun DrawScope.drawPlayhead(state: PianoRollState, beat: Float) {
     val x = state.beatToX(beat)
     if (x < 0f || x > size.width) return
     drawRect(color = Color(0xFF3DDC84), topLeft = Offset(x, 0f), size = Size(2f, size.height))
-    val path = Path().apply {
-        moveTo(x - 5f, 0f); lineTo(x + 5f, 0f); lineTo(x, 9f); close()
-    }
+    val path = Path().apply { moveTo(x - 5f, 0f); lineTo(x + 5f, 0f); lineTo(x, 9f); close() }
     drawPath(path, color = Color(0xFF3DDC84))
 }
 
 // ── Touch handling ────────────────────────────────────────────────────────────
+
 fun handleGridTap(
     offset: Offset,
     state: PianoRollState,
@@ -316,28 +283,27 @@ fun handleGridTap(
         viewModel.setPlayhead(state.xToBeat(offset.x))
         return
     }
-
     val beat  = state.snapBeat(state.xToBeat(offset.x), snapValue).coerceIn(0f, state.totalBeats.toFloat())
     val pitch = state.yToPitch(offset.y).coerceIn(0, state.totalNotes - 1)
-
+    val hitTolerance = if (tool == PianoRollViewModel.Tool.ERASE) 8f else 0f
     val hitNote = activeNotes.lastOrNull { note ->
         val nx = state.beatToX(note.beat)
         val ny = state.pitchToY(note.pitch)
         val nw = maxOf(4f, note.duration * state.pixelsPerBeat)
-        offset.x >= nx && offset.x <= nx + nw && offset.y >= ny && offset.y <= ny + state.noteHeight - 2f
+        offset.x >= nx - hitTolerance && offset.x <= nx + nw + hitTolerance &&
+                offset.y >= ny - hitTolerance && offset.y <= ny + state.noteHeight - 2f + hitTolerance
     }
-
     when (tool) {
         PianoRollViewModel.Tool.DRAW -> {
             if (hitNote == null) {
                 viewModel.addNote(pitch, beat, snapValue)
+                viewModel.auditionNote(pitch)
             } else {
                 viewModel.selectNote(hitNote.id)
+                viewModel.auditionNote(hitNote.pitch)
             }
         }
-        PianoRollViewModel.Tool.ERASE -> {
-            hitNote?.let { viewModel.deleteNote(it.id) }
-        }
+        PianoRollViewModel.Tool.ERASE -> hitNote?.let { viewModel.deleteNote(it.id) }
         PianoRollViewModel.Tool.SELECT -> {
             if (hitNote != null) viewModel.selectNote(hitNote.id)
             else viewModel.clearSelection()
@@ -346,6 +312,7 @@ fun handleGridTap(
 }
 
 // ── Piano Keys ────────────────────────────────────────────────────────────────
+
 @Composable
 fun PianoKeys(state: PianoRollState, modifier: Modifier = Modifier) {
     val textMeasurer = rememberTextMeasurer()
@@ -356,29 +323,22 @@ fun PianoKeys(state: PianoRollState, modifier: Modifier = Modifier) {
             val black = state.isBlackKey(p)
             val name  = state.noteName(p)
             val isC   = name.startsWith("C") && !name.contains("#")
-
-            drawRect(
-                color = if (black) Color(0xFF1C1C26) else Color(0xFFD0D0DC),
-                topLeft = Offset(0f, y),
-                size = Size(size.width - (if (black) 14f else 0f), state.noteHeight - 1f)
-            )
+            drawRect(color = if (black) Color(0xFF1C1C26) else Color(0xFFD0D0DC),
+                topLeft = Offset(0f, y), size = Size(size.width - (if (black) 14f else 0f), state.noteHeight - 1f))
             if (isC) {
                 drawRect(color = Color(0x22E84040), topLeft = Offset(0f, y), size = Size(size.width, state.noteHeight - 1f))
-                val measured = textMeasurer.measure(
-                    name,
-                    style = TextStyle(color = Color(0xFFE84040), fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                )
+                val measured = textMeasurer.measure(name,
+                    style = TextStyle(color = Color(0xFFE84040), fontSize = 9.sp, fontFamily = FontFamily.Monospace))
                 drawText(measured, topLeft = Offset(size.width - measured.size.width - 2f, y + state.noteHeight - 13f))
             }
-            if (black) {
-                drawRect(color = Color(0xFF12121A), topLeft = Offset(size.width - 14f, y), size = Size(14f, state.noteHeight - 1f))
-            }
+            if (black) drawRect(color = Color(0xFF12121A), topLeft = Offset(size.width - 14f, y), size = Size(14f, state.noteHeight - 1f))
             drawRect(color = Color(0xFF111118), topLeft = Offset(0f, y + state.noteHeight - 1f), size = Size(size.width, 1f))
         }
     }
 }
 
 // ── Velocity Strip ────────────────────────────────────────────────────────────
+
 @Composable
 fun VelocityStrip(notes: List<NoteEvent>, state: PianoRollState, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
@@ -389,30 +349,27 @@ fun VelocityStrip(notes: List<NoteEvent>, state: PianoRollState, modifier: Modif
             if (x < -barW || x > size.width) return@forEach
             val velH = (note.velocity / 127f) * (size.height - 14f)
             val y    = size.height - velH
-            drawRect(
-                color = Color(0xFFE84040),
-                topLeft = Offset(x, y),
-                size = Size(minOf(barW, state.pixelsPerBeat - 1f), velH)
-            )
-            drawRect(
-                color = Color.White.copy(alpha = 0.3f),
-                topLeft = Offset(x, y),
-                size = Size(minOf(barW, state.pixelsPerBeat - 1f), 2f)
-            )
+            drawRect(color = Color(0xFFE84040), topLeft = Offset(x, y), size = Size(minOf(barW, state.pixelsPerBeat - 1f), velH))
+            drawRect(color = Color.White.copy(alpha = 0.3f), topLeft = Offset(x, y), size = Size(minOf(barW, state.pixelsPerBeat - 1f), 2f))
         }
     }
 }
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
+
 @Composable
 fun PianoRollToolbar(
     currentTool: PianoRollViewModel.Tool,
     snapIndex: Int,
     snapLabels: List<String>,
     loopEnabled: Boolean,
+    isPlaying: Boolean,
     onTool: (PianoRollViewModel.Tool) -> Unit,
     onSnapCycle: () -> Unit,
-    onLoopToggle: () -> Unit
+    onLoopToggle: () -> Unit,
+    onPlay: () -> Unit,
+    onStop: () -> Unit,
+    onRewind: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().height(40.dp).background(PANEL).padding(horizontal = 8.dp),
@@ -420,28 +377,20 @@ fun PianoRollToolbar(
         horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         PianoRollViewModel.Tool.values().forEach { tool ->
-            ToolChip(
-                label = tool.name,
-                selected = tool == currentTool,
-                onClick = { onTool(tool) }
-            )
+            ToolChip(label = tool.name, selected = tool == currentTool, onClick = { onTool(tool) })
         }
         Box(modifier = Modifier.width(1.dp).height(24.dp).background(BORDER))
-        ToolChip(
-            label = snapLabels[snapIndex],
-            selected = false,
-            onClick = onSnapCycle,
-            monospace = true
-        )
+        ToolChip(label = snapLabels[snapIndex], selected = false, onClick = onSnapCycle, monospace = true)
         Box(modifier = Modifier.width(1.dp).height(24.dp).background(BORDER))
-        ToolChip(
-            label = "LOOP",
-            selected = loopEnabled,
-            selectedColor = Color(0xFF1A4A2E),
-            selectedBorder = GREEN,
-            selectedText = GREEN,
-            onClick = onLoopToggle
-        )
+        ToolChip(label = "LOOP", selected = loopEnabled,
+            selectedColor = Color(0xFF1A4A2E), selectedBorder = GREEN, selectedText = GREEN,
+            onClick = onLoopToggle)
+        Box(modifier = Modifier.width(1.dp).height(24.dp).background(BORDER))
+        ToolChip(label = "<<", selected = false, onClick = onRewind)
+        ToolChip(label = if (isPlaying) "||" else ">",
+            selected = isPlaying, selectedColor = Color(0xFF1A3A2A),
+            selectedBorder = GREEN, selectedText = GREEN, onClick = onPlay)
+        ToolChip(label = "[]", selected = false, onClick = onStop)
     }
     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(BORDER))
 }
@@ -475,19 +424,16 @@ fun ToolChip(
 }
 
 // ── Track selector ────────────────────────────────────────────────────────────
+
 @Composable
-fun TrackSelector(
-    tracks: List<MidiTrack>,
-    activeIndex: Int,
-    onSelect: (Int) -> Unit
-) {
+fun TrackSelector(tracks: List<MidiTrack>, activeIndex: Int, onSelect: (Int) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().height(36.dp).background(RACK).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         tracks.forEachIndexed { i, track ->
-            val isActive = i == activeIndex
+            val isActive   = i == activeIndex
             val trackColor = Color(when (i % 8) {
                 0 -> 0xFFE84040L; 1 -> 0xFF3DDC84L; 2 -> 0xFF38BDF8L; 3 -> 0xFFA78BFAL
                 4 -> 0xFFFF6B35L; 5 -> 0xFFF5C518L; 6 -> 0xFFF472B6L; else -> 0xFF94A3B8L
@@ -499,13 +445,8 @@ fun TrackSelector(
                     .clickable { onSelect(i) }
                     .padding(horizontal = 10.dp, vertical = 4.dp)
             ) {
-                Text(
-                    text = track.name,
-                    color = if (isActive) trackColor else TEXT_DIM,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
+                Text(text = track.name, color = if (isActive) trackColor else TEXT_DIM,
+                    fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
             }
         }
     }
@@ -513,26 +454,21 @@ fun TrackSelector(
 }
 
 // ── Status bar ────────────────────────────────────────────────────────────────
+
 @Composable
 fun StatusBar(
-    noteCount: Int,
-    trackName: String,
-    tool: PianoRollViewModel.Tool,
-    loopEnabled: Boolean,
-    loopStart: Float,
-    loopEnd: Float
+    noteCount: Int, trackName: String, tool: PianoRollViewModel.Tool,
+    loopEnabled: Boolean, loopStart: Float, loopEnd: Float
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().height(22.dp).background(BG).padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        StatusItem(label = "NOTES", value = "$noteCount")
-        StatusItem(label = "TRACK", value = trackName)
-        StatusItem(label = "TOOL", value = tool.name)
-        if (loopEnabled) {
-            StatusItem(label = "LOOP", value = "${loopStart.toInt()+1}→${loopEnd.toInt()}", valueColor = GREEN)
-        }
+        StatusItem("NOTES", "$noteCount")
+        StatusItem("TRACK", trackName)
+        StatusItem("TOOL", tool.name)
+        if (loopEnabled) StatusItem("LOOP", "${loopStart.toInt()+1}>${loopEnd.toInt()}", GREEN)
     }
 }
 
