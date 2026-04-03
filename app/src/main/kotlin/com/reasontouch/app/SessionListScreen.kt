@@ -2,6 +2,11 @@ package com.reasontouch.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -124,10 +129,10 @@ fun SessionListScreen(
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
                     items(sessions) { session ->
-                        SessionCard(
+                        SwipeToDeleteSessionCard(
                             session = session,
                             onClick = { onSessionSelected(session.id) },
-                            onLongPress = { sessionToDelete = session }
+                            onDelete = { viewModel.deleteSession(session) }
                         )
                     }
                 }
@@ -383,4 +388,53 @@ fun DeleteSessionDialog(
             }
         }
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SwipeToDeleteSessionCard(
+    session: com.reasontouch.core.data.Session,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                onDelete()
+                true
+            } else false
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            // Red delete background revealed on swipe
+            androidx.compose.foundation.layout.Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF5A1A1A)),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Text(
+                    text = "DELETE",
+                    color = Color(0xFFE84040),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.padding(end = 20.dp)
+                )
+            }
+        }
+    ) {
+        SessionCard(
+            session = session,
+            onClick = onClick,
+            onLongPress = {}
+        )
+    }
 }

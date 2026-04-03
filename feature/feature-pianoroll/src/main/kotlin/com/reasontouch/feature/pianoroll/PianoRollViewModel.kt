@@ -95,6 +95,13 @@ class PianoRollViewModel @Inject constructor(
     }
 
     fun setActiveTrack(index: Int) { _activeTrackIndex.value = index; updateActiveNotes() }
+
+    fun muteTrack(index: Int) {
+        viewModelScope.launch {
+            val track = tracks.value.getOrNull(index) ?: return@launch
+            repository.updateTrack(track.copy(muted = !track.muted))
+        }
+    }
     fun setTool(tool: Tool)        { _currentTool.value = tool }
     fun setSnapIndex(index: Int)   { _snapIndex.value = index }
     fun toggleLoop()               { _loopEnabled.value = !_loopEnabled.value }
