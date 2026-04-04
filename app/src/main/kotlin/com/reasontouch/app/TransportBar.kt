@@ -31,29 +31,27 @@ fun TransportBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(48.dp)
-            .background(Color(0xFF222228))
+            .height(44.dp)
+            .background(Color(0xFF1A1A22))
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        TransportButton(label = "REW", onClick = onRewind)
-        TransportButton(
-            label = if (isPlaying) "PAUSE" else "PLAY",
-            onClick = onPlay,
-            active = isPlaying,
-            activeColor = Color(0xFF3DDC84)
-        )
-        TransportButton(label = "STOP", onClick = onStop)
+        // BPM display
         Text(
             text = "$bpm BPM",
             color = Color(0xFFFF6B35),
-            fontSize = 12.sp,
+            fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.weight(1f).padding(start = 4.dp)
+            fontFamily = FontFamily.Monospace
         )
-        TransportButton(label = "MIDI", onClick = onExport)
+
+        // MIDI export button
+        TransportButton(
+            label = "⬇ MIDI",
+            onClick = onExport,
+            activeColor = Color(0xFF3DDC84)
+        )
     }
 }
 
@@ -70,14 +68,14 @@ fun TransportButton(
             containerColor = if (active) activeColor else Color(0xFF2A2A32),
             contentColor = Color.White
         ),
-        modifier = Modifier.height(34.dp),
+        modifier = Modifier.height(32.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            horizontal = 8.dp, vertical = 0.dp
+            horizontal = 12.dp, vertical = 0.dp
         )
     ) {
         Text(
             text = label,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace
         )
