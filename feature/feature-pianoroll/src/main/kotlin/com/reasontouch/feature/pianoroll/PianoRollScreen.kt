@@ -105,7 +105,7 @@ fun PianoRollScreen(
             onTool       = viewModel::setTool,
             onSnapCycle  = { viewModel.setSnapIndex((snapIndex + 1) % viewModel.snapValues.size) },
             onLoopToggle = viewModel::toggleLoop,
-            onPlay       = { viewModel.play(bpm) },
+            onPlay       = { viewModel.play(bpm, totalBars) },
             onStop       = viewModel::stop,
             onRewind     = viewModel::rewind
         )

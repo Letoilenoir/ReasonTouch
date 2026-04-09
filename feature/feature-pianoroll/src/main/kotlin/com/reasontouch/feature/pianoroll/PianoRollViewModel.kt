@@ -102,25 +102,40 @@ class PianoRollViewModel @Inject constructor(
             repository.updateTrack(track.copy(muted = !track.muted))
         }
     }
-    fun setTool(tool: Tool)        { _currentTool.value = tool }
-    fun setSnapIndex(index: Int)   { _snapIndex.value = index }
-    fun toggleLoop()               { _loopEnabled.value = !_loopEnabled.value }
-    fun setLoopStart(beat: Float)  {
-        val maxBeat = totalBeatsFromSession()
+
+    fun setTool(tool: Tool)      { _currentTool.value = tool }
+    fun setSnapIndex(index: Int) { _snapIndex.value = index }
+    fun toggleLoop()             { _loopEnabled.value = !_loopEnabled.value }
+
+    fun setLoopStart(beat: Float) {
         _loopStart.value = beat.coerceIn(0f, (_loopEnd.value - snapValues[_snapIndex.value]).coerceAtLeast(0f))
     }
-    fun setLoopEnd(beat: Float)    {
-        val maxBeat = totalBeatsFromSession()
+    fun setLoopEnd(beat: Float, totalBars: Int = 4) {
+        val maxBeat = (totalBars * 4).toFloat()
         _loopEnd.value = beat.coerceIn(_loopStart.value + snapValues[_snapIndex.value], maxBeat)
     }
-    fun setPlayhead(beat: Float)   { _playheadBeat.value = beat.coerceIn(0f, totalBeatsFromSession()) }
-    fun setBpm(bpm: Int)           { _bpm.value = bpm.coerceIn(20, 300) }
+    fun setPlayhead(beat: Float, totalBars: Int = 4) {
+        _playheadBeat.value = beat.coerceIn(0f, (totalBars * 4).toFloat())
+    }
+    fun setBpm(bpm: Int) { _bpm.value = bpm.coerceIn(20, 300) }
 
-    // Derive total beats from session, falling back to 16 if session not yet loaded.
-    private fun totalBeatsFromSession(): Float =
-        ((session.value?.totalBars ?: 4) * 4).toFloat()
+    // Derive endBeat from the furthest note across all tracks, then round up
+    // to the next complete bar. Falls back to totalBars * 4 if no notes exist.
+    // This is intentionally independent of session.value which may be null at
+    // call time.
+    private fun computeEndBeat(totalBars: Int): Float {
+        val allNotesList = _allNotes.value
+        val lastNoteBeat = allNotesList.values
+            .flatten()
+            .maxOfOrNull { it.beat + it.duration } ?: 0f
+        val beatsPerBar  = 4f
+        // Round up to next bar boundary
+        val barsNeeded   = kotlin.math.ceil(lastNoteBeat / beatsPerBar).toInt()
+        // Use whichever is larger: the actual note content or the session bar count
+        return (maxOf(barsNeeded, totalBars) * beatsPerBar)
+    }
 
-    fun play(bpm: Int) {
+    fun play(bpm: Int, totalBars: Int) {
         if (_isPlaying.value) return
         _isPlaying.value = true
 
@@ -128,10 +143,8 @@ class PianoRollViewModel @Inject constructor(
         val loopMode   = _loopEnabled.value
         val loopS      = _loopStart.value
         val loopE      = _loopEnd.value
-        val totalBeats = totalBeatsFromSession()
-        val endBeat    = if (loopMode) loopE else totalBeats
+        val endBeat    = if (loopMode) loopE else computeEndBeat(totalBars)
 
-        // Schedules all notes for one pass starting from fromBeat
         fun schedulePass(fromBeat: Float, timeOriginMs: Long) {
             val trackList    = tracks.value
             val allNotesList = _allNotes.value
@@ -159,7 +172,6 @@ class PianoRollViewModel @Inject constructor(
             var loopOrigin  = System.currentTimeMillis()
             var currentPass = startBeat
 
-            // Schedule first pass immediately
             schedulePass(currentPass, loopOrigin)
 
             while (_isPlaying.value) {
@@ -168,7 +180,6 @@ class PianoRollViewModel @Inject constructor(
 
                 when {
                     currentBeat >= endBeat && loopMode -> {
-                        // Loop: reset origin and reschedule notes from loopStart
                         loopOrigin  = System.currentTimeMillis()
                         currentPass = loopS
                         _playheadBeat.value = loopS
