@@ -105,30 +105,46 @@ class PianoRollViewModel @Inject constructor(
     fun setTool(tool: Tool)        { _currentTool.value = tool }
     fun setSnapIndex(index: Int)   { _snapIndex.value = index }
     fun toggleLoop()               { _loopEnabled.value = !_loopEnabled.value }
-    fun setLoopStart(beat: Float)  { _loopStart.value = beat.coerceIn(0f, _loopEnd.value - snapValues[_snapIndex.value]) }
-    fun setLoopEnd(beat: Float)    { _loopEnd.value = beat.coerceIn(_loopStart.value + snapValues[_snapIndex.value], 16f) }
-    fun setPlayhead(beat: Float)   { _playheadBeat.value = beat.coerceIn(0f, 16f) }
+    fun setLoopStart(beat: Float)  {
+        val maxBeat = totalBeatsFromSession()
+        _loopStart.value = beat.coerceIn(0f, (_loopEnd.value - snapValues[_snapIndex.value]).coerceAtLeast(0f))
+    }
+    fun setLoopEnd(beat: Float)    {
+        val maxBeat = totalBeatsFromSession()
+        _loopEnd.value = beat.coerceIn(_loopStart.value + snapValues[_snapIndex.value], maxBeat)
+    }
+    fun setPlayhead(beat: Float)   { _playheadBeat.value = beat.coerceIn(0f, totalBeatsFromSession()) }
     fun setBpm(bpm: Int)           { _bpm.value = bpm.coerceIn(20, 300) }
+
+    // Derive total beats from session, falling back to 16 if session not yet loaded.
+    private fun totalBeatsFromSession(): Float =
+        ((session.value?.totalBars ?: 4) * 4).toFloat()
 
     fun play(bpm: Int) {
         if (_isPlaying.value) return
         _isPlaying.value = true
-        val startBeat    = _playheadBeat.value
-        val beatDurMs    = 60000.0 / bpm.toDouble()
-        val startTime    = System.currentTimeMillis()
-        val endBeat      = if (_loopEnabled.value) _loopEnd.value else 16f
-        val allNotesList = _allNotes.value
 
-        playbackJob = viewModelScope.launch(Dispatchers.Main) {
-            tracks.value.forEach { track ->
+        val beatDurMs  = 60000.0 / bpm.toDouble()
+        val loopMode   = _loopEnabled.value
+        val loopS      = _loopStart.value
+        val loopE      = _loopEnd.value
+        val totalBeats = totalBeatsFromSession()
+        val endBeat    = if (loopMode) loopE else totalBeats
+
+        // Schedules all notes for one pass starting from fromBeat
+        fun schedulePass(fromBeat: Float, timeOriginMs: Long) {
+            val trackList    = tracks.value
+            val allNotesList = _allNotes.value
+            trackList.forEach { track ->
                 if (track.muted) return@forEach
                 val notes = allNotesList[track.id] ?: emptyList()
                 val voice = SynthVoice.fromString(track.voice)
-                notes.filter { it.beat >= startBeat }.forEach { note ->
-                    val delayMs = ((note.beat - startBeat) * beatDurMs).toLong()
+                notes.filter { it.beat >= fromBeat && it.beat < endBeat }.forEach { note ->
+                    val delayMs = ((note.beat - fromBeat) * beatDurMs).toLong()
                     val durSec  = (note.duration * beatDurMs / 1000.0).toFloat()
-                    launch(Dispatchers.IO) {
-                        delay(delayMs)
+                    viewModelScope.launch(Dispatchers.IO) {
+                        val waitMs = timeOriginMs + delayMs - System.currentTimeMillis()
+                        if (waitMs > 0) delay(waitMs)
                         if (_isPlaying.value) {
                             val midi = (108 - note.pitch).coerceIn(0, 127)
                             synthEngine.playNote(midi, durSec, note.velocity, voice)
@@ -136,12 +152,33 @@ class PianoRollViewModel @Inject constructor(
                     }
                 }
             }
+        }
+
+        playbackJob = viewModelScope.launch(Dispatchers.Main) {
+            val startBeat   = _playheadBeat.value
+            var loopOrigin  = System.currentTimeMillis()
+            var currentPass = startBeat
+
+            // Schedule first pass immediately
+            schedulePass(currentPass, loopOrigin)
+
             while (_isPlaying.value) {
-                val elapsed     = System.currentTimeMillis() - startTime
-                val currentBeat = startBeat + (elapsed / beatDurMs).toFloat()
+                val elapsed     = System.currentTimeMillis() - loopOrigin
+                val currentBeat = currentPass + (elapsed / beatDurMs).toFloat()
+
                 when {
-                    currentBeat >= endBeat && _loopEnabled.value -> _playheadBeat.value = _loopStart.value
-                    currentBeat >= endBeat -> { _playheadBeat.value = endBeat; _isPlaying.value = false; break }
+                    currentBeat >= endBeat && loopMode -> {
+                        // Loop: reset origin and reschedule notes from loopStart
+                        loopOrigin  = System.currentTimeMillis()
+                        currentPass = loopS
+                        _playheadBeat.value = loopS
+                        schedulePass(loopS, loopOrigin)
+                    }
+                    currentBeat >= endBeat -> {
+                        _playheadBeat.value = endBeat
+                        _isPlaying.value = false
+                        break
+                    }
                     else -> _playheadBeat.value = currentBeat
                 }
                 delay(16)
