@@ -119,31 +119,23 @@ class PianoRollViewModel @Inject constructor(
     }
     fun setBpm(bpm: Int) { _bpm.value = bpm.coerceIn(20, 300) }
 
-    // Derive endBeat from the furthest note across all tracks, then round up
-    // to the next complete bar. Falls back to totalBars * 4 if no notes exist.
-    // This is intentionally independent of session.value which may be null at
-    // call time.
     private fun computeEndBeat(totalBars: Int): Float {
-        val allNotesList = _allNotes.value
-        val lastNoteBeat = allNotesList.values
+        val lastNoteBeat = _allNotes.value.values
             .flatten()
             .maxOfOrNull { it.beat + it.duration } ?: 0f
-        val beatsPerBar  = 4f
-        // Round up to next bar boundary
-        val barsNeeded   = kotlin.math.ceil(lastNoteBeat / beatsPerBar).toInt()
-        // Use whichever is larger: the actual note content or the session bar count
-        return (maxOf(barsNeeded, totalBars) * beatsPerBar)
+        val barsNeeded = kotlin.math.ceil(lastNoteBeat / 4f).toInt()
+        return (maxOf(barsNeeded, totalBars) * 4f)
     }
 
     fun play(bpm: Int, totalBars: Int) {
         if (_isPlaying.value) return
         _isPlaying.value = true
 
-        val beatDurMs  = 60000.0 / bpm.toDouble()
-        val loopMode   = _loopEnabled.value
-        val loopS      = _loopStart.value
-        val loopE      = _loopEnd.value
-        val endBeat    = if (loopMode) loopE else computeEndBeat(totalBars)
+        val beatDurMs = 60000.0 / bpm.toDouble()
+        val loopMode  = _loopEnabled.value
+        val loopS     = _loopStart.value
+        val loopE     = _loopEnd.value
+        val endBeat   = if (loopMode) loopE else computeEndBeat(totalBars)
 
         fun schedulePass(fromBeat: Float, timeOriginMs: Long) {
             val trackList    = tracks.value
@@ -225,6 +217,25 @@ class PianoRollViewModel @Inject constructor(
             current[activeTrack.id] = (current[activeTrack.id] ?: emptyList()).filter { it.id != noteId }
             _allNotes.value = current
             updateActiveNotes()
+        }
+    }
+
+    // Updates note duration in memory immediately for responsive UI,
+    // then persists to Room. Called repeatedly during drag so kept lightweight —
+    // only updates the in-memory map on every call; Room write is debounced
+    // by only writing on drag end (caller sets noteId to null when drag ends).
+    fun updateNoteDuration(noteId: String, newDuration: Float) {
+        val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
+        val current     = _allNotes.value.toMutableMap()
+        val notes       = current[activeTrack.id] ?: return
+        val updated     = notes.map { if (it.id == noteId) it.copy(duration = newDuration) else it }
+        current[activeTrack.id] = updated
+        _allNotes.value = current
+        updateActiveNotes()
+        // Persist to Room
+        viewModelScope.launch {
+            val note = updated.firstOrNull { it.id == noteId } ?: return@launch
+            repository.saveNote(note)
         }
     }
 

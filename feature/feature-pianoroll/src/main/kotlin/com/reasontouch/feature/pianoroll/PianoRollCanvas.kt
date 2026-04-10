@@ -2,6 +2,8 @@ package com.reasontouch.feature.pianoroll
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,52 +29,83 @@ fun PianoRollCanvas(
         state.totalBars = uiState.totalBars
     }
 
-    Row(modifier = modifier) {
+    Column(modifier = modifier) {
 
-        // Piano keys
-        Canvas(
-            modifier = Modifier
-                .width(state.keyWidth.dp)
-                .fillMaxHeight()
-                .background(Color(0xFF1A1A22))
-                .pianoKeyGestures(state) { pitch -> viewModel.auditionNote(pitch) }
-        ) {
-            drawPianoKeys(state, textMeasurer)
+        Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+
+            // Piano keys
+            Canvas(
+                modifier = Modifier
+                    .width(state.keyWidth.dp)
+                    .fillMaxHeight()
+                    .background(Color(0xFF1A1A22))
+                    .pianoKeyGestures(state) { pitch -> viewModel.auditionNote(pitch) }
+            ) {
+                drawPianoKeys(state, textMeasurer)
+            }
+
+            // Note grid — single unified gesture handler
+            Canvas(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .pianoRollGestures(state, uiState, viewModel)
+            ) {
+                state.gridWidth  = size.width
+                state.gridHeight = size.height
+
+                drawRowBackgrounds(state)
+                drawGridLines(state, uiState.snapValue)
+                drawRuler(state, textMeasurer)
+
+                if (uiState.loopEnabled) drawLoopRegion(state, uiState.loopStart, uiState.loopEnd)
+
+                uiState.tracks.forEachIndexed { i, track ->
+                    if (i != uiState.activeIndex && !track.muted) {
+                        val notes = uiState.allNotes[track.id] ?: emptyList()
+                        drawNotes(state, notes, state.trackColor(i), ghost = true)
+                    }
+                }
+
+                uiState.activeTrack?.let { track ->
+                    if (!track.muted) {
+                        drawNotes(state, uiState.activeNotes, state.trackColor(uiState.activeIndex),
+                            ghost = false, selectedIds = uiState.selectedIds)
+                    }
+                }
+
+                drawPlayhead(state, uiState.playheadBeat)
+            }
+
+            // Vertical scrollbar
+            Canvas(
+                modifier = Modifier
+                    .width(12.dp)
+                    .fillMaxHeight()
+                    .verticalScrollBarGestures(state)
+            ) {
+                drawVerticalScrollBar(state)
+            }
         }
 
-        // Grid canvas — tap, drag/zoom unified, erase-drag separate
-        Canvas(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .pianoRollTapGestures(state, uiState, viewModel)
-                .pianoRollDragGestures(state, uiState, viewModel)
-                .pianoRollEraseDragGestures(state, uiState, viewModel)
-        ) {
-            state.gridWidth  = size.width
-            state.gridHeight = size.height
-
-            drawRowBackgrounds(state)
-            drawGridLines(state, uiState.snapValue)
-            drawRuler(state, textMeasurer)
-
-            if (uiState.loopEnabled) drawLoopRegion(state, uiState.loopStart, uiState.loopEnd)
-
-            uiState.tracks.forEachIndexed { i, track ->
-                if (i != uiState.activeIndex && !track.muted) {
-                    val notes = uiState.allNotes[track.id] ?: emptyList()
-                    drawNotes(state, notes, state.trackColor(i), ghost = true)
-                }
+        // Horizontal scrollbar
+        Row(modifier = Modifier.fillMaxWidth().height(12.dp)) {
+            Box(modifier = Modifier
+                .width(state.keyWidth.dp)
+                .height(12.dp)
+                .background(Color(0xFF1A1A22)))
+            Canvas(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(12.dp)
+                    .horizontalScrollBarGestures(state)
+            ) {
+                drawHorizontalScrollBar(state)
             }
-
-            uiState.activeTrack?.let { track ->
-                if (!track.muted) {
-                    drawNotes(state, uiState.activeNotes, state.trackColor(uiState.activeIndex),
-                        ghost = false, selectedIds = uiState.selectedIds)
-                }
-            }
-
-            drawPlayhead(state, uiState.playheadBeat)
+            Box(modifier = Modifier
+                .width(12.dp)
+                .height(12.dp)
+                .background(Color(0xFF1A1A22)))
         }
     }
 }

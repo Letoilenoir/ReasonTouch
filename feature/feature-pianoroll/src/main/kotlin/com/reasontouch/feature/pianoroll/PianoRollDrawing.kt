@@ -141,3 +141,30 @@ fun DrawScope.drawVelocityBars(state: PianoRollState, notes: List<NoteEvent>) {
         drawRect(color = Color.White.copy(alpha = 0.3f), topLeft = Offset(x, y), size = Size(minOf(barW, state.pixelsPerBeat - 1f), 2f))
     }
 }
+fun DrawScope.drawHorizontalScrollBar(state: PianoRollState) {
+    val totalW    = state.totalBeats * state.pixelsPerBeat
+    if (totalW <= state.gridWidth) return
+    val thumbW    = (state.gridWidth / totalW * size.width).coerceAtLeast(40f)
+    val maxScroll = totalW - state.gridWidth
+    val thumbX    = (state.scrollX / maxScroll) * (size.width - thumbW)
+    drawRect(color = androidx.compose.ui.graphics.Color(0xFF2A2A35),
+        topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
+        size    = androidx.compose.ui.geometry.Size(size.width, size.height))
+    drawRect(color = androidx.compose.ui.graphics.Color(0xFF555568),
+        topLeft = androidx.compose.ui.geometry.Offset(thumbX, 2f),
+        size    = androidx.compose.ui.geometry.Size(thumbW, size.height - 4f))
+}
+
+fun DrawScope.drawVerticalScrollBar(state: PianoRollState) {
+    val totalH    = state.totalNotes * state.noteHeight
+    if (totalH <= state.gridHeight) return
+    val thumbH    = (state.gridHeight / totalH * size.height).coerceAtLeast(40f)
+    val maxScroll = totalH - state.gridHeight
+    val thumbY    = (state.scrollY / maxScroll) * (size.height - thumbH)
+    drawRect(color = androidx.compose.ui.graphics.Color(0xFF2A2A35),
+        topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
+        size    = androidx.compose.ui.geometry.Size(size.width, size.height))
+    drawRect(color = androidx.compose.ui.graphics.Color(0xFF555568),
+        topLeft = androidx.compose.ui.geometry.Offset(2f, thumbY),
+        size    = androidx.compose.ui.geometry.Size(size.width - 4f, thumbH))
+}

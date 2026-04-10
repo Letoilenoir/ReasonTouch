@@ -17,7 +17,6 @@ class PianoRollState {
     val totalNotes = 88
     val beatsPerBar = 4
 
-    // Driven by session.totalBars — updated by PianoRollCanvas on each recompose
     var totalBars by mutableStateOf(4)
     val totalBeats get() = totalBars * beatsPerBar
 
@@ -35,8 +34,14 @@ class PianoRollState {
     var loopDragOrigStart: Float = 0f
     var loopDragOrigEnd: Float = 0f
 
-    // Handle hit works across the FULL canvas height, not just the header strip.
-    // The header-only restriction was causing all hits to return null from the grid area.
+    // Note duration drag state.
+    // durationDragAnchorX is the pixel position of the note right edge at
+    // drag start — NOT the touch position. This means delta is always measured
+    // from the actual edge, so dragging left immediately shrinks the note.
+    var durationDragNoteId: String? = null
+    var durationDragAnchorX: Float = 0f      // right-edge pixel at drag start
+    var durationDragOrigDuration: Float = 0f
+
     fun loopHandleHit(x: Float, y: Float, loopStart: Float, loopEnd: Float): String? {
         val lx = beatToX(loopStart)
         val rx = beatToX(loopEnd)
@@ -46,6 +51,29 @@ class PianoRollState {
             kotlin.math.abs(x - rx) <= tolerance -> "R"
             x > lx + tolerance && x < rx - tolerance -> "BODY"
             else -> null
+        }
+    }
+
+    // Returns the note whose right edge was touched.
+    // Also stores the exact right-edge pixel as durationDragAnchorX so
+    // delta is measured from the edge, not the finger position.
+    fun noteRightEdgeHit(
+        x: Float,
+        y: Float,
+        notes: List<com.reasontouch.core.data.NoteEvent>
+    ): com.reasontouch.core.data.NoteEvent? {
+        val edgeZone = 18f
+        return notes.lastOrNull { note ->
+            val nx = beatToX(note.beat)
+            val ny = pitchToY(note.pitch)
+            val nw = maxOf(4f, note.duration * pixelsPerBeat - 1f)
+            val rightEdge = nx + nw
+            if (x >= rightEdge - edgeZone && x <= rightEdge + edgeZone &&
+                y >= ny && y <= ny + noteHeight - 2f) {
+                // Store the actual right-edge pixel for delta calculation
+                durationDragAnchorX = rightEdge
+                true
+            } else false
         }
     }
 

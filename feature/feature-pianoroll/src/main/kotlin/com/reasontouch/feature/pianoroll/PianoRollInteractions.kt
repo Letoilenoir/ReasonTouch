@@ -11,11 +11,8 @@ fun handleGridTap(
 ) {
     if (uiState.activeTrack == null) return
 
-    // Tap in ruler — set playhead
     if (offset.y < state.headerHeight) {
-        viewModel.setPlayhead(
-            state.xToBeat(offset.x)
-        )
+        viewModel.setPlayhead(state.xToBeat(offset.x), uiState.totalBars)
         return
     }
 
@@ -55,7 +52,7 @@ fun findHitNote(
         val ny = state.pitchToY(note.pitch)
         val nw = maxOf(4f, note.duration * state.pixelsPerBeat)
         offset.x >= nx - tolerance && offset.x <= nx + nw + tolerance &&
-                offset.y >= ny - tolerance && offset.y <= ny + state.noteHeight - 2f + tolerance
+        offset.y >= ny - tolerance && offset.y <= ny + state.noteHeight - 2f + tolerance
     }
 }
 
@@ -75,13 +72,11 @@ fun handleLoopDragStart(
     }
 }
 
-// Loop dragging handled; clamping is done in ViewModel
 fun handleLoopDrag(
     position: Offset,
     state: PianoRollState,
     snapValue: Float,
     viewModel: PianoRollViewModel
-
 ) {
     val target = state.loopDragTarget ?: return
     val dx     = position.x - state.loopDragStartX
@@ -90,14 +85,58 @@ fun handleLoopDrag(
         "L" -> viewModel.setLoopStart(
             state.snapBeat(state.loopDragOrigStart + dBeats, snapValue))
         "R" -> viewModel.setLoopEnd(
-            state.snapBeat(state.loopDragOrigEnd + dBeats, snapValue)
-        )
+            state.snapBeat(state.loopDragOrigEnd + dBeats, snapValue))
         "BODY" -> {
             val span     = state.loopDragOrigEnd - state.loopDragOrigStart
             val newStart = state.snapBeat(state.loopDragOrigStart + dBeats, snapValue)
             viewModel.setLoopStart(newStart)
             viewModel.setLoopEnd(newStart + span)
-
         }
     }
+}
+
+fun handleDragStart(
+    offset: Offset,
+    state: PianoRollState,
+    uiState: PianoRollUiState
+) {
+    state.durationDragNoteId = null
+    if (uiState.currentTool == PianoRollViewModel.Tool.DRAW ||
+        uiState.currentTool == PianoRollViewModel.Tool.SELECT) {
+        val edgeHit = state.noteRightEdgeHit(offset.x, offset.y, uiState.activeNotes)
+        if (edgeHit != null) {
+            state.durationDragNoteId     = edgeHit.id
+            // anchorX already set inside noteRightEdgeHit
+            state.durationDragOrigDuration = edgeHit.duration
+            return
+        }
+    }
+    handleLoopDragStart(offset, state, uiState)
+}
+
+fun handleDrag(
+    position: Offset,
+    dragAmount: Offset,
+    state: PianoRollState,
+    uiState: PianoRollUiState,
+    viewModel: PianoRollViewModel
+) {
+    when {
+        state.durationDragNoteId != null -> {
+            // Delta measured from note right-edge pixel, not finger start.
+            // This means leftward drag immediately reduces duration.
+            val dx     = position.x - state.durationDragAnchorX
+            val dBeats = dx / state.pixelsPerBeat
+            val newDur = state.snapBeat((state.durationDragOrigDuration + dBeats).coerceAtLeast(state.durationDragOrigDuration), uiState.snapValue)
+            viewModel.updateNoteDuration(state.durationDragNoteId!!, newDur)
+        }
+        state.loopDragTarget != null -> {
+            handleLoopDrag(position, state, uiState.snapValue, viewModel)
+        }
+    }
+}
+
+fun handleDragEnd(state: PianoRollState) {
+    state.durationDragNoteId = null
+    state.loopDragTarget     = null
 }
