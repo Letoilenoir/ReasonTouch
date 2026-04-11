@@ -23,8 +23,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ChordViewModel @Inject constructor(
     private val repository: SessionRepository,
-    private val synthEngine: SynthEngine,  // retained for MIDI export
-    private val sf2Player: Sf2Player,      // SF2 for all audition
+    private val synthEngine: SynthEngine,
+    private val sf2Player: Sf2Player,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -143,13 +143,36 @@ class ChordViewModel @Inject constructor(
 
     fun clearStatus() { _statusMessage.value = null }
 
-    // Chord audition now uses SF2 — program 25 = Steel String Guitar
     fun auditionChord(chordName: String, position: String) {
-        val notes       = GuitarVoicings.voicings[chordName]?.get(position) ?: return
-        val midiNotes   = notes.filterNotNull()
-        val gmProgram   = _instrument.value.program
-        val strumDelay  = if (_strumEnabled.value) (_strumSpeed.value * 1000).toLong() else 0L
+        val notes      = GuitarVoicings.voicings[chordName]?.get(position) ?: return
+        val midiNotes  = notes.filterNotNull()
+        val gmProgram  = _instrument.value.program
+        val strumDelay = if (_strumEnabled.value) (_strumSpeed.value * 1000).toLong() else 0L
         sf2Player.playChord(midiNotes, 0.5f, 90, gmProgram, strumDelay)
+    }
+
+    /**
+     * Calculate per-string velocity for a strum stroke.
+     *
+     * Downstroke: bass string (index 0) hits hardest, tapers to treble.
+     * Upstroke:   treble string (index 0 of reversed order) hits hardest,
+     *             tapers to bass.
+     *
+     * This mirrors real guitar dynamics — the pick contacts the first string
+     * in the stroke direction with the most force and naturally lightens
+     * across subsequent strings.
+     */
+    private fun strumVelocity(
+        strIdx:     Int,
+        stringCount: Int,
+        isDownstroke: Boolean
+    ): Int {
+        // Down: strong bass (105) tapering to lighter treble (72)
+        // Up:   strong treble (90) tapering to lighter bass (65)
+        val baseVel  = if (isDownstroke) 105 else 90
+        val taperVel = if (isDownstroke) 72  else 65
+        val t        = strIdx.toFloat() / (stringCount - 1).coerceAtLeast(1)
+        return (baseVel - t * (baseVel - taperVel)).toInt().coerceIn(40, 127)
     }
 
     fun sendToPianoRoll(
@@ -170,46 +193,62 @@ class ChordViewModel @Inject constructor(
             val strumSpeedVal = if (useStrum && _strumEnabled.value) _strumSpeed.value else 0.0
 
             bars.forEachIndexed { barIdx, chord ->
-                val startBeat = (barIdx * beatsPerBar).toFloat()
-                val midiNotes = chord.midiNotes.split(",").mapNotNull { it.trim().toIntOrNull() }
+                val startBeat  = (barIdx * beatsPerBar).toFloat()
+                val midiNotes  = chord.midiNotes.split(",").mapNotNull { it.trim().toIntOrNull() }
                 val notesPairs = midiNotes.mapIndexed { i, midi -> Pair(i, midi) }
 
                 if (!useStrum || strumSpeedVal == 0.0) {
+                    // Block mode — all notes simultaneous, uniform velocity
                     notesPairs.forEach { (_, midi) ->
                         val pitch = (108 - midi).coerceIn(0, 87)
                         repository.saveNote(NoteEvent(
-                            id = UUID.randomUUID().toString(), trackId = targetTrack.id,
-                            pitch = pitch, beat = startBeat,
-                            duration = beatsPerBar.toFloat(), velocity = 90))
+                            id       = UUID.randomUUID().toString(),
+                            trackId  = targetTrack.id,
+                            pitch    = pitch,
+                            beat     = startBeat,
+                            duration = beatsPerBar.toFloat(),
+                            velocity = 90
+                        ))
                     }
                 } else {
-                    val stepStates  = _stepStates.value
+                    val stepStates   = _stepStates.value
                     val beatsPerStep = beatsPerBar / 16.0
-                    val activeSteps = stepStates.mapIndexedNotNull { i, s ->
+                    val activeSteps  = stepStates.mapIndexedNotNull { i, s ->
                         if (s != StepState.OFF) Pair(i, s) else null
                     }
+
                     if (activeSteps.isEmpty()) {
                         notesPairs.forEach { (_, midi) ->
                             val pitch = (108 - midi).coerceIn(0, 87)
                             repository.saveNote(NoteEvent(
-                                id = UUID.randomUUID().toString(), trackId = targetTrack.id,
-                                pitch = pitch, beat = startBeat,
-                                duration = beatsPerBar.toFloat(), velocity = 90))
+                                id       = UUID.randomUUID().toString(),
+                                trackId  = targetTrack.id,
+                                pitch    = pitch,
+                                beat     = startBeat,
+                                duration = beatsPerBar.toFloat(),
+                                velocity = 90
+                            ))
                         }
                     } else {
                         activeSteps.forEach { (stepIdx, stepState) ->
-                            val stepBeat = startBeat + (stepIdx * beatsPerStep).toFloat()
-                            val strOrder = if (stepState == StepState.DOWN) notesPairs
-                                           else notesPairs.reversed()
-                            val noteDur  = (beatsPerStep * 0.95).toFloat().coerceAtLeast(0.0625f)
-                            val vel      = if (stepState == StepState.DOWN) 100 else 80
+                            val stepBeat      = startBeat + (stepIdx * beatsPerStep).toFloat()
+                            val isDownstroke  = stepState == StepState.DOWN
+                            val strOrder      = if (isDownstroke) notesPairs else notesPairs.reversed()
+                            val noteDur       = (beatsPerStep * 0.95).toFloat().coerceAtLeast(0.0625f)
+
                             strOrder.forEachIndexed { strIdx, (_, midi) ->
                                 val offset = (strIdx * strumSpeedVal).toFloat()
                                 val pitch  = (108 - midi).coerceIn(0, 87)
+                                // Velocity tapers across strings matching real pick dynamics
+                                val vel    = strumVelocity(strIdx, strOrder.size, isDownstroke)
                                 repository.saveNote(NoteEvent(
-                                    id = UUID.randomUUID().toString(), trackId = targetTrack.id,
-                                    pitch = pitch, beat = (stepBeat + offset).coerceAtLeast(0f),
-                                    duration = noteDur, velocity = vel))
+                                    id       = UUID.randomUUID().toString(),
+                                    trackId  = targetTrack.id,
+                                    pitch    = pitch,
+                                    beat     = (stepBeat + offset).coerceAtLeast(0f),
+                                    duration = noteDur,
+                                    velocity = vel
+                                ))
                             }
                         }
                     }

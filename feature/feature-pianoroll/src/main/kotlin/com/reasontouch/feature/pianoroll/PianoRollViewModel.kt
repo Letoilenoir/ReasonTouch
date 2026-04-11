@@ -75,6 +75,10 @@ class PianoRollViewModel @Inject constructor(
     private val _bpm = MutableStateFlow(120)
     val bpm: StateFlow<Int> = _bpm.asStateFlow()
 
+    // Duration used by chord button audition — this is the reference ring time
+    // that sounds correct. Piano roll playback matches this.
+    private val CHORD_AUDITION_DUR_SEC = 0.5f
+
     init { loadTracksAndNotes() }
 
     private fun loadTracksAndNotes() {
@@ -137,7 +141,12 @@ class PianoRollViewModel @Inject constructor(
         else    -> 0
     }
 
-    private fun buildStrumClusters(
+    /**
+     * Groups notes into chord clusters — notes within strumWindow beats of
+     * each other belong to the same chord stroke.
+     * Returns a sorted list of cluster start beats.
+     */
+    private fun buildChordClusters(
         notes: List<NoteEvent>,
         strumWindow: Float = 0.5f
     ): List<Float> {
@@ -153,20 +162,32 @@ class PianoRollViewModel @Inject constructor(
         return clusters
     }
 
-    private fun ringDuration(
+    /**
+     * Calculate ring duration for a note matching the chord audition button.
+     *
+     * Rule:
+     *   - Start with CHORD_AUDITION_DUR_SEC (0.5s) — the duration that sounds
+     *     right on the chord button.
+     *   - If the next chord cluster starts sooner than that, use the gap to
+     *     the next cluster instead so the ring cuts off cleanly.
+     *   - Never shorter than 0.1s.
+     */
+    private fun chordRingDuration(
         note: NoteEvent,
         clusterBeats: List<Float>,
-        beatDurMs: Double,
-        endBeat: Float
+        beatDurMs: Double
     ): Float {
-        val maxRingBeats = 4f
         val myCluster   = clusterBeats.lastOrNull { it <= note.beat + 0.001f } ?: note.beat
         val nextCluster = clusterBeats.firstOrNull { it > myCluster + 0.001f }
-        val ringBeats   = when {
-            nextCluster != null -> (nextCluster - myCluster).coerceAtMost(maxRingBeats)
-            else                -> (endBeat - myCluster).coerceAtMost(maxRingBeats)
+
+        return if (nextCluster != null) {
+            val gapSec = ((nextCluster - myCluster) * beatDurMs / 1000.0).toFloat()
+            // Use whichever is shorter: the audition reference or the actual gap
+            minOf(CHORD_AUDITION_DUR_SEC, gapSec).coerceAtLeast(0.1f)
+        } else {
+            // Last chord — ring for the full audition duration
+            CHORD_AUDITION_DUR_SEC
         }
-        return (ringBeats * beatDurMs / 1000.0).toFloat().coerceAtLeast(0.05f)
     }
 
     fun play(bpm: Int, totalBars: Int) {
@@ -184,13 +205,15 @@ class PianoRollViewModel @Inject constructor(
             val allNotesList = _allNotes.value
             trackList.forEach { track ->
                 if (track.muted) return@forEach
-                val notes     = allNotesList[track.id] ?: emptyList()
-                val gmProgram = gmProgramForTrack(track)
-                val clusterBeats = buildStrumClusters(notes)
+                val notes        = allNotesList[track.id] ?: emptyList()
+                val gmProgram    = gmProgramForTrack(track)
+                val clusterBeats = buildChordClusters(notes)
+
                 notes.filter { it.beat >= fromBeat && it.beat < endBeat }
                     .forEach { note ->
                         val delayMs = ((note.beat - fromBeat) * beatDurMs).toLong()
-                        val durSec  = ringDuration(note, clusterBeats, beatDurMs, endBeat)
+                        val durSec  = chordRingDuration(note, clusterBeats, beatDurMs)
+
                         viewModelScope.launch(Dispatchers.IO) {
                             val waitMs = timeOriginMs + delayMs - System.currentTimeMillis()
                             if (waitMs > 0) delay(waitMs)
