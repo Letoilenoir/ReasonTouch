@@ -3,8 +3,8 @@ package com.reasontouch.feature.pianoroll
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.reasontouch.core.audio.Sf2Player
 import com.reasontouch.core.audio.SynthEngine
-import com.reasontouch.core.audio.SynthVoice
 import com.reasontouch.core.data.ChordEvent
 import com.reasontouch.core.data.MidiTrack
 import com.reasontouch.core.data.NoteEvent
@@ -27,6 +27,7 @@ import javax.inject.Inject
 class PianoRollViewModel @Inject constructor(
     private val repository: SessionRepository,
     private val synthEngine: SynthEngine,
+    private val sf2Player: Sf2Player,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -108,11 +109,12 @@ class PianoRollViewModel @Inject constructor(
     fun toggleLoop()             { _loopEnabled.value = !_loopEnabled.value }
 
     fun setLoopStart(beat: Float) {
-        _loopStart.value = beat.coerceIn(0f, (_loopEnd.value - snapValues[_snapIndex.value]).coerceAtLeast(0f))
+        _loopStart.value = beat.coerceIn(
+            0f, (_loopEnd.value - snapValues[_snapIndex.value]).coerceAtLeast(0f))
     }
     fun setLoopEnd(beat: Float, totalBars: Int = 4) {
-        val maxBeat = (totalBars * 4).toFloat()
-        _loopEnd.value = beat.coerceIn(_loopStart.value + snapValues[_snapIndex.value], maxBeat)
+        _loopEnd.value = beat.coerceIn(
+            _loopStart.value + snapValues[_snapIndex.value], (totalBars * 4).toFloat())
     }
     fun setPlayhead(beat: Float, totalBars: Int = 4) {
         _playheadBeat.value = beat.coerceIn(0f, (totalBars * 4).toFloat())
@@ -125,6 +127,46 @@ class PianoRollViewModel @Inject constructor(
             .maxOfOrNull { it.beat + it.duration } ?: 0f
         val barsNeeded = kotlin.math.ceil(lastNoteBeat / 4f).toInt()
         return (maxOf(barsNeeded, totalBars) * 4f)
+    }
+
+    private fun gmProgramForTrack(track: MidiTrack): Int = when (track.name.uppercase()) {
+        "BASS"  -> 32
+        "LEAD"  -> 80
+        "CHORD" -> 25
+        "PAD"   -> 88
+        else    -> 0
+    }
+
+    private fun buildStrumClusters(
+        notes: List<NoteEvent>,
+        strumWindow: Float = 0.5f
+    ): List<Float> {
+        val sorted   = notes.sortedBy { it.beat }
+        val clusters = mutableListOf<Float>()
+        var clusterStart = Float.MIN_VALUE
+        sorted.forEach { note ->
+            if (note.beat - clusterStart > strumWindow) {
+                clusterStart = note.beat
+                clusters.add(clusterStart)
+            }
+        }
+        return clusters
+    }
+
+    private fun ringDuration(
+        note: NoteEvent,
+        clusterBeats: List<Float>,
+        beatDurMs: Double,
+        endBeat: Float
+    ): Float {
+        val maxRingBeats = 4f
+        val myCluster   = clusterBeats.lastOrNull { it <= note.beat + 0.001f } ?: note.beat
+        val nextCluster = clusterBeats.firstOrNull { it > myCluster + 0.001f }
+        val ringBeats   = when {
+            nextCluster != null -> (nextCluster - myCluster).coerceAtMost(maxRingBeats)
+            else                -> (endBeat - myCluster).coerceAtMost(maxRingBeats)
+        }
+        return (ringBeats * beatDurMs / 1000.0).toFloat().coerceAtLeast(0.05f)
     }
 
     fun play(bpm: Int, totalBars: Int) {
@@ -142,20 +184,22 @@ class PianoRollViewModel @Inject constructor(
             val allNotesList = _allNotes.value
             trackList.forEach { track ->
                 if (track.muted) return@forEach
-                val notes = allNotesList[track.id] ?: emptyList()
-                val voice = SynthVoice.fromString(track.voice)
-                notes.filter { it.beat >= fromBeat && it.beat < endBeat }.forEach { note ->
-                    val delayMs = ((note.beat - fromBeat) * beatDurMs).toLong()
-                    val durSec  = (note.duration * beatDurMs / 1000.0).toFloat()
-                    viewModelScope.launch(Dispatchers.IO) {
-                        val waitMs = timeOriginMs + delayMs - System.currentTimeMillis()
-                        if (waitMs > 0) delay(waitMs)
-                        if (_isPlaying.value) {
-                            val midi = (108 - note.pitch).coerceIn(0, 127)
-                            synthEngine.playNote(midi, durSec, note.velocity, voice)
+                val notes     = allNotesList[track.id] ?: emptyList()
+                val gmProgram = gmProgramForTrack(track)
+                val clusterBeats = buildStrumClusters(notes)
+                notes.filter { it.beat >= fromBeat && it.beat < endBeat }
+                    .forEach { note ->
+                        val delayMs = ((note.beat - fromBeat) * beatDurMs).toLong()
+                        val durSec  = ringDuration(note, clusterBeats, beatDurMs, endBeat)
+                        viewModelScope.launch(Dispatchers.IO) {
+                            val waitMs = timeOriginMs + delayMs - System.currentTimeMillis()
+                            if (waitMs > 0) delay(waitMs)
+                            if (_isPlaying.value) {
+                                val midi = (108 - note.pitch).coerceIn(0, 127)
+                                sf2Player.playNote(midi, durSec, note.velocity, gmProgram)
+                            }
                         }
                     }
-                }
             }
         }
 
@@ -214,16 +258,13 @@ class PianoRollViewModel @Inject constructor(
             repository.deleteNoteById(noteId)
             val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return@launch
             val current = _allNotes.value.toMutableMap()
-            current[activeTrack.id] = (current[activeTrack.id] ?: emptyList()).filter { it.id != noteId }
+            current[activeTrack.id] = (current[activeTrack.id] ?: emptyList())
+                .filter { it.id != noteId }
             _allNotes.value = current
             updateActiveNotes()
         }
     }
 
-    // Updates note duration in memory immediately for responsive UI,
-    // then persists to Room. Called repeatedly during drag so kept lightweight —
-    // only updates the in-memory map on every call; Room write is debounced
-    // by only writing on drag end (caller sets noteId to null when drag ends).
     fun updateNoteDuration(noteId: String, newDuration: Float) {
         val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
         val current     = _allNotes.value.toMutableMap()
@@ -232,7 +273,6 @@ class PianoRollViewModel @Inject constructor(
         current[activeTrack.id] = updated
         _allNotes.value = current
         updateActiveNotes()
-        // Persist to Room
         viewModelScope.launch {
             val note = updated.firstOrNull { it.id == noteId } ?: return@launch
             repository.saveNote(note)
@@ -244,7 +284,8 @@ class PianoRollViewModel @Inject constructor(
 
     fun auditionNote(pitch: Int, velocity: Int = 100) {
         val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
-        synthEngine.playNote((108 - pitch).coerceIn(0, 127), 0.4f, velocity, SynthVoice.fromString(activeTrack.voice))
+        val gmProgram   = gmProgramForTrack(activeTrack)
+        sf2Player.playNote((108 - pitch).coerceIn(0, 127), 0.8f, velocity, gmProgram)
     }
 
     fun bounceDown(sourceIndices: List<Int>, destIndex: Int, clearSources: Boolean) {
