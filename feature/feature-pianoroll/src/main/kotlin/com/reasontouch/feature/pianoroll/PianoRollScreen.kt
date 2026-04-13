@@ -38,6 +38,7 @@ private val ACCENT2  = Color(0xFFFF6B35)
 private val GREEN    = Color(0xFF3DDC84)
 private val TEXT     = Color(0xFFC8C8D4)
 private val TEXT_DIM = Color(0xFF666675)
+private val PURPLE   = Color(0xFFA78BFA)
 
 @Composable
 fun PianoRollScreen(
@@ -59,6 +60,7 @@ fun PianoRollScreen(
     val loopEnd      by viewModel.loopEnd.collectAsState()
     val playheadBeat by viewModel.playheadBeat.collectAsState()
     val isPlaying    by viewModel.isPlaying.collectAsState()
+    val hasClipboard by viewModel.hasClipboard.collectAsState()
 
     val bpm       = session?.bpm ?: 120
     val totalBars = session?.totalBars ?: 4
@@ -76,7 +78,8 @@ fun PianoRollScreen(
         loopEnd      = loopEnd,
         playheadBeat = playheadBeat,
         isPlaying    = isPlaying,
-        totalBars    = totalBars
+        totalBars    = totalBars,
+        hasClipboard = hasClipboard
     )
 
     // Auto-scroll during playback
@@ -91,7 +94,7 @@ fun PianoRollScreen(
         }
     }
 
-    // Scroll back to bar 1 when rewind fires (playheadBeat == 0 and not playing)
+    // Scroll back on rewind
     LaunchedEffect(isPlaying, playheadBeat) {
         if (!isPlaying && playheadBeat == 0f) {
             state.scrollX = 0f
@@ -110,6 +113,18 @@ fun PianoRollScreen(
             onRewind     = viewModel::rewind
         )
 
+        // Selection action bar — visible only when notes are selected
+        if (uiState.hasSelection) {
+            SelectionActionBar(
+                selectedCount = selectedIds.size,
+                hasClipboard  = hasClipboard,
+                onCopy   = { viewModel.copySelectedNotes() },
+                onPaste  = { viewModel.pasteNotes(playheadBeat, uiState.snapValue) },
+                onDelete = { viewModel.deleteSelectedNotes() },
+                onClear  = { viewModel.clearSelection() }
+            )
+        }
+
         TrackSelector(
             tracks       = tracks,
             activeIndex  = activeIndex,
@@ -125,12 +140,66 @@ fun PianoRollScreen(
         )
 
         VelocityStripCanvas(
-            state    = state,
-            uiState  = uiState,
-            modifier = Modifier.fillMaxWidth().height(56.dp).background(RACK)
+            state     = state,
+            uiState   = uiState,
+            viewModel = viewModel,
+            modifier  = Modifier.fillMaxWidth().height(56.dp).background(RACK)
         )
 
         StatusBar(uiState = uiState, bpm = bpm, totalBars = totalBars)
+    }
+}
+
+// ── Selection action bar ──────────────────────────────────────────────────────
+
+@Composable
+fun SelectionActionBar(
+    selectedCount: Int,
+    hasClipboard:  Boolean,
+    onCopy:   () -> Unit,
+    onPaste:  () -> Unit,
+    onDelete: () -> Unit,
+    onClear:  () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(36.dp)
+            .background(Color(0xFF1E1A2E))
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = "$selectedCount selected",
+            color = PURPLE,
+            fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f)
+        )
+        SelectionChip("COPY",   PURPLE,              onCopy)
+        if (hasClipboard) SelectionChip("PASTE", GREEN, onPaste)
+        SelectionChip("DELETE", ACCENT,              onDelete)
+        SelectionChip("✕",      TEXT_DIM,            onClear)
+    }
+    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PURPLE.copy(alpha = 0.3f)))
+}
+
+@Composable
+fun SelectionChip(label: String, color: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(3.dp))
+            .background(color.copy(alpha = 0.15f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label, color = color, fontSize = 11.sp,
+            fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace
+        )
     }
 }
 
@@ -152,10 +221,12 @@ fun PianoRollToolbar(
         horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         PianoRollViewModel.Tool.values().forEach { tool ->
-            ToolChip(label = tool.name, selected = tool == uiState.currentTool, onClick = { onTool(tool) })
+            ToolChip(label = tool.name, selected = tool == uiState.currentTool,
+                onClick = { onTool(tool) })
         }
         Divider()
-        ToolChip(label = uiState.snapLabels[uiState.snapIndex], selected = false, onClick = onSnapCycle, monospace = true)
+        ToolChip(label = uiState.snapLabels[uiState.snapIndex], selected = false,
+            onClick = onSnapCycle, monospace = true)
         Divider()
         ToolChip(label = "LOOP", selected = uiState.loopEnabled,
             selectedColor = Color(0xFF1A4A2E), selectedBorder = GREEN, selectedText = GREEN,
@@ -278,6 +349,9 @@ fun StatusBar(uiState: PianoRollUiState, bpm: Int, totalBars: Int) {
         StatusItem("NOTES", "${uiState.activeNotes.size}")
         StatusItem("TRACK", uiState.activeTrack?.name ?: "")
         StatusItem("TOOL",  uiState.currentTool.name)
+        if (uiState.hasSelection) {
+            StatusItem("SEL", "${uiState.selectedIds.size}", PURPLE)
+        }
         if (uiState.loopEnabled) {
             StatusItem("LOOP", "${uiState.loopStart.toInt()+1}>${uiState.loopEnd.toInt()}", GREEN)
         }

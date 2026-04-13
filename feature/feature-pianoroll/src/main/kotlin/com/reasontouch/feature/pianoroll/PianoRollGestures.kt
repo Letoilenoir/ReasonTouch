@@ -4,11 +4,13 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 fun Modifier.pianoRollGestures(
     state: PianoRollState,
@@ -16,7 +18,7 @@ fun Modifier.pianoRollGestures(
     viewModel: PianoRollViewModel
 ): Modifier = this.pointerInput(
     uiState.currentTool, uiState.snapValue, uiState.activeTrack,
-    uiState.loopEnabled, uiState.activeNotes
+    uiState.loopEnabled, uiState.activeNotes, uiState.selectedIds
 ) {
     awaitEachGesture {
         val down    = awaitFirstDown(requireUnconsumed = false)
@@ -24,7 +26,7 @@ fun Modifier.pianoRollGestures(
         var lastPos = downPos
         var totalMoved = 0f
 
-        // Classify on finger-down
+        // ── Classify intent on finger-down ────────────────────────────────
         val isDurationDrag = (uiState.currentTool == PianoRollViewModel.Tool.DRAW ||
                               uiState.currentTool == PianoRollViewModel.Tool.SELECT) &&
                              state.noteRightEdgeHit(downPos.x, downPos.y,
@@ -34,10 +36,35 @@ fun Modifier.pianoRollGestures(
                          state.loopHandleHit(downPos.x, downPos.y,
                              uiState.loopStart, uiState.loopEnd) != null
 
-        // Initialise drag state immediately on finger-down
-        if (isDurationDrag || isLoopDrag) {
+        // In SELECT mode — check if touching a selected note body for move
+        val hitNote = findHitNote(downPos, state, uiState.activeNotes)
+        val isMoveDrag = !isDurationDrag && !isLoopDrag &&
+                         uiState.currentTool == PianoRollViewModel.Tool.SELECT &&
+                         hitNote != null &&
+                         hitNote.id in uiState.selectedIds
+
+        // Rubber band: SELECT tool, empty space, below header
+        val isRubberBand = !isDurationDrag && !isLoopDrag && !isMoveDrag &&
+                           uiState.currentTool == PianoRollViewModel.Tool.SELECT &&
+                           downPos.y > state.headerHeight
+
+        if (isDurationDrag || isLoopDrag) down.consume()
+
+        if (isDurationDrag) handleDragStart(downPos, state, uiState)
+        if (isLoopDrag)     handleLoopDragStart(downPos, state, uiState)
+
+        if (isMoveDrag) {
+            state.moveDragActive    = true
+            state.moveDragStartX    = downPos.x
+            state.moveDragStartY    = downPos.y
+            state.moveDragDeltaBeat = 0f
+            state.moveDragDeltaPitch = 0
             down.consume()
-            handleDragStart(downPos, state, uiState)
+        }
+
+        if (isRubberBand) {
+            state.rubberBandStart = downPos
+            state.rubberBandEnd   = downPos
         }
 
         do {
@@ -45,10 +72,14 @@ fun Modifier.pianoRollGestures(
             val pointers = event.changes.filter { it.pressed }
 
             if (pointers.size >= 2) {
-                // Pinch zoom
+                // Pinch zoom — cancel all drags
                 state.durationDragNoteId = null
                 state.loopDragTarget     = null
-                totalMoved = Float.MAX_VALUE  // never fire tap
+                state.moveDragActive     = false
+                state.rubberBandStart    = null
+                state.rubberBandEnd      = null
+                totalMoved = Float.MAX_VALUE
+
                 val zoom = event.calculateZoom()
                 if (zoom != 1f) {
                     val cx = event.changes.map { it.position.x }.average().toFloat()
@@ -60,37 +91,77 @@ fun Modifier.pianoRollGestures(
 
             } else if (pointers.size == 1) {
                 val change = pointers[0]
-                val delta  = Offset(
-                    change.position.x - lastPos.x,
-                    change.position.y - lastPos.y
-                )
+                val delta  = Offset(change.position.x - lastPos.x, change.position.y - lastPos.y)
                 totalMoved += abs(delta.x) + abs(delta.y)
                 lastPos = change.position
 
                 when {
-                    // Duration or loop drag — always handle regardless of movement
-                    isDurationDrag || isLoopDrag -> {
+                    isDurationDrag || state.durationDragNoteId != null -> {
                         handleDrag(change.position, delta, state, uiState, viewModel)
                         change.consume()
                     }
-                    // Erase — drag erases continuously
+                    isLoopDrag || state.loopDragTarget != null -> {
+                        handleLoopDrag(change.position, state, uiState.snapValue, viewModel)
+                        change.consume()
+                    }
+                    isMoveDrag && state.moveDragActive -> {
+                        // Calculate beat and pitch delta from drag start
+                        val totalDx = change.position.x - state.moveDragStartX
+                        val totalDy = change.position.y - state.moveDragStartY
+                        val rawDeltaBeat  = totalDx / state.pixelsPerBeat
+                        val rawDeltaPitch = (totalDy / state.noteHeight).roundToInt()
+                        val snappedDelta  = state.snapBeat(rawDeltaBeat, uiState.snapValue)
+
+                        // Only update if changed to avoid excess recompose
+                        if (snappedDelta != state.moveDragDeltaBeat ||
+                            rawDeltaPitch != state.moveDragDeltaPitch) {
+                            state.moveDragDeltaBeat  = snappedDelta
+                            state.moveDragDeltaPitch = rawDeltaPitch
+                        }
+                        change.consume()
+                    }
+                    isRubberBand && state.rubberBandStart != null -> {
+                        state.rubberBandEnd = change.position
+                        change.consume()
+                    }
                     uiState.currentTool == PianoRollViewModel.Tool.ERASE && totalMoved > 4f -> {
                         handleGridTap(change.position, state, uiState, viewModel)
                         change.consume()
-                    }
-                    // Movement without a specific target — not a tap, not our drag
-                    totalMoved > 8f -> {
-                        // consumed by scrollbars — just mark as moved
                     }
                 }
             }
         } while (pointers.isNotEmpty())
 
+        // ── Finger up — finalise gesture ──────────────────────────────────
+
+        // Commit move
+        if (isMoveDrag && state.moveDragActive &&
+            (state.moveDragDeltaBeat != 0f || state.moveDragDeltaPitch != 0)) {
+            viewModel.moveSelectedNotes(
+                state.moveDragDeltaBeat, state.moveDragDeltaPitch, uiState.snapValue)
+            viewModel.commitMove()
+        }
+        state.moveDragActive     = false
+        state.moveDragDeltaBeat  = 0f
+        state.moveDragDeltaPitch = 0
+
+        // Commit rubber band selection
+        if (isRubberBand && state.rubberBandStart != null) {
+            val selected = state.notesInRubberBand(uiState.activeNotes)
+            if (selected.isNotEmpty()) {
+                viewModel.setSelection(selected.map { it.id }.toSet())
+            } else {
+                viewModel.clearSelection()
+            }
+            state.rubberBandStart = null
+            state.rubberBandEnd   = null
+        }
+
         handleDragEnd(state)
 
-        // Fire tap only on clean short press — no significant movement,
-        // not already handled as a drag type
-        if (totalMoved <= 8f && !isDurationDrag && !isLoopDrag) {
+        // Fire tap only on clean short press
+        if (totalMoved <= 8f && !isDurationDrag && !isLoopDrag &&
+            !isMoveDrag && !isRubberBand) {
             handleGridTap(downPos, state, uiState, viewModel)
         }
     }
@@ -120,7 +191,30 @@ fun Modifier.verticalScrollBarGestures(
     }
 }
 
-// These are now no-ops — everything runs through pianoRollGestures
+fun Modifier.velocityStripGestures(
+    state: PianoRollState,
+    uiState: PianoRollUiState,
+    viewModel: PianoRollViewModel
+): Modifier = this.pointerInput(uiState.activeNotes) {
+    detectDragGestures(
+        onDragStart = { offset ->
+            val hit = state.velocityBarHit(offset.x, uiState.activeNotes)
+            if (hit != null) {
+                state.velocityDragNoteId      = hit.id
+                state.velocityDragOrigVelocity = hit.velocity
+            }
+        },
+        onDragEnd    = { state.velocityDragNoteId = null },
+        onDragCancel = { state.velocityDragNoteId = null },
+        onDrag = { change, _ ->
+            change.consume()
+            val noteId = state.velocityDragNoteId ?: return@detectDragGestures
+            val newVel = state.yToVelocity(change.position.y, size.height.toFloat())
+            viewModel.updateNoteVelocity(noteId, newVel)
+        }
+    )
+}
+
 fun Modifier.pianoRollZoomGestures(state: PianoRollState): Modifier = this
 fun Modifier.pianoRollTapGestures(state: PianoRollState, uiState: PianoRollUiState,
     viewModel: PianoRollViewModel): Modifier = this
@@ -136,14 +230,12 @@ fun Modifier.pianoKeyGestures(
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         var lastPos = down.position
-        var moved = false
         onKeyTap(state.yToPitch(down.position.y).coerceIn(0, state.totalNotes - 1))
         do {
             val event = awaitPointerEvent()
             event.changes.forEach { change ->
                 if (change.pressed) {
                     if (abs(change.position.y - lastPos.y) > 2f) {
-                        moved = true
                         lastPos = change.position
                         onKeyTap(state.yToPitch(change.position.y).coerceIn(0, state.totalNotes - 1))
                     }

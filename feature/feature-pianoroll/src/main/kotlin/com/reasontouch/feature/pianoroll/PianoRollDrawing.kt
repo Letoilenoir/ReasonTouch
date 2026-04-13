@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -34,7 +35,11 @@ fun DrawScope.drawGridLines(state: PianoRollState, snapValue: Float) {
         if (x in 0f..size.width) {
             val isBar  = abs(b % state.beatsPerBar) < 0.001f
             val isBeat = abs(b % 1f) < 0.001f
-            val color  = when { isBar -> Color(0xFF404050); isBeat -> Color(0xFF2E2E3E); else -> Color(0xFF252530) }
+            val color  = when {
+                isBar  -> Color(0xFF404050)
+                isBeat -> Color(0xFF2E2E3E)
+                else   -> Color(0xFF252530)
+            }
             drawRect(color = color, topLeft = Offset(x, state.headerHeight), size = Size(1f, size.height))
         }
         b += snapValue
@@ -60,19 +65,19 @@ fun DrawScope.drawRuler(state: PianoRollState, textMeasurer: TextMeasurer) {
 }
 
 fun DrawScope.drawLoopRegion(state: PianoRollState, loopStart: Float, loopEnd: Float) {
-    val lx = state.beatToX(loopStart)
-    val rx = state.beatToX(loopEnd)
+    val lx        = state.beatToX(loopStart)
+    val rx        = state.beatToX(loopEnd)
     val clampedLx = lx.coerceAtLeast(0f)
     val clampedRx = rx.coerceAtMost(size.width)
-    drawRect(color = Color(0x263DDC84), topLeft = Offset(clampedLx, 0f), size = Size(clampedRx - clampedLx, state.headerHeight))
-    drawRect(color = Color(0x103DDC84), topLeft = Offset(clampedLx, state.headerHeight), size = Size(clampedRx - clampedLx, size.height))
-    // L handle
+    drawRect(color = Color(0x263DDC84), topLeft = Offset(clampedLx, 0f),
+        size = Size(clampedRx - clampedLx, state.headerHeight))
+    drawRect(color = Color(0x103DDC84), topLeft = Offset(clampedLx, state.headerHeight),
+        size = Size(clampedRx - clampedLx, size.height))
     if (lx > -12f && lx < size.width + 12f) {
         drawRect(color = Color(0xFF3DDC84), topLeft = Offset(lx - 1f, 0f), size = Size(2f, state.headerHeight))
         val path = Path().apply { moveTo(lx, 2f); lineTo(lx + 13f, 2f); lineTo(lx + 13f, 13f); lineTo(lx, 13f); close() }
         drawPath(path, color = Color(0xFF3DDC84))
     }
-    // R handle
     if (rx > -12f && rx < size.width + 12f) {
         drawRect(color = Color(0xFF3DDC84), topLeft = Offset(rx - 1f, 0f), size = Size(2f, state.headerHeight))
         val path = Path().apply { moveTo(rx, 2f); lineTo(rx - 13f, 2f); lineTo(rx - 13f, 13f); lineTo(rx, 13f); close() }
@@ -85,19 +90,88 @@ fun DrawScope.drawNotes(
     notes: List<NoteEvent>,
     trackColor: Long,
     ghost: Boolean,
-    selectedIds: Set<String> = emptySet()
+    selectedIds: Set<String> = emptySet(),
+    moveDeltaBeat: Float = 0f,
+    moveDeltaPitch: Int  = 0
 ) {
     val baseColor = Color(trackColor)
     notes.forEach { note ->
-        val x = state.beatToX(note.beat)
-        val y = state.pitchToY(note.pitch)
+        // Apply move preview offset for selected notes
+        val displayBeat  = if (note.id in selectedIds) note.beat + moveDeltaBeat else note.beat
+        val displayPitch = if (note.id in selectedIds) note.pitch + moveDeltaPitch else note.pitch
+
+        val x = state.beatToX(displayBeat)
+        val y = state.pitchToY(displayPitch)
         val w = maxOf(4f, note.duration * state.pixelsPerBeat - 1f)
         if (x + w < 0 || x > size.width || y + state.noteHeight < 0 || y > size.height) return@forEach
+
         val alpha     = if (ghost) 0.2f else 1f
-        val noteColor = if (note.id in selectedIds) Color(0xFFFF6B35) else baseColor
-        drawRect(color = noteColor.copy(alpha = alpha * 0.9f), topLeft = Offset(x, y), size = Size(w, state.noteHeight - 2f))
-        drawRect(color = Color.White.copy(alpha = alpha * 0.15f), topLeft = Offset(x, y), size = Size(w, 3f))
+        val isSelected = note.id in selectedIds
+        val noteColor = when {
+            isSelected -> Color(0xFFFF6B35)
+            else       -> baseColor
+        }
+
+        drawRect(
+            color   = noteColor.copy(alpha = alpha * 0.9f),
+            topLeft = Offset(x, y),
+            size    = Size(w, state.noteHeight - 2f)
+        )
+        drawRect(
+            color   = Color.White.copy(alpha = alpha * 0.15f),
+            topLeft = Offset(x, y),
+            size    = Size(w, 3f)
+        )
+
+        // Selected note — draw border highlight
+        if (isSelected && !ghost) {
+            drawRect(
+                color   = Color(0xFFFF6B35).copy(alpha = 0.8f),
+                topLeft = Offset(x, y),
+                size    = Size(w, state.noteHeight - 2f),
+                style   = Stroke(width = 2f)
+            )
+        }
+
+        // Right-edge grab handle
+        if (!ghost && w > 12f) {
+            val handleW = 10f
+            drawRect(
+                color   = Color.Black.copy(alpha = 0.55f),
+                topLeft = Offset(x + w - handleW - 1f, y),
+                size    = Size(1f, state.noteHeight - 2f)
+            )
+            drawRect(
+                color   = Color.White.copy(alpha = 0.82f),
+                topLeft = Offset(x + w - handleW, y + 1f),
+                size    = Size(handleW, state.noteHeight - 3f)
+            )
+            val cx = x + w - handleW / 2f
+            listOf(-3.5f, 0f, 3.5f).forEach { offset ->
+                drawRect(
+                    color   = Color.Black.copy(alpha = 0.4f),
+                    topLeft = Offset(cx - 1f, y + state.noteHeight / 2f + offset - 1f),
+                    size    = Size(2f, 2f)
+                )
+            }
+        }
     }
+}
+
+// Rubber band selection rectangle
+fun DrawScope.drawRubberBand(state: PianoRollState) {
+    val rect = state.rubberBandRect ?: return
+    drawRect(
+        color   = Color(0x33A78BFA),
+        topLeft = Offset(rect.left, rect.top),
+        size    = Size(rect.width, rect.height)
+    )
+    drawRect(
+        color   = Color(0xFFA78BFA),
+        topLeft = Offset(rect.left, rect.top),
+        size    = Size(rect.width, rect.height),
+        style   = Stroke(width = 1.5f)
+    )
 }
 
 fun DrawScope.drawPlayhead(state: PianoRollState, beat: Float) {
@@ -115,17 +189,22 @@ fun DrawScope.drawPianoKeys(state: PianoRollState, textMeasurer: TextMeasurer) {
         val black = state.isBlackKey(p)
         val name  = state.noteName(p)
         val isC   = name.startsWith("C") && !name.contains("#")
-        drawRect(color = if (black) Color(0xFF1C1C26) else Color(0xFFD0D0DC),
-            topLeft = Offset(0f, y), size = Size(state.keyWidth - (if (black) 14f else 0f), state.noteHeight - 1f))
+        drawRect(
+            color   = if (black) Color(0xFF1C1C26) else Color(0xFFD0D0DC),
+            topLeft = Offset(0f, y),
+            size    = Size(state.keyWidth - (if (black) 14f else 0f), state.noteHeight - 1f)
+        )
         if (isC) {
-            drawRect(color = Color(0x22E84040), topLeft = Offset(0f, y), size = Size(state.keyWidth, state.noteHeight - 1f))
+            drawRect(color = Color(0x22E84040), topLeft = Offset(0f, y),
+                size = Size(state.keyWidth, state.noteHeight - 1f))
             val measured = textMeasurer.measure(name,
                 style = TextStyle(color = Color(0xFFE84040), fontSize = 9.sp, fontFamily = FontFamily.Monospace))
             drawText(measured, topLeft = Offset(state.keyWidth - measured.size.width - 2f, y + state.noteHeight - 13f))
         }
         if (black) drawRect(color = Color(0xFF12121A),
             topLeft = Offset(state.keyWidth - 14f, y), size = Size(14f, state.noteHeight - 1f))
-        drawRect(color = Color(0xFF111118), topLeft = Offset(0f, y + state.noteHeight - 1f), size = Size(state.keyWidth, 1f))
+        drawRect(color = Color(0xFF111118),
+            topLeft = Offset(0f, y + state.noteHeight - 1f), size = Size(state.keyWidth, 1f))
     }
 }
 
@@ -137,34 +216,29 @@ fun DrawScope.drawVelocityBars(state: PianoRollState, notes: List<NoteEvent>) {
         if (x < -barW || x > size.width) return@forEach
         val velH = (note.velocity / 127f) * (size.height - 14f)
         val y    = size.height - velH
-        drawRect(color = Color(0xFFE84040), topLeft = Offset(x, y), size = Size(minOf(barW, state.pixelsPerBeat - 1f), velH))
-        drawRect(color = Color.White.copy(alpha = 0.3f), topLeft = Offset(x, y), size = Size(minOf(barW, state.pixelsPerBeat - 1f), 2f))
+        drawRect(color = Color(0xFFE84040), topLeft = Offset(x, y),
+            size = Size(minOf(barW, state.pixelsPerBeat - 1f), velH))
+        drawRect(color = Color.White.copy(alpha = 0.3f), topLeft = Offset(x, y),
+            size = Size(minOf(barW, state.pixelsPerBeat - 1f), 2f))
     }
 }
+
 fun DrawScope.drawHorizontalScrollBar(state: PianoRollState) {
-    val totalW    = state.totalBeats * state.pixelsPerBeat
+    val totalW = state.totalBeats * state.pixelsPerBeat
     if (totalW <= state.gridWidth) return
     val thumbW    = (state.gridWidth / totalW * size.width).coerceAtLeast(40f)
     val maxScroll = totalW - state.gridWidth
     val thumbX    = (state.scrollX / maxScroll) * (size.width - thumbW)
-    drawRect(color = androidx.compose.ui.graphics.Color(0xFF2A2A35),
-        topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
-        size    = androidx.compose.ui.geometry.Size(size.width, size.height))
-    drawRect(color = androidx.compose.ui.graphics.Color(0xFF555568),
-        topLeft = androidx.compose.ui.geometry.Offset(thumbX, 2f),
-        size    = androidx.compose.ui.geometry.Size(thumbW, size.height - 4f))
+    drawRect(color = Color(0xFF2A2A35), topLeft = Offset(0f, 0f), size = Size(size.width, size.height))
+    drawRect(color = Color(0xFF555568), topLeft = Offset(thumbX, 2f), size = Size(thumbW, size.height - 4f))
 }
 
 fun DrawScope.drawVerticalScrollBar(state: PianoRollState) {
-    val totalH    = state.totalNotes * state.noteHeight
+    val totalH = state.totalNotes * state.noteHeight
     if (totalH <= state.gridHeight) return
     val thumbH    = (state.gridHeight / totalH * size.height).coerceAtLeast(40f)
     val maxScroll = totalH - state.gridHeight
     val thumbY    = (state.scrollY / maxScroll) * (size.height - thumbH)
-    drawRect(color = androidx.compose.ui.graphics.Color(0xFF2A2A35),
-        topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
-        size    = androidx.compose.ui.geometry.Size(size.width, size.height))
-    drawRect(color = androidx.compose.ui.graphics.Color(0xFF555568),
-        topLeft = androidx.compose.ui.geometry.Offset(2f, thumbY),
-        size    = androidx.compose.ui.geometry.Size(size.width - 4f, thumbH))
+    drawRect(color = Color(0xFF2A2A35), topLeft = Offset(0f, 0f), size = Size(size.width, size.height))
+    drawRect(color = Color(0xFF555568), topLeft = Offset(2f, thumbY), size = Size(size.width - 4f, thumbH))
 }

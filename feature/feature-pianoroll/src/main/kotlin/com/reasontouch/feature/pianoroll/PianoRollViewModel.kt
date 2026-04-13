@@ -72,11 +72,14 @@ class PianoRollViewModel @Inject constructor(
     private val _selectedNoteIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedNoteIds: StateFlow<Set<String>> = _selectedNoteIds.asStateFlow()
 
+    // Clipboard — stores copies of notes for paste
+    private var clipboard: List<NoteEvent> = emptyList()
+    private val _hasClipboard = MutableStateFlow(false)
+    val hasClipboard: StateFlow<Boolean> = _hasClipboard.asStateFlow()
+
     private val _bpm = MutableStateFlow(120)
     val bpm: StateFlow<Int> = _bpm.asStateFlow()
 
-    // Duration used by chord button audition — this is the reference ring time
-    // that sounds correct. Piano roll playback matches this.
     private val CHORD_AUDITION_DUR_SEC = 0.5f
 
     init { loadTracksAndNotes() }
@@ -108,7 +111,7 @@ class PianoRollViewModel @Inject constructor(
         }
     }
 
-    fun setTool(tool: Tool)      { _currentTool.value = tool }
+    fun setTool(tool: Tool)      { _currentTool.value = tool; _selectedNoteIds.value = emptySet() }
     fun setSnapIndex(index: Int) { _snapIndex.value = index }
     fun toggleLoop()             { _loopEnabled.value = !_loopEnabled.value }
 
@@ -141,11 +144,6 @@ class PianoRollViewModel @Inject constructor(
         else    -> 0
     }
 
-    /**
-     * Groups notes into chord clusters — notes within strumWindow beats of
-     * each other belong to the same chord stroke.
-     * Returns a sorted list of cluster start beats.
-     */
     private fun buildChordClusters(
         notes: List<NoteEvent>,
         strumWindow: Float = 0.5f
@@ -162,16 +160,6 @@ class PianoRollViewModel @Inject constructor(
         return clusters
     }
 
-    /**
-     * Calculate ring duration for a note matching the chord audition button.
-     *
-     * Rule:
-     *   - Start with CHORD_AUDITION_DUR_SEC (0.5s) — the duration that sounds
-     *     right on the chord button.
-     *   - If the next chord cluster starts sooner than that, use the gap to
-     *     the next cluster instead so the ring cuts off cleanly.
-     *   - Never shorter than 0.1s.
-     */
     private fun chordRingDuration(
         note: NoteEvent,
         clusterBeats: List<Float>,
@@ -179,13 +167,10 @@ class PianoRollViewModel @Inject constructor(
     ): Float {
         val myCluster   = clusterBeats.lastOrNull { it <= note.beat + 0.001f } ?: note.beat
         val nextCluster = clusterBeats.firstOrNull { it > myCluster + 0.001f }
-
         return if (nextCluster != null) {
             val gapSec = ((nextCluster - myCluster) * beatDurMs / 1000.0).toFloat()
-            // Use whichever is shorter: the audition reference or the actual gap
             minOf(CHORD_AUDITION_DUR_SEC, gapSec).coerceAtLeast(0.1f)
         } else {
-            // Last chord — ring for the full audition duration
             CHORD_AUDITION_DUR_SEC
         }
     }
@@ -213,7 +198,6 @@ class PianoRollViewModel @Inject constructor(
                     .forEach { note ->
                         val delayMs = ((note.beat - fromBeat) * beatDurMs).toLong()
                         val durSec  = chordRingDuration(note, clusterBeats, beatDurMs)
-
                         viewModelScope.launch(Dispatchers.IO) {
                             val waitMs = timeOriginMs + delayMs - System.currentTimeMillis()
                             if (waitMs > 0) delay(waitMs)
@@ -288,6 +272,105 @@ class PianoRollViewModel @Inject constructor(
         }
     }
 
+    // ── Selection operations ──────────────────────────────────────────────
+
+    fun selectNote(noteId: String)    { _selectedNoteIds.value = setOf(noteId) }
+    fun addToSelection(noteId: String){ _selectedNoteIds.value = _selectedNoteIds.value + noteId }
+    fun setSelection(ids: Set<String>){ _selectedNoteIds.value = ids }
+    fun clearSelection()              { _selectedNoteIds.value = emptySet() }
+
+    fun deleteSelectedNotes() {
+        val ids = _selectedNoteIds.value
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            ids.forEach { repository.deleteNoteById(it) }
+            val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return@launch
+            val current = _allNotes.value.toMutableMap()
+            current[activeTrack.id] = (current[activeTrack.id] ?: emptyList())
+                .filter { it.id !in ids }
+            _allNotes.value = current
+            _selectedNoteIds.value = emptySet()
+            updateActiveNotes()
+        }
+    }
+
+    /**
+     * Move selected notes by deltaBeats horizontally and deltaPitch vertically.
+     * Called repeatedly during drag — updates in-memory immediately,
+     * persists to Room on drag end (commitMove).
+     */
+    fun moveSelectedNotes(deltaBeats: Float, deltaPitch: Int, snapValue: Float) {
+        val ids         = _selectedNoteIds.value
+        if (ids.isEmpty()) return
+        val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
+        val current     = _allNotes.value.toMutableMap()
+        val notes       = current[activeTrack.id] ?: return
+
+        val updated = notes.map { note ->
+            if (note.id in ids) {
+                val newBeat  = (note.beat + deltaBeats).coerceAtLeast(0f)
+                val newPitch = (note.pitch + deltaPitch).coerceIn(0, 87)
+                note.copy(beat = newBeat, pitch = newPitch)
+            } else note
+        }
+        current[activeTrack.id] = updated
+        _allNotes.value = current
+        updateActiveNotes()
+    }
+
+    /** Persist moved notes to Room after drag ends */
+    fun commitMove() {
+        val ids         = _selectedNoteIds.value
+        if (ids.isEmpty()) return
+        val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
+        val notes       = _allNotes.value[activeTrack.id] ?: return
+        viewModelScope.launch {
+            notes.filter { it.id in ids }.forEach { repository.saveNote(it) }
+        }
+    }
+
+    fun copySelectedNotes() {
+        val ids         = _selectedNoteIds.value
+        if (ids.isEmpty()) return
+        val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
+        val notes       = _allNotes.value[activeTrack.id] ?: return
+        clipboard       = notes.filter { it.id in ids }
+        _hasClipboard.value = clipboard.isNotEmpty()
+    }
+
+    /**
+     * Paste clipboard notes starting at pasteAtBeat.
+     * Notes preserve their relative positions — the earliest note in the
+     * clipboard lands at pasteAtBeat, others are offset accordingly.
+     */
+    fun pasteNotes(pasteAtBeat: Float, snapValue: Float) {
+        if (clipboard.isEmpty()) return
+        val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
+        val earliestBeat = clipboard.minOf { it.beat }
+        val offset       = pasteAtBeat - earliestBeat
+
+        viewModelScope.launch {
+            val newNotes = clipboard.map { note ->
+                note.copy(
+                    id      = UUID.randomUUID().toString(),
+                    trackId = activeTrack.id,
+                    beat    = snapBeat(note.beat + offset, snapValue).coerceAtLeast(0f)
+                )
+            }
+            newNotes.forEach { repository.saveNote(it) }
+            val current = _allNotes.value.toMutableMap()
+            current[activeTrack.id] = (current[activeTrack.id] ?: emptyList()) + newNotes
+            _allNotes.value = current
+            _selectedNoteIds.value = newNotes.map { it.id }.toSet()
+            updateActiveNotes()
+        }
+    }
+
+    private fun snapBeat(beat: Float, snapValue: Float): Float =
+        (Math.round(beat / snapValue) * snapValue)
+
+    // ── Note edits ────────────────────────────────────────────────────────
+
     fun updateNoteDuration(noteId: String, newDuration: Float) {
         val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
         val current     = _allNotes.value.toMutableMap()
@@ -302,8 +385,21 @@ class PianoRollViewModel @Inject constructor(
         }
     }
 
-    fun selectNote(noteId: String) { _selectedNoteIds.value = setOf(noteId) }
-    fun clearSelection()           { _selectedNoteIds.value = emptySet() }
+    fun updateNoteVelocity(noteId: String, newVelocity: Int) {
+        val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
+        val current     = _allNotes.value.toMutableMap()
+        val notes       = current[activeTrack.id] ?: return
+        val updated     = notes.map {
+            if (it.id == noteId) it.copy(velocity = newVelocity.coerceIn(1, 127)) else it
+        }
+        current[activeTrack.id] = updated
+        _allNotes.value = current
+        updateActiveNotes()
+        viewModelScope.launch {
+            val note = updated.firstOrNull { it.id == noteId } ?: return@launch
+            repository.saveNote(note)
+        }
+    }
 
     fun auditionNote(pitch: Int, velocity: Int = 100) {
         val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return

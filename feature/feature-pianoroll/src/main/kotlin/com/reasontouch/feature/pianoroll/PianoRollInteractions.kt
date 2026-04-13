@@ -122,13 +122,18 @@ fun handleDrag(
     viewModel: PianoRollViewModel
 ) {
     when {
-        state.durationDragNoteId != null -> {
-            // Delta measured from note right-edge pixel, not finger start.
-            // This means leftward drag immediately reduces duration.
+                state.durationDragNoteId != null -> {
             val dx     = position.x - state.durationDragAnchorX
             val dBeats = dx / state.pixelsPerBeat
-            val newDur = state.snapBeat((state.durationDragOrigDuration + dBeats).coerceAtLeast(state.durationDragOrigDuration), uiState.snapValue)
+            val newDur = state.snapBeat(
+                (state.durationDragOrigDuration + dBeats).coerceAtLeast(uiState.snapValue),
+                uiState.snapValue
+            )
             viewModel.updateNoteDuration(state.durationDragNoteId!!, newDur)
+            // Update origDuration and anchorX progressively so drag is
+            // not limited by screen width — each frame becomes a new baseline
+            state.durationDragOrigDuration = newDur
+            state.durationDragAnchorX      = position.x
         }
         state.loopDragTarget != null -> {
             handleLoopDrag(position, state, uiState.snapValue, viewModel)

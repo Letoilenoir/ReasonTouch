@@ -16,10 +16,12 @@ data class PianoRollUiState(
     val loopEnd:      Float                        = 4f,
     val playheadBeat: Float                        = 0f,
     val isPlaying:    Boolean                      = false,
-    val totalBars:    Int                          = 4
+    val totalBars:    Int                          = 4,
+    val hasClipboard: Boolean                      = false
 ) {
-    val snapValues  = listOf(1f, 0.5f, 0.25f, 0.125f, 0.0625f)
-    val snapLabels  = listOf("1/4","1/8","1/16","1/32","1/64")
-    val snapValue   get() = snapValues[snapIndex]
-    val activeTrack get() = tracks.getOrNull(activeIndex)
+    val snapValues   = listOf(1f, 0.5f, 0.25f, 0.125f, 0.0625f)
+    val snapLabels   = listOf("1/4","1/8","1/16","1/32","1/64")
+    val snapValue    get() = snapValues[snapIndex]
+    val activeTrack  get() = tracks.getOrNull(activeIndex)
+    val hasSelection get() = selectedIds.isNotEmpty()
 }

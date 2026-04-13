@@ -151,34 +151,32 @@ class ChordViewModel @Inject constructor(
         sf2Player.playChord(midiNotes, 0.5f, 90, gmProgram, strumDelay)
     }
 
-    /**
-     * Calculate per-string velocity for a strum stroke.
-     *
-     * Downstroke: bass string (index 0) hits hardest, tapers to treble.
-     * Upstroke:   treble string (index 0 of reversed order) hits hardest,
-     *             tapers to bass.
-     *
-     * This mirrors real guitar dynamics — the pick contacts the first string
-     * in the stroke direction with the most force and naturally lightens
-     * across subsequent strings.
-     */
-    private fun strumVelocity(
-        strIdx:     Int,
-        stringCount: Int,
-        isDownstroke: Boolean
-    ): Int {
-        // Down: strong bass (105) tapering to lighter treble (72)
-        // Up:   strong treble (90) tapering to lighter bass (65)
+    private fun strumVelocity(strIdx: Int, stringCount: Int, isDownstroke: Boolean): Int {
         val baseVel  = if (isDownstroke) 105 else 90
         val taperVel = if (isDownstroke) 72  else 65
         val t        = strIdx.toFloat() / (stringCount - 1).coerceAtLeast(1)
         return (baseVel - t * (baseVel - taperVel)).toInt().coerceIn(40, 127)
     }
 
+    /**
+     * Returns the last occupied beat across all notes on the target track.
+     * Used to calculate the append offset when sending to piano roll.
+     */
+    suspend fun getLastBeatOnTrack(trackId: String): Float {
+        val notes = repository.getNotesForTrackOnce(trackId)
+        return notes.maxOfOrNull { it.beat + it.duration } ?: 0f
+    }
+
+    /**
+     * Send progression to piano roll.
+     * startFromBeat: offset in beats — 0f = overwrite from bar 1,
+     * positive value = append after existing content.
+     */
     fun sendToPianoRoll(
         targetTrackIndex: Int,
-        useStrum: Boolean,
-        onComplete: () -> Unit
+        useStrum:         Boolean,
+        appendMode:       Boolean,
+        onComplete:       () -> Unit
     ) {
         viewModelScope.launch {
             val trackList   = tracks.value
@@ -189,16 +187,27 @@ class ChordViewModel @Inject constructor(
                 return@launch
             }
 
+            // In append mode, find the last occupied beat and round up to
+            // the next complete bar boundary
+            val startFromBeat = if (appendMode) {
+                val lastBeat  = getLastBeatOnTrack(targetTrack.id)
+                val beatsPerBar = _barDuration.value
+                if (lastBeat <= 0f) 0f
+                else {
+                    val barsUsed = kotlin.math.ceil(lastBeat / beatsPerBar).toInt()
+                    (barsUsed * beatsPerBar).toFloat()
+                }
+            } else 0f
+
             val beatsPerBar   = _barDuration.value
             val strumSpeedVal = if (useStrum && _strumEnabled.value) _strumSpeed.value else 0.0
 
             bars.forEachIndexed { barIdx, chord ->
-                val startBeat  = (barIdx * beatsPerBar).toFloat()
+                val startBeat  = startFromBeat + (barIdx * beatsPerBar).toFloat()
                 val midiNotes  = chord.midiNotes.split(",").mapNotNull { it.trim().toIntOrNull() }
                 val notesPairs = midiNotes.mapIndexed { i, midi -> Pair(i, midi) }
 
                 if (!useStrum || strumSpeedVal == 0.0) {
-                    // Block mode — all notes simultaneous, uniform velocity
                     notesPairs.forEach { (_, midi) ->
                         val pitch = (108 - midi).coerceIn(0, 87)
                         repository.saveNote(NoteEvent(
@@ -216,7 +225,6 @@ class ChordViewModel @Inject constructor(
                     val activeSteps  = stepStates.mapIndexedNotNull { i, s ->
                         if (s != StepState.OFF) Pair(i, s) else null
                     }
-
                     if (activeSteps.isEmpty()) {
                         notesPairs.forEach { (_, midi) ->
                             val pitch = (108 - midi).coerceIn(0, 87)
@@ -231,15 +239,13 @@ class ChordViewModel @Inject constructor(
                         }
                     } else {
                         activeSteps.forEach { (stepIdx, stepState) ->
-                            val stepBeat      = startBeat + (stepIdx * beatsPerStep).toFloat()
-                            val isDownstroke  = stepState == StepState.DOWN
-                            val strOrder      = if (isDownstroke) notesPairs else notesPairs.reversed()
-                            val noteDur       = (beatsPerStep * 0.95).toFloat().coerceAtLeast(0.0625f)
-
+                            val stepBeat     = startBeat + (stepIdx * beatsPerStep).toFloat()
+                            val isDownstroke = stepState == StepState.DOWN
+                            val strOrder     = if (isDownstroke) notesPairs else notesPairs.reversed()
+                            val noteDur      = (beatsPerStep * 0.95).toFloat().coerceAtLeast(0.0625f)
                             strOrder.forEachIndexed { strIdx, (_, midi) ->
                                 val offset = (strIdx * strumSpeedVal).toFloat()
                                 val pitch  = (108 - midi).coerceIn(0, 87)
-                                // Velocity tapers across strings matching real pick dynamics
                                 val vel    = strumVelocity(strIdx, strOrder.size, isDownstroke)
                                 repository.saveNote(NoteEvent(
                                     id       = UUID.randomUUID().toString(),
@@ -254,7 +260,7 @@ class ChordViewModel @Inject constructor(
                     }
                 }
             }
-            _statusMessage.value = "Sent to ${targetTrack.name}"
+            _statusMessage.value = "Sent to ${targetTrack.name}${if (appendMode) " (appended)" else ""}"
             onComplete()
         }
     }

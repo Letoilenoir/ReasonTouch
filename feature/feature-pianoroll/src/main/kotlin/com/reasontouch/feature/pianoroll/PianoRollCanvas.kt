@@ -44,7 +44,7 @@ fun PianoRollCanvas(
                 drawPianoKeys(state, textMeasurer)
             }
 
-            // Note grid — single unified gesture handler
+            // Note grid
             Canvas(
                 modifier = Modifier
                     .weight(1f)
@@ -60,6 +60,7 @@ fun PianoRollCanvas(
 
                 if (uiState.loopEnabled) drawLoopRegion(state, uiState.loopStart, uiState.loopEnd)
 
+                // Ghost notes from other tracks
                 uiState.tracks.forEachIndexed { i, track ->
                     if (i != uiState.activeIndex && !track.muted) {
                         val notes = uiState.allNotes[track.id] ?: emptyList()
@@ -67,13 +68,22 @@ fun PianoRollCanvas(
                     }
                 }
 
+                // Active track notes — pass move deltas for live preview
                 uiState.activeTrack?.let { track ->
                     if (!track.muted) {
-                        drawNotes(state, uiState.activeNotes, state.trackColor(uiState.activeIndex),
-                            ghost = false, selectedIds = uiState.selectedIds)
+                        drawNotes(
+                            state          = state,
+                            notes          = uiState.activeNotes,
+                            trackColor     = state.trackColor(uiState.activeIndex),
+                            ghost          = false,
+                            selectedIds    = uiState.selectedIds,
+                            moveDeltaBeat  = state.moveDragDeltaBeat,
+                            moveDeltaPitch = state.moveDragDeltaPitch
+                        )
                     }
                 }
 
+                drawRubberBand(state)
                 drawPlayhead(state, uiState.playheadBeat)
             }
 
@@ -114,9 +124,10 @@ fun PianoRollCanvas(
 fun VelocityStripCanvas(
     state: PianoRollState,
     uiState: PianoRollUiState,
+    viewModel: PianoRollViewModel,
     modifier: Modifier = Modifier
 ) {
-    Canvas(modifier = modifier) {
+    Canvas(modifier = modifier.velocityStripGestures(state, uiState, viewModel)) {
         drawVelocityBars(state, uiState.activeNotes)
     }
 }

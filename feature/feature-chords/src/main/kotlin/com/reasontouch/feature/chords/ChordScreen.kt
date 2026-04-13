@@ -80,7 +80,7 @@ fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) 
 
     Column(modifier = Modifier.fillMaxSize().background(BG)) {
 
-        // ── Fixed toolbar ─────────────────────────────────────────────────
+        // â”€â”€ Fixed toolbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         ChordToolbar(
             showSettings     = showSettings,
             onToggleSettings = { showSettings = !showSettings },
@@ -88,7 +88,7 @@ fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) 
             hasBars          = progression.isNotEmpty()
         )
 
-        // ── Scrollable content area ───────────────────────────────────────
+        // â”€â”€ Scrollable content area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         AnimatedContent(
             targetState = showSettings,
             transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -98,7 +98,7 @@ fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) 
             else ChordPanel(viewModel = viewModel)
         }
 
-        // ── Fixed bottom bar — always visible ─────────────────────────────
+        // â”€â”€ Fixed bottom bar â€” always visible â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         FixedBottomBar(
             progression      = progression,
             chordName        = "$selectedChord $selectedPosition",
@@ -112,8 +112,8 @@ fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) 
     if (showSendDialog) {
         SendToPianoRollDialog(
             tracks    = tracks,
-            onConfirm = { trackIndex, useStrum ->
-                viewModel.sendToPianoRoll(trackIndex, useStrum) {}
+            onConfirm = { trackIndex, useStrum, appendMode ->
+                viewModel.sendToPianoRoll(trackIndex, useStrum, appendMode) {}
                 showSendDialog = false
             },
             onDismiss = { showSendDialog = false }
@@ -121,7 +121,7 @@ fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) 
     }
 }
 
-// ── Fixed bottom bar ──────────────────────────────────────────────────────────
+// â”€â”€ Fixed bottom bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @Composable
 fun FixedBottomBar(
@@ -142,7 +142,7 @@ fun FixedBottomBar(
                 shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
             )
     ) {
-        // Progression strip — horizontal scroll
+        // Progression strip â€” horizontal scroll
         if (progression.isNotEmpty()) {
             Row(
                 modifier = Modifier
@@ -195,7 +195,7 @@ fun FixedBottomBar(
             )
         }
 
-        // Add Bar button — always visible
+        // Add Bar button â€” always visible
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -262,7 +262,7 @@ fun ProgressionChip(bar: ChordEvent, onRemove: () -> Unit) {
     }
 }
 
-// ── Toolbar ───────────────────────────────────────────────────────────────────
+// â”€â”€ Toolbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @Composable
 fun ChordToolbar(
@@ -329,7 +329,7 @@ fun ChordToolbar(
     Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(ACCENT))
 }
 
-// ── Chord panel ───────────────────────────────────────────────────────────────
+// â”€â”€ Chord panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @Composable
 fun ChordPanel(viewModel: ChordViewModel) {
@@ -377,13 +377,13 @@ fun ChordPanel(viewModel: ChordViewModel) {
         item { PatternGrid(steps = stepStates, onCycleStep = viewModel::cycleStep) }
 
         item { SectionLabel("PRESETS") }
-        item { PresetPatterns(onApply = viewModel::applyPreset) }
+        item { PresetPatternsDropdown(onApply = viewModel::applyPreset) }
 
         item { Spacer(modifier = Modifier.height(8.dp)) }
     }
 }
 
-// ── Settings panel ────────────────────────────────────────────────────────────
+// â”€â”€ Settings panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -406,7 +406,7 @@ fun SettingsPanel(viewModel: ChordViewModel) {
         contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp)
     ) {
         item {
-            // ── Tempo ─────────────────────────────────────────────────────
+            // â”€â”€ Tempo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             SectionLabel("TEMPO & BAR DURATION")
             SettingsRow(label = "Tempo") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -435,7 +435,7 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                 }
             }
 
-            // ── Strum ─────────────────────────────────────────────────────
+            // â”€â”€ Strum â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             SectionLabel("STRUM")
             SettingsRow(label = "Strum Simulation") {
                 Switch(
@@ -517,7 +517,7 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                 }
             }
 
-            // ── GM Guitar sound dropdown ───────────────────────────────────
+            // â”€â”€ GM Guitar sound dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             SectionLabel("GUITAR SOUND (GM PROGRAM)")
             SettingsRow(label = "Instrument") {
                 ExposedDropdownMenuBox(
@@ -589,7 +589,7 @@ fun SettingsPanel(viewModel: ChordViewModel) {
     }
 }
 
-// ── Shared components ─────────────────────────────────────────────────────────
+// â”€â”€ Shared components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @Composable
 fun SectionLabel(text: String) {
@@ -842,11 +842,12 @@ fun StepperButton(label: String, onClick: () -> Unit) {
 @Composable
 fun SendToPianoRollDialog(
     tracks:    List<com.reasontouch.core.data.MidiTrack>,
-    onConfirm: (trackIndex: Int, useStrum: Boolean) -> Unit,
+    onConfirm: (trackIndex: Int, useStrum: Boolean, appendMode: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     var selectedTrack by remember { mutableStateOf(0) }
     var useStrum      by remember { mutableStateOf(false) }
+    var appendMode    by remember { mutableStateOf(false) }
 
     androidx.compose.material3.AlertDialog(
         onDismissRequest  = onDismiss,
@@ -945,7 +946,7 @@ fun SendToPianoRollDialog(
         },
         confirmButton = {
             androidx.compose.material3.Button(
-                onClick = { onConfirm(selectedTrack, useStrum) },
+                onClick = { onConfirm(selectedTrack, useStrum, appendMode) },
                 colors  = androidx.compose.material3.ButtonDefaults.buttonColors(
                     containerColor = GREEN
                 )
@@ -962,4 +963,94 @@ fun SendToPianoRollDialog(
             }
         }
     )
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PresetPatternsDropdown(onApply: (StepPattern) -> Unit) {
+    var expanded     by remember { mutableStateOf(false) }
+    var selectedName by remember { mutableStateOf("Select preset...") }
+
+    // Flatten groups into a list of (groupName, patternName, pattern)
+    // groupName == "" signals a header row
+    data class PresetItem(val group: String, val name: String, val pattern: StepPattern?)
+
+    val items = StrumPatterns.groups.flatMap { (groupName, patterns) ->
+        listOf(PresetItem(groupName, "", null)) +
+        patterns.map { (name, pattern) -> PresetItem(groupName, name, pattern) }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it },
+            modifier = Modifier.weight(1f)
+        ) {
+            TextField(
+                value = selectedName,
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                },
+                colors = TextFieldDefaults.colors(
+                    unfocusedContainerColor = PANEL,
+                    focusedContainerColor   = PANEL,
+                    unfocusedTextColor      = TEXT,
+                    focusedTextColor        = TEXT,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor   = Color.Transparent
+                ),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontFamily = FontFamily.Monospace,
+                    fontSize   = 12.sp
+                ),
+                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable)
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(PANEL)
+            ) {
+                items.forEach { item ->
+                    if (item.pattern == null) {
+                        // Group header — not clickable
+                        Text(
+                            text = item.group.uppercase(),
+                            color = ACCENT2,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 2.sp,
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
+                    } else {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = item.name,
+                                    color = if (item.name == selectedName) GREEN else TEXT,
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            },
+                            onClick = {
+                                selectedName = item.name
+                                onApply(item.pattern)
+                                expanded = false
+                            },
+                            modifier = Modifier.background(
+                                if (item.name == selectedName)
+                                    Color(0xFF1A2A1A) else Color.Transparent
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
