@@ -118,6 +118,7 @@ fun PianoRollScreen(
             SelectionActionBar(
                 selectedCount = selectedIds.size,
                 hasClipboard  = hasClipboard,
+                pasteAtBeat   = playheadBeat,
                 onCopy   = { viewModel.copySelectedNotes() },
                 onPaste  = { viewModel.pasteNotes(playheadBeat, uiState.snapValue) },
                 onDelete = { viewModel.deleteSelectedNotes() },
@@ -156,6 +157,7 @@ fun PianoRollScreen(
 fun SelectionActionBar(
     selectedCount: Int,
     hasClipboard:  Boolean,
+    pasteAtBeat:   Float = 0f,
     onCopy:   () -> Unit,
     onPaste:  () -> Unit,
     onDelete: () -> Unit,
@@ -179,7 +181,7 @@ fun SelectionActionBar(
             modifier = Modifier.weight(1f)
         )
         SelectionChip("COPY",   PURPLE,              onCopy)
-        if (hasClipboard) SelectionChip("PASTE", GREEN, onPaste)
+        if (hasClipboard) SelectionChip("PASTE @${pasteAtBeat}", GREEN, onPaste)
         SelectionChip("DELETE", ACCENT,              onDelete)
         SelectionChip("✕",      TEXT_DIM,            onClear)
     }
