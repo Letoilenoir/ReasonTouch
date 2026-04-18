@@ -32,10 +32,8 @@ class ChordViewModel @Inject constructor(
 
     val session = repository.getSession(sessionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
     val tracks = repository.getTracksForSession(sessionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
     val progression = repository.getChordsForSession(sessionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -72,6 +70,10 @@ class ChordViewModel @Inject constructor(
 
     private val _statusMessage = MutableStateFlow<String?>(null)
     val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
+
+    // ── Harmony suggestion state ──────────────────────────────────────────
+    private val _harmonyState = MutableStateFlow(HarmonyState())
+    val harmonyState: StateFlow<HarmonyState> = _harmonyState.asStateFlow()
 
     fun selectCategory(cat: String) { _selectedCategory.value = cat }
 
@@ -138,6 +140,7 @@ class ChordViewModel @Inject constructor(
             repository.deleteChordsForSession(sessionId)
             _stepStates.value = List(16) { StepState.OFF }
             _statusMessage.value = null
+            _harmonyState.value = HarmonyState()
         }
     }
 
@@ -151,6 +154,13 @@ class ChordViewModel @Inject constructor(
         sf2Player.playChord(midiNotes, 0.5f, 90, gmProgram, strumDelay)
     }
 
+    /** Audition a suggestion chord directly from its MIDI notes */
+    fun auditionSuggestion(suggestion: ChordSuggestion) {
+        val gmProgram  = _instrument.value.program
+        val strumDelay = if (_strumEnabled.value) (_strumSpeed.value * 1000).toLong() else 0L
+        sf2Player.playChord(suggestion.chord.midiNotes, 0.5f, 90, gmProgram, strumDelay)
+    }
+
     private fun strumVelocity(strIdx: Int, stringCount: Int, isDownstroke: Boolean): Int {
         val baseVel  = if (isDownstroke) 105 else 90
         val taperVel = if (isDownstroke) 72  else 65
@@ -158,20 +168,129 @@ class ChordViewModel @Inject constructor(
         return (baseVel - t * (baseVel - taperVel)).toInt().coerceIn(40, 127)
     }
 
+    // ── Harmony analysis ──────────────────────────────────────────────────
+
     /**
-     * Returns the last occupied beat across all notes on the target track.
-     * Used to calculate the append offset when sending to piano roll.
+     * Analyses the current progression and detects candidate keys.
+     * Called when user taps SUGGEST in the toolbar.
+     * Option B: shows key candidates for user selection before generating suggestions.
      */
+    fun analyseProgression() {
+        val bars = progression.value
+        if (bars.isEmpty()) {
+            _statusMessage.value = "Add at least one bar before analysing"
+            return
+        }
+
+        _harmonyState.value = _harmonyState.value.copy(
+            isAnalysing   = true,
+            showPanel     = true,
+            keyCandidates = emptyList(),
+            selectedKey   = null,
+            suggestions   = emptyList()
+        )
+
+        viewModelScope.launch {
+            // Extract chord names from progression (just the chord part, not voicing)
+            val chordNames = bars.map { it.chordName.trim().split(" ").first() }
+            val candidates = KeyDetector.detect(chordNames)
+
+            _harmonyState.value = _harmonyState.value.copy(
+                isAnalysing   = false,
+                keyCandidates = candidates,
+                selectedKey   = null,
+                suggestions   = emptyList()
+            )
+        }
+    }
+
+    /**
+     * User selects a key from the candidates.
+     * Immediately generates chord suggestions for that key.
+     */
+    fun selectKey(candidate: KeyCandidate) {
+        val lastChordName = progression.value.lastOrNull()?.chordName
+            ?.trim()?.split(" ")?.first()
+
+        val suggestions = if (lastChordName != null) {
+            ChordSuggestionEngine.suggest(candidate, lastChordName)
+        } else {
+            ChordSuggestionEngine.suggestAll(candidate)
+        }
+
+        _harmonyState.value = _harmonyState.value.copy(
+            selectedKey = candidate,
+            suggestions = suggestions
+        )
+    }
+
+    /**
+     * User taps a suggestion — adds it as the next bar in the progression.
+     * Finds the best matching chord in GuitarVoicings or falls back to
+     * the first available voicing for that root.
+     */
+    fun addSuggestedChord(suggestion: ChordSuggestion) {
+        val rootLabel    = suggestion.chord.root.label
+        val qualitySuffix = when (suggestion.chord.quality) {
+            ChordQuality.MIN  -> "m"
+            ChordQuality.DIM  -> "dim"
+            ChordQuality.AUG  -> "aug"
+            ChordQuality.DOM7 -> "7"
+            ChordQuality.MAJ7 -> "maj7"
+            ChordQuality.MIN7 -> "m7"
+            ChordQuality.SUS2 -> "sus2"
+            ChordQuality.SUS4 -> "sus4"
+            ChordQuality.MAJ  -> ""
+        }
+        val chordKey = "$rootLabel$qualitySuffix"
+
+        // Find matching chord in GuitarVoicings
+        val voicingMap = GuitarVoicings.voicings[chordKey]
+            ?: GuitarVoicings.voicings.entries
+                .firstOrNull { it.key.startsWith(rootLabel) }
+                ?.value
+
+        if (voicingMap == null) {
+            _statusMessage.value = "No voicing found for ${suggestion.chord.label} — tap to add manually"
+            return
+        }
+
+        val pos   = voicingMap.keys.first()
+        val notes = voicingMap[pos] ?: return
+
+        viewModelScope.launch {
+            val barIndex = progression.value.size
+            val chordEvent = ChordEvent(
+                id             = UUID.randomUUID().toString(),
+                sessionId      = sessionId,
+                barIndex       = barIndex,
+                chordName      = "$chordKey $pos",
+                rootMidi       = notes.firstOrNull { it != null } ?: 0,
+                midiNotes      = notes.filterNotNull().joinToString(","),
+                voicing        = pos,
+                strumPatternId = null
+            )
+            repository.saveChord(chordEvent)
+
+            // Refresh suggestions based on new last chord
+            val selectedKey = _harmonyState.value.selectedKey
+            if (selectedKey != null) {
+                val newSuggestions = ChordSuggestionEngine.suggest(selectedKey, chordKey)
+                _harmonyState.value = _harmonyState.value.copy(suggestions = newSuggestions)
+            }
+            _statusMessage.value = null
+        }
+    }
+
+    fun dismissHarmonyPanel() {
+        _harmonyState.value = HarmonyState()
+    }
+
     suspend fun getLastBeatOnTrack(trackId: String): Float {
         val notes = repository.getNotesForTrackOnce(trackId)
         return notes.maxOfOrNull { it.beat + it.duration } ?: 0f
     }
 
-    /**
-     * Send progression to piano roll.
-     * startFromBeat: offset in beats — 0f = overwrite from bar 1,
-     * positive value = append after existing content.
-     */
     fun sendToPianoRoll(
         targetTrackIndex: Int,
         useStrum:         Boolean,
@@ -187,10 +306,8 @@ class ChordViewModel @Inject constructor(
                 return@launch
             }
 
-            // In append mode, find the last occupied beat and round up to
-            // the next complete bar boundary
             val startFromBeat = if (appendMode) {
-                val lastBeat  = getLastBeatOnTrack(targetTrack.id)
+                val lastBeat    = getLastBeatOnTrack(targetTrack.id)
                 val beatsPerBar = _barDuration.value
                 if (lastBeat <= 0f) 0f
                 else {
@@ -220,9 +337,9 @@ class ChordViewModel @Inject constructor(
                         ))
                     }
                 } else {
-                    val stepStates   = _stepStates.value
-                    val beatsPerStep = beatsPerBar / 16.0
-                    val activeSteps  = stepStates.mapIndexedNotNull { i, s ->
+                    val stepStates    = _stepStates.value
+                    val beatsPerStep  = beatsPerBar / 16.0
+                    val activeSteps   = stepStates.mapIndexedNotNull { i, s ->
                         if (s != StepState.OFF) Pair(i, s) else null
                     }
                     if (activeSteps.isEmpty()) {

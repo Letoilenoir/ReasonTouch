@@ -1,8 +1,11 @@
 package com.reasontouch.feature.chords
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +29,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -67,6 +71,8 @@ private val TEXT     = Color(0xFFC8C8D4)
 private val TEXT_DIM = Color(0xFF666675)
 private val DOWN_COL = Color(0xFF1A3A5A)
 private val UP_COL   = Color(0xFF2A1A3A)
+private val PURPLE   = Color(0xFFA78BFA)
+private val GOLD     = Color(0xFFF5C518)
 
 @Composable
 fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) {
@@ -77,18 +83,34 @@ fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) 
     val selectedChord  by viewModel.selectedChord.collectAsState()
     val selectedPosition by viewModel.selectedPosition.collectAsState()
     val statusMessage  by viewModel.statusMessage.collectAsState()
+    val harmonyState   by viewModel.harmonyState.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize().background(BG)) {
 
-        // â”€â”€ Fixed toolbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         ChordToolbar(
-            showSettings     = showSettings,
-            onToggleSettings = { showSettings = !showSettings },
-            onSendToRoll     = { showSendDialog = true },
-            hasBars          = progression.isNotEmpty()
+            showSettings      = showSettings,
+            onToggleSettings  = { showSettings = !showSettings },
+            onSendToRoll      = { showSendDialog = true },
+            onSuggest         = viewModel::analyseProgression,
+            hasBars           = progression.isNotEmpty(),
+            showingSuggestions = harmonyState.showPanel
         )
 
-        // â”€â”€ Scrollable content area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // Harmony suggestion panel — slides in below toolbar
+        AnimatedVisibility(
+            visible = harmonyState.showPanel && !showSettings,
+            enter   = expandVertically() + fadeIn(),
+            exit    = shrinkVertically() + fadeOut()
+        ) {
+            HarmonyPanel(
+                state      = harmonyState,
+                onSelectKey = viewModel::selectKey,
+                onAddChord  = viewModel::addSuggestedChord,
+                onAudition  = viewModel::auditionSuggestion,
+                onDismiss   = viewModel::dismissHarmonyPanel
+            )
+        }
+
         AnimatedContent(
             targetState = showSettings,
             transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -98,14 +120,13 @@ fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) 
             else ChordPanel(viewModel = viewModel)
         }
 
-        // â”€â”€ Fixed bottom bar â€” always visible â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         FixedBottomBar(
-            progression      = progression,
-            chordName        = "$selectedChord $selectedPosition",
-            statusMessage    = statusMessage,
-            onAddBar         = viewModel::addBar,
-            onRemoveBar      = viewModel::removeBar,
-            onClear          = viewModel::clearProgression
+            progression   = progression,
+            chordName     = "$selectedChord $selectedPosition",
+            statusMessage = statusMessage,
+            onAddBar      = viewModel::addBar,
+            onRemoveBar   = viewModel::removeBar,
+            onClear       = viewModel::clearProgression
         )
     }
 
@@ -121,155 +142,192 @@ fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) 
     }
 }
 
-// â”€â”€ Fixed bottom bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Harmony suggestion panel ──────────────────────────────────────────────────
 
 @Composable
-fun FixedBottomBar(
-    progression:   List<ChordEvent>,
-    chordName:     String,
-    statusMessage: String?,
-    onAddBar:      () -> Unit,
-    onRemoveBar:   (ChordEvent) -> Unit,
-    onClear:       () -> Unit
+fun HarmonyPanel(
+    state:       HarmonyState,
+    onSelectKey: (KeyCandidate) -> Unit,
+    onAddChord:  (ChordSuggestion) -> Unit,
+    onAudition:  (ChordSuggestion) -> Unit,
+    onDismiss:   () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF16161A))
+            .background(Color(0xFF1A1A28))
             .border(
                 width = 1.dp,
-                color = BORDER,
-                shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+                color = PURPLE.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(0.dp)
             )
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        // Progression strip â€” horizontal scroll
-        if (progression.isNotEmpty()) {
-            Row(
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "\uD83E\uDDE0  HARMONY ANALYSIS",
+                color = PURPLE,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.sp
+            )
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(RACK)
-                    .padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .clip(RoundedCornerShape(3.dp))
+                    .clickable(onClick = onDismiss)
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
-                LazyRow(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                Text("✕", color = TEXT_DIM, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        when {
+            state.isAnalysing -> {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(progression) { bar ->
-                        ProgressionChip(
-                            bar      = bar,
-                            onRemove = { onRemoveBar(bar) }
-                        )
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        color = PURPLE,
+                        strokeWidth = 2.dp
+                    )
+                    Text("Analysing progression...", color = TEXT_DIM,
+                        fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                }
+            }
+
+            state.keyCandidates.isEmpty() -> {
+                Text("No key detected — add more chords and try again",
+                    color = TEXT_DIM, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            }
+
+            else -> {
+                // Step 1 — Key selection
+                Text(
+                    text = if (state.selectedKey == null)
+                        "SELECT KEY" else "KEY",
+                    color = TEXT_DIM, fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace, letterSpacing = 2.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(state.keyCandidates) { candidate ->
+                        val isSelected = state.selectedKey == candidate
+                        val confidence = (candidate.confidence * 100).toInt()
+                        val borderCol  = if (candidate.isMinor) PURPLE else GOLD
+                        Column(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(
+                                    if (isSelected)
+                                        borderCol.copy(alpha = 0.2f)
+                                    else Color(0xFF1E1E2A)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isSelected) borderCol else BORDER,
+                                    RoundedCornerShape(6.dp)
+                                )
+                                .clickable { onSelectKey(candidate) }
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "${candidate.root.label} ${if (candidate.isMinor) "Minor" else "Major"}",
+                                color = if (isSelected) borderCol else TEXT,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = if (candidate.isMinor) "Dark" else "Bright",
+                                color = TEXT_DIM,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "$confidence% match",
+                                color = if (isSelected) borderCol else TEXT_DIM,
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
                     }
                 }
-                // Clear all button
-                Box(
-                    modifier = Modifier
-                        .padding(end = 8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xFF2A1A1A))
-                        .border(1.dp, ACCENT, RoundedCornerShape(4.dp))
-                        .clickable(onClick = onClear)
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
+
+                // Step 2 — Chord suggestions (appears after key selected)
+                if (state.selectedKey != null && state.suggestions.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "CLR",
-                        color = ACCENT,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
+                        text = "SUGGESTED NEXT CHORDS",
+                        color = TEXT_DIM, fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace, letterSpacing = 2.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(state.suggestions) { suggestion ->
+                            val funcColor = when (suggestion.function) {
+                                HarmonicFunction.TONIC       -> GREEN
+                                HarmonicFunction.PREDOMINANT -> GOLD
+                                HarmonicFunction.DOMINANT    -> ACCENT2
+                            }
+                            Column(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(funcColor.copy(alpha = 0.12f))
+                                    .border(1.dp, funcColor.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                                    .clickable { onAudition(suggestion); onAddChord(suggestion) }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = suggestion.chord.label,
+                                    color = TEXT,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Text(
+                                    text = suggestion.description,
+                                    color = funcColor,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Tap a chord to audition and add to progression",
+                        color = TEXT_DIM, fontSize = 9.sp,
                         fontFamily = FontFamily.Monospace
                     )
                 }
             }
         }
-
-        // Status message
-        statusMessage?.let { msg ->
-            Text(
-                text = msg,
-                color = ACCENT2,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
-            )
-        }
-
-        // Add Bar button â€” always visible
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(ACCENT)
-                .clickable(onClick = onAddBar)
-                .padding(vertical = 14.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "+ ADD BAR  ${chordName.uppercase()}",
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.sp
-            )
-        }
     }
 }
 
-@Composable
-fun ProgressionChip(bar: ChordEvent, onRemove: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(PANEL)
-            .border(1.dp, BORDER, RoundedCornerShape(4.dp))
-            .padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text(
-            text = "${bar.barIndex + 1}",
-            color = ACCENT2,
-            fontSize = 10.sp,
-            fontFamily = FontFamily.Monospace
-        )
-        Text(
-            text = bar.chordName.uppercase(),
-            color = TEXT,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            maxLines = 1
-        )
-        Box(
-            modifier = Modifier
-                .size(18.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(Color(0xFF3A1A1A))
-                .clickable(onClick = onRemove),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "x",
-                color = ACCENT,
-                fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-// â”€â”€ Toolbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Toolbar ───────────────────────────────────────────────────────────────────
 
 @Composable
 fun ChordToolbar(
-    showSettings:    Boolean,
-    onToggleSettings: () -> Unit,
-    onSendToRoll:    () -> Unit,
-    hasBars:         Boolean
+    showSettings:       Boolean,
+    onToggleSettings:   () -> Unit,
+    onSendToRoll:       () -> Unit,
+    onSuggest:          () -> Unit,
+    hasBars:            Boolean,
+    showingSuggestions: Boolean
 ) {
     Row(
         modifier = Modifier
@@ -289,7 +347,32 @@ fun ChordToolbar(
             letterSpacing = 2.sp
         )
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Suggest button — only when there are bars and not in settings
             if (hasBars && !showSettings) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            if (showingSuggestions)
+                                PURPLE.copy(alpha = 0.2f) else Color(0xFF1E1A2E)
+                        )
+                        .border(
+                            1.dp,
+                            if (showingSuggestions) PURPLE else PURPLE.copy(alpha = 0.4f),
+                            RoundedCornerShape(4.dp)
+                        )
+                        .clickable(onClick = onSuggest)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "\uD83E\uDDE0 SUGGEST",
+                        color = PURPLE,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                // Send to Roll
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
@@ -307,6 +390,7 @@ fun ChordToolbar(
                     )
                 }
             }
+            // Settings toggle
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
@@ -329,7 +413,114 @@ fun ChordToolbar(
     Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(ACCENT))
 }
 
-// â”€â”€ Chord panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Fixed bottom bar ──────────────────────────────────────────────────────────
+
+@Composable
+fun FixedBottomBar(
+    progression:   List<ChordEvent>,
+    chordName:     String,
+    statusMessage: String?,
+    onAddBar:      () -> Unit,
+    onRemoveBar:   (ChordEvent) -> Unit,
+    onClear:       () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF16161A))
+            .border(width = 1.dp, color = BORDER,
+                shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+    ) {
+        if (progression.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(RACK)
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LazyRow(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(progression) { bar ->
+                        ProgressionChip(bar = bar, onRemove = { onRemoveBar(bar) })
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFF2A1A1A))
+                        .border(1.dp, ACCENT, RoundedCornerShape(4.dp))
+                        .clickable(onClick = onClear)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text("CLR", color = ACCENT, fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+            }
+        }
+
+        statusMessage?.let { msg ->
+            Text(
+                text = msg,
+                color = ACCENT2, fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(ACCENT)
+                .clickable(onClick = onAddBar)
+                .padding(vertical = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "+ ADD BAR  ${chordName.uppercase()}",
+                color = Color.White, fontSize = 14.sp,
+                fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun ProgressionChip(bar: ChordEvent, onRemove: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(PANEL)
+            .border(1.dp, BORDER, RoundedCornerShape(4.dp))
+            .padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text("${bar.barIndex + 1}", color = ACCENT2, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+        Text(bar.chordName.uppercase(), color = TEXT, fontSize = 11.sp,
+            fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 1)
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color(0xFF3A1A1A))
+                .clickable(onClick = onRemove),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("x", color = ACCENT, fontSize = 10.sp, fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+// ── Chord panel ───────────────────────────────────────────────────────────────
 
 @Composable
 fun ChordPanel(viewModel: ChordViewModel) {
@@ -352,7 +543,6 @@ fun ChordPanel(viewModel: ChordViewModel) {
                 onSelect   = viewModel::selectCategory
             )
         }
-
         item { SectionLabel("CHORD") }
         item {
             ChordGrid(
@@ -361,7 +551,6 @@ fun ChordPanel(viewModel: ChordViewModel) {
                 onSelect = viewModel::selectChord
             )
         }
-
         if (availablePositions.size > 1) {
             item { SectionLabel("VOICING / POSITION") }
             item {
@@ -372,18 +561,15 @@ fun ChordPanel(viewModel: ChordViewModel) {
                 )
             }
         }
-
         item { SectionLabel("PATTERN") }
         item { PatternGrid(steps = stepStates, onCycleStep = viewModel::cycleStep) }
-
         item { SectionLabel("PRESETS") }
         item { PresetPatternsDropdown(onApply = viewModel::applyPreset) }
-
         item { Spacer(modifier = Modifier.height(8.dp)) }
     }
 }
 
-// â”€â”€ Settings panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Settings panel ────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -406,17 +592,13 @@ fun SettingsPanel(viewModel: ChordViewModel) {
         contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp)
     ) {
         item {
-            // â”€â”€ Tempo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             SectionLabel("TEMPO & BAR DURATION")
             SettingsRow(label = "Tempo") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     StepperButton("<") { viewModel.setTempo(tempo - 1) }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "$tempo BPM",
-                        color = ACCENT2, fontSize = 14.sp,
-                        fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold
-                    )
+                    Text("$tempo BPM", color = ACCENT2, fontSize = 14.sp,
+                        fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.width(8.dp))
                     StepperButton(">") { viewModel.setTempo(tempo + 1) }
                 }
@@ -425,17 +607,12 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     StepperButton("<") { viewModel.setBarDuration(barDuration - 0.5) }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "$barDuration beats",
-                        color = ACCENT2, fontSize = 14.sp,
-                        fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold
-                    )
+                    Text("$barDuration beats", color = ACCENT2, fontSize = 14.sp,
+                        fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.width(8.dp))
                     StepperButton(">") { viewModel.setBarDuration(barDuration + 0.5) }
                 }
             }
-
-            // â”€â”€ Strum â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             SectionLabel("STRUM")
             SettingsRow(label = "Strum Simulation") {
                 Switch(
@@ -447,9 +624,7 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                     )
                 )
             }
-
             if (strumEnabled) {
-                // Strum speed dropdown
                 SettingsRow(label = "Strum Speed") {
                     ExposedDropdownMenuBox(
                         expanded = strumDropdownExpanded,
@@ -471,9 +646,7 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                                 focusedIndicatorColor   = Color.Transparent
                             ),
                             textStyle = androidx.compose.ui.text.TextStyle(
-                                fontFamily = FontFamily.Monospace,
-                                fontSize   = 12.sp
-                            ),
+                                fontFamily = FontFamily.Monospace, fontSize = 12.sp),
                             modifier = Modifier
                                 .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                                 .widthIn(min = 140.dp)
@@ -487,19 +660,12 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                                 DropdownMenuItem(
                                     text = {
                                         Column {
-                                            Text(
-                                                text = preset.label,
+                                            Text(preset.label,
                                                 color = if (preset.beatsPerString == strumSpeed) GREEN else TEXT,
-                                                fontSize = 12.sp,
-                                                fontFamily = FontFamily.Monospace,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Text(
-                                                text = preset.description,
-                                                color = TEXT_DIM,
-                                                fontSize = 10.sp,
-                                                fontFamily = FontFamily.Monospace
-                                            )
+                                                fontSize = 12.sp, fontFamily = FontFamily.Monospace,
+                                                fontWeight = FontWeight.Bold)
+                                            Text(preset.description, color = TEXT_DIM,
+                                                fontSize = 10.sp, fontFamily = FontFamily.Monospace)
                                         }
                                     },
                                     onClick = {
@@ -508,16 +674,13 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                                     },
                                     modifier = Modifier.background(
                                         if (preset.beatsPerString == strumSpeed)
-                                            Color(0xFF1A2A1A) else Color.Transparent
-                                    )
+                                            Color(0xFF1A2A1A) else Color.Transparent)
                                 )
                             }
                         }
                     }
                 }
             }
-
-            // â”€â”€ GM Guitar sound dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             SectionLabel("GUITAR SOUND (GM PROGRAM)")
             SettingsRow(label = "Instrument") {
                 ExposedDropdownMenuBox(
@@ -540,9 +703,7 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                             focusedIndicatorColor   = Color.Transparent
                         ),
                         textStyle = androidx.compose.ui.text.TextStyle(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize   = 12.sp
-                        ),
+                            fontFamily = FontFamily.Monospace, fontSize = 12.sp),
                         modifier = Modifier
                             .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                             .widthIn(min = 160.dp)
@@ -556,20 +717,13 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                             DropdownMenuItem(
                                 text = {
                                     Column {
-                                        Text(
-                                            text = gm.label,
+                                        Text(gm.label,
                                             color = if (gm.program == instrument.program)
                                                 Color(0xFF38BDF8) else TEXT,
-                                            fontSize = 12.sp,
-                                            fontFamily = FontFamily.Monospace,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "GM ${gm.program + 1}",
-                                            color = TEXT_DIM,
-                                            fontSize = 10.sp,
-                                            fontFamily = FontFamily.Monospace
-                                        )
+                                            fontSize = 12.sp, fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold)
+                                        Text("GM ${gm.program + 1}", color = TEXT_DIM,
+                                            fontSize = 10.sp, fontFamily = FontFamily.Monospace)
                                     }
                                 },
                                 onClick = {
@@ -578,8 +732,7 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                                 },
                                 modifier = Modifier.background(
                                     if (gm.program == instrument.program)
-                                        Color(0xFF1A2A3A) else Color.Transparent
-                                )
+                                        Color(0xFF1A2A3A) else Color.Transparent)
                             )
                         }
                     }
@@ -589,7 +742,7 @@ fun SettingsPanel(viewModel: ChordViewModel) {
     }
 }
 
-// â”€â”€ Shared components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Shared components ─────────────────────────────────────────────────────────
 
 @Composable
 fun SectionLabel(text: String) {
@@ -616,12 +769,9 @@ fun CategoryFilter(categories: List<String>, selected: String, onSelect: (String
                     .clickable { onSelect(cat) }
                     .padding(horizontal = 14.dp, vertical = 7.dp)
             ) {
-                Text(
-                    text = cat,
-                    color = if (isSelected) Color.White else TEXT_DIM,
+                Text(cat, color = if (isSelected) Color.White else TEXT_DIM,
                     fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
+                    fontFamily = FontFamily.Monospace)
             }
         }
     }
@@ -657,12 +807,9 @@ fun ChordGrid(chords: List<String>, selected: String, onSelect: (String) -> Unit
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = chord,
-                    color = if (isSelected) Color.White else TEXT,
+                Text(chord, color = if (isSelected) Color.White else TEXT,
                     fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
+                    fontFamily = FontFamily.Monospace)
             }
         }
     }
@@ -680,20 +827,15 @@ fun PositionSelector(positions: List<String>, selected: String, onSelect: (Strin
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
                     .background(if (isSelected) Color(0xFF1A3A5A) else PANEL)
-                    .border(
-                        1.dp,
+                    .border(1.dp,
                         if (isSelected) Color(0xFF38BDF8) else BORDER,
-                        RoundedCornerShape(4.dp)
-                    )
+                        RoundedCornerShape(4.dp))
                     .clickable { onSelect(pos) }
                     .padding(horizontal = 14.dp, vertical = 8.dp)
             ) {
-                Text(
-                    text = pos,
-                    color = if (isSelected) Color(0xFF38BDF8) else TEXT_DIM,
+                Text(pos, color = if (isSelected) Color(0xFF38BDF8) else TEXT_DIM,
                     fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
+                    fontFamily = FontFamily.Monospace)
             }
         }
     }
@@ -704,27 +846,19 @@ fun PatternGrid(steps: List<StepState>, onCycleStep: (Int) -> Unit) {
     Column(modifier = Modifier.padding(horizontal = 12.dp)) {
         Row(modifier = Modifier.fillMaxWidth()) {
             listOf("B1","B2","B3","B4").forEach { label ->
-                Text(
-                    text = label, color = TEXT_DIM, fontSize = 9.sp,
+                Text(label, color = TEXT_DIM, fontSize = 9.sp,
                     fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.weight(1f), textAlign = TextAlign.Start
-                )
+                    modifier = Modifier.weight(1f), textAlign = TextAlign.Start)
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             (0 until 4).forEach { beat ->
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
+                Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     (0 until 4).forEach { sub ->
                         StepButton(
-                            state   = steps[beat * 4 + sub],
-                            onClick = { onCycleStep(beat * 4 + sub) },
+                            state    = steps[beat * 4 + sub],
+                            onClick  = { onCycleStep(beat * 4 + sub) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -756,10 +890,8 @@ fun StepButton(state: StepState, onClick: () -> Unit, modifier: Modifier = Modif
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = label, color = fg, fontSize = 12.sp,
-            fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace
-        )
+        Text(label, color = fg, fontSize = 12.sp,
+            fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
     }
 }
 
@@ -768,35 +900,81 @@ fun StepLegendItem(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(8.dp).background(color, RoundedCornerShape(2.dp)))
         Spacer(modifier = Modifier.width(4.dp))
-        Text(text = label, color = TEXT_DIM, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+        Text(label, color = TEXT_DIM, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PresetPatterns(onApply: (StepPattern) -> Unit) {
-    StrumPatterns.groups.forEach { (groupName, patterns) ->
-        Text(
-            text = groupName.uppercase(), color = TEXT_DIM, fontSize = 9.sp,
-            fontFamily = FontFamily.Monospace, letterSpacing = 2.sp,
-            modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 3.dp)
-        )
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+fun PresetPatternsDropdown(onApply: (StepPattern) -> Unit) {
+    var expanded     by remember { mutableStateOf(false) }
+    var selectedName by remember { mutableStateOf("Select preset...") }
+
+    data class PresetItem(val group: String, val name: String, val pattern: StepPattern?)
+
+    val items = StrumPatterns.groups.flatMap { (groupName, patterns) ->
+        listOf(PresetItem(groupName, "", null)) +
+        patterns.map { (name, pattern) -> PresetItem(groupName, name, pattern) }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it },
+            modifier = Modifier.weight(1f)
         ) {
-            items(patterns.entries.toList()) { (name, pattern) ->
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(PANEL)
-                        .border(1.dp, BORDER, RoundedCornerShape(4.dp))
-                        .clickable { onApply(pattern) }
-                        .padding(horizontal = 12.dp, vertical = 7.dp)
-                ) {
-                    Text(
-                        text = name, color = TEXT, fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
+            TextField(
+                value = selectedName,
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                },
+                colors = TextFieldDefaults.colors(
+                    unfocusedContainerColor = PANEL, focusedContainerColor = PANEL,
+                    unfocusedTextColor = TEXT, focusedTextColor = TEXT,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor   = Color.Transparent
+                ),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontFamily = FontFamily.Monospace, fontSize = 12.sp),
+                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable)
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(PANEL)
+            ) {
+                items.forEach { item ->
+                    if (item.pattern == null) {
+                        Text(
+                            text = item.group.uppercase(),
+                            color = ACCENT2,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 2.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
+                    } else {
+                        DropdownMenuItem(
+                            text = {
+                                Text(item.name,
+                                    color = if (item.name == selectedName) GREEN else TEXT,
+                                    fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                            },
+                            onClick = {
+                                selectedName = item.name
+                                onApply(item.pattern)
+                                expanded = false
+                            },
+                            modifier = Modifier.background(
+                                if (item.name == selectedName)
+                                    Color(0xFF1A2A1A) else Color.Transparent)
+                        )
+                    }
                 }
             }
         }
@@ -816,7 +994,7 @@ fun SettingsRow(label: String, content: @Composable () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = label, color = TEXT, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+        Text(label, color = TEXT, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
         content()
     }
 }
@@ -832,10 +1010,8 @@ fun StepperButton(label: String, onClick: () -> Unit) {
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = label, color = TEXT, fontSize = 14.sp,
-            fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold
-        )
+        Text(label, color = TEXT, fontSize = 14.sp,
+            fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -855,29 +1031,21 @@ fun SendToPianoRollDialog(
         titleContentColor = GREEN,
         textContentColor  = TEXT,
         title = {
-            Text(
-                text = "SEND TO PIANO ROLL",
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp, fontSize = 14.sp
-            )
+            Text("SEND TO PIANO ROLL", fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 14.sp)
         },
         text = {
             Column {
-                Text(
-                    text = "MODE", color = TEXT_DIM, fontSize = 10.sp,
+                Text("MODE", color = TEXT_DIM, fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace, letterSpacing = 2.sp,
-                    modifier = Modifier.padding(bottom = 6.dp)
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                    modifier = Modifier.padding(bottom = 6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(false to "BLOCK" to "All notes together",
-                           true  to "STRUM" to "Apply pattern timing").forEach { (pair, desc) ->
+                           true  to "STRUM" to "Apply pattern timing")
+                        .forEach { (pair, desc) ->
                         val (mode, modeLabel) = pair
-                        val active  = useStrum == mode
-                        val col     = if (mode) GREEN else Color(0xFF38BDF8)
+                        val active = useStrum == mode
+                        val col    = if (mode) GREEN else Color(0xFF38BDF8)
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -889,27 +1057,21 @@ fun SendToPianoRollDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = modeLabel,
+                                Text(modeLabel,
                                     color = if (active) col else TEXT_DIM,
                                     fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                                Text(
-                                    text = desc, color = TEXT_DIM, fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace)
+                                Text(desc, color = TEXT_DIM, fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace,
-                                    textAlign = TextAlign.Center
-                                )
+                                    textAlign = TextAlign.Center)
                             }
                         }
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "TARGET TRACK", color = TEXT_DIM, fontSize = 10.sp,
+                Text("TARGET TRACK", color = TEXT_DIM, fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace, letterSpacing = 2.sp,
-                    modifier = Modifier.padding(bottom = 6.dp)
-                )
+                    modifier = Modifier.padding(bottom = 6.dp))
                 tracks.forEachIndexed { i, track ->
                     val trackColor = Color(when (i % 8) {
                         0 -> 0xFFE84040L; 1 -> 0xFF3DDC84L; 2 -> 0xFF38BDF8L
@@ -929,18 +1091,47 @@ fun SendToPianoRollDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .width(3.dp).height(20.dp)
-                                .background(trackColor, RoundedCornerShape(2.dp))
-                        )
-                        Text(
-                            text = track.name,
+                        Box(modifier = Modifier.width(3.dp).height(20.dp)
+                            .background(trackColor, RoundedCornerShape(2.dp)))
+                        Text(track.name,
                             color = if (isSelected) trackColor else TEXT_DIM,
                             fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
+                            fontFamily = FontFamily.Monospace)
                     }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (appendMode) Color(0xFF1A2A3A) else BG)
+                        .border(1.dp,
+                            if (appendMode) Color(0xFF38BDF8) else BORDER,
+                            RoundedCornerShape(4.dp))
+                        .clickable { appendMode = !appendMode }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("APPEND TO EXISTING",
+                            color = if (appendMode) Color(0xFF38BDF8) else TEXT_DIM,
+                            fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace)
+                        Text(
+                            text = if (appendMode) "Adds after last note on track"
+                                   else "Overwrites from bar 1",
+                            color = TEXT_DIM, fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace)
+                    }
+                    Switch(
+                        checked = appendMode,
+                        onCheckedChange = { appendMode = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Color(0xFF38BDF8)
+                        )
+                    )
                 }
             }
         },
@@ -948,109 +1139,16 @@ fun SendToPianoRollDialog(
             androidx.compose.material3.Button(
                 onClick = { onConfirm(selectedTrack, useStrum, appendMode) },
                 colors  = androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = GREEN
-                )
+                    containerColor = GREEN)
             ) {
-                Text(
-                    text = "SEND", color = BG,
-                    fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold
-                )
+                Text("SEND", color = BG, fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text(text = "CANCEL", color = TEXT_DIM, fontFamily = FontFamily.Monospace)
+                Text("CANCEL", color = TEXT_DIM, fontFamily = FontFamily.Monospace)
             }
         }
     )
-}
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun PresetPatternsDropdown(onApply: (StepPattern) -> Unit) {
-    var expanded     by remember { mutableStateOf(false) }
-    var selectedName by remember { mutableStateOf("Select preset...") }
-
-    // Flatten groups into a list of (groupName, patternName, pattern)
-    // groupName == "" signals a header row
-    data class PresetItem(val group: String, val name: String, val pattern: StepPattern?)
-
-    val items = StrumPatterns.groups.flatMap { (groupName, patterns) ->
-        listOf(PresetItem(groupName, "", null)) +
-        patterns.map { (name, pattern) -> PresetItem(groupName, name, pattern) }
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = it },
-            modifier = Modifier.weight(1f)
-        ) {
-            TextField(
-                value = selectedName,
-                onValueChange = {},
-                readOnly = true,
-                trailingIcon = {
-                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                },
-                colors = TextFieldDefaults.colors(
-                    unfocusedContainerColor = PANEL,
-                    focusedContainerColor   = PANEL,
-                    unfocusedTextColor      = TEXT,
-                    focusedTextColor        = TEXT,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedIndicatorColor   = Color.Transparent
-                ),
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize   = 12.sp
-                ),
-                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable)
-            )
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.background(PANEL)
-            ) {
-                items.forEach { item ->
-                    if (item.pattern == null) {
-                        // Group header — not clickable
-                        Text(
-                            text = item.group.uppercase(),
-                            color = ACCENT2,
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 2.sp,
-                            modifier = Modifier
-                                .padding(horizontal = 16.dp, vertical = 6.dp)
-                        )
-                    } else {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = item.name,
-                                    color = if (item.name == selectedName) GREEN else TEXT,
-                                    fontSize = 12.sp,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            },
-                            onClick = {
-                                selectedName = item.name
-                                onApply(item.pattern)
-                                expanded = false
-                            },
-                            modifier = Modifier.background(
-                                if (item.name == selectedName)
-                                    Color(0xFF1A2A1A) else Color.Transparent
-                            )
-                        )
-                    }
-                }
-            }
-        }
-    }
 }
