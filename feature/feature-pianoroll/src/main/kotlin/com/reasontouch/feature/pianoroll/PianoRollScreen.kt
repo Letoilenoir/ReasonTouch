@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -82,7 +84,6 @@ fun PianoRollScreen(
         hasClipboard = hasClipboard
     )
 
-    // Auto-scroll during playback
     LaunchedEffect(playheadBeat, isPlaying) {
         if (isPlaying && state.gridWidth > 0f) {
             val playheadX = state.beatToX(playheadBeat)
@@ -94,11 +95,8 @@ fun PianoRollScreen(
         }
     }
 
-    // Scroll back on rewind
     LaunchedEffect(isPlaying, playheadBeat) {
-        if (!isPlaying && playheadBeat == 0f) {
-            state.scrollX = 0f
-        }
+        if (!isPlaying && playheadBeat == 0f) state.scrollX = 0f
     }
 
     Column(modifier = Modifier.fillMaxSize().background(BG)) {
@@ -113,24 +111,24 @@ fun PianoRollScreen(
             onRewind     = viewModel::rewind
         )
 
-        // Selection action bar — visible only when notes are selected
         if (uiState.hasSelection) {
             SelectionActionBar(
                 selectedCount = selectedIds.size,
                 hasClipboard  = hasClipboard,
                 pasteAtBeat   = playheadBeat,
-                onCopy   = { viewModel.copySelectedNotes() },
-                onPaste  = { viewModel.pasteNotes(playheadBeat, uiState.snapValue) },
-                onDelete = { viewModel.deleteSelectedNotes() },
-                onClear  = { viewModel.clearSelection() }
+                onCopy        = { viewModel.copySelectedNotes() },
+                onPaste       = { viewModel.pasteNotes(playheadBeat, uiState.snapValue) },
+                onDelete      = { viewModel.deleteSelectedNotes() },
+                onClear       = { viewModel.clearSelection() }
             )
         }
 
         TrackSelector(
-            tracks       = tracks,
-            activeIndex  = activeIndex,
-            onSelect     = viewModel::setActiveTrack,
-            onMuteToggle = viewModel::muteTrack
+            tracks          = tracks,
+            activeIndex     = activeIndex,
+            onSelect        = viewModel::setActiveTrack,
+            onMuteToggle    = viewModel::muteTrack,
+            onVolumeChange  = viewModel::setTrackVolume
         )
 
         PianoRollCanvas(
@@ -174,18 +172,22 @@ fun SelectionActionBar(
     ) {
         Text(
             text = "$selectedCount selected",
-            color = PURPLE,
-            fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
+            color = PURPLE, fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f)
         )
-        SelectionChip("COPY",   PURPLE,              onCopy)
-        if (hasClipboard) SelectionChip("PASTE @${pasteAtBeat}", GREEN, onPaste)
-        SelectionChip("DELETE", ACCENT,              onDelete)
-        SelectionChip("✕",      TEXT_DIM,            onClear)
+        SelectionChip("COPY",   PURPLE, onCopy)
+        if (hasClipboard) {
+            SelectionChip(
+                "PASTE \u2192 bar ${(pasteAtBeat / 4).toInt() + 1}",
+                GREEN, onPaste
+            )
+        }
+        SelectionChip("DELETE", ACCENT,   onDelete)
+        SelectionChip("X",      TEXT_DIM, onClear)
     }
-    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(PURPLE.copy(alpha = 0.3f)))
+    Box(modifier = Modifier.fillMaxWidth().height(1.dp)
+        .background(PURPLE.copy(alpha = 0.3f)))
 }
 
 @Composable
@@ -198,10 +200,8 @@ fun SelectionChip(label: String, color: Color, onClick: () -> Unit) {
             .padding(horizontal = 10.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = label, color = color, fontSize = 11.sp,
-            fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace
-        )
+        Text(label, color = color, fontSize = 11.sp,
+            fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
     }
 }
 
@@ -209,37 +209,53 @@ fun SelectionChip(label: String, color: Color, onClick: () -> Unit) {
 
 @Composable
 fun PianoRollToolbar(
-    uiState: PianoRollUiState,
-    onTool: (PianoRollViewModel.Tool) -> Unit,
-    onSnapCycle: () -> Unit,
+    uiState:      PianoRollUiState,
+    onTool:       (PianoRollViewModel.Tool) -> Unit,
+    onSnapCycle:  () -> Unit,
     onLoopToggle: () -> Unit,
-    onPlay: () -> Unit,
-    onStop: () -> Unit,
-    onRewind: () -> Unit
+    onPlay:       () -> Unit,
+    onStop:       () -> Unit,
+    onRewind:     () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().height(40.dp).background(PANEL).padding(horizontal = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth().height(40.dp)
+            .background(PANEL).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
-        PianoRollViewModel.Tool.values().forEach { tool ->
-            ToolChip(label = tool.name, selected = tool == uiState.currentTool,
-                onClick = { onTool(tool) })
+        PianoRollViewModel.Tool.entries.forEach { tool ->
+            ToolChip(
+                label    = tool.name,
+                selected = tool == uiState.currentTool,
+                onClick  = { onTool(tool) }
+            )
         }
         Divider()
-        ToolChip(label = uiState.snapLabels[uiState.snapIndex], selected = false,
-            onClick = onSnapCycle, monospace = true)
+        ToolChip(
+            label    = uiState.snapLabels[uiState.snapIndex],
+            selected = false,
+            onClick  = onSnapCycle,
+            monospace = true
+        )
         Divider()
-        ToolChip(label = "LOOP", selected = uiState.loopEnabled,
-            selectedColor = Color(0xFF1A4A2E), selectedBorder = GREEN, selectedText = GREEN,
-            onClick = onLoopToggle)
+        ToolChip(
+            label         = "LOOP",
+            selected      = uiState.loopEnabled,
+            selectedColor = Color(0xFF1A4A2E),
+            selectedBorder = GREEN,
+            selectedText  = GREEN,
+            onClick       = onLoopToggle
+        )
         Divider()
         ToolChip(label = "<<", selected = false, onClick = onRewind)
         ToolChip(
-            label = if (uiState.isPlaying) "||" else ">",
-            selected = uiState.isPlaying,
-            selectedColor = Color(0xFF1A3A2A), selectedBorder = GREEN, selectedText = GREEN,
-            onClick = onPlay
+            label         = if (uiState.isPlaying) "||" else ">",
+            selected      = uiState.isPlaying,
+            selectedColor = Color(0xFF1A3A2A),
+            selectedBorder = GREEN,
+            selectedText  = GREEN,
+            onClick       = onPlay
         )
         ToolChip(label = "[]", selected = false, onClick = onStop)
     }
@@ -253,13 +269,13 @@ private fun Divider() {
 
 @Composable
 fun ToolChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    monospace: Boolean = false,
-    selectedColor: Color = ACCENT,
-    selectedBorder: Color = ACCENT,
-    selectedText: Color = Color.White
+    label:         String,
+    selected:      Boolean,
+    onClick:       () -> Unit,
+    monospace:     Boolean = false,
+    selectedColor: Color   = ACCENT,
+    selectedBorder: Color  = ACCENT,
+    selectedText:  Color   = Color.White
 ) {
     Box(
         modifier = Modifier
@@ -272,65 +288,109 @@ fun ToolChip(
         Text(
             text = label,
             color = if (selected) selectedText else TEXT_DIM,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp, fontWeight = FontWeight.Bold,
             fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default
         )
     }
 }
 
-// ── Track selector ────────────────────────────────────────────────────────────
+// ── Track selector with volume sliders ───────────────────────────────────────
 
 @Composable
 fun TrackSelector(
-    tracks: List<MidiTrack>,
-    activeIndex: Int,
-    onSelect: (Int) -> Unit,
-    onMuteToggle: (Int) -> Unit = {}
+    tracks:         List<MidiTrack>,
+    activeIndex:    Int,
+    onSelect:       (Int) -> Unit,
+    onMuteToggle:   (Int) -> Unit = {},
+    onVolumeChange: (Int, Float) -> Unit = { _, _ -> }
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(40.dp).background(RACK).padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        tracks.forEachIndexed { i, track ->
-            val isActive   = i == activeIndex
-            val trackColor = Color(when (i % 8) {
-                0 -> 0xFFE84040L; 1 -> 0xFF3DDC84L; 2 -> 0xFF38BDF8L; 3 -> 0xFFA78BFAL
-                4 -> 0xFFFF6B35L; 5 -> 0xFFF5C518L; 6 -> 0xFFF472B6L; else -> 0xFF94A3B8L
-            })
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(when {
-                        track.muted -> Color(0xFF2A1A1A)
-                        isActive    -> Color(0xFF28283A)
-                        else        -> RACK
-                    })
-                    .clickable { onSelect(i) }
-                    .padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = track.name,
-                    color = when {
-                        track.muted -> TEXT_DIM.copy(alpha = 0.4f)
-                        isActive    -> trackColor
-                        else        -> TEXT_DIM
-                    },
-                    fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace
-                )
-                Box(
+    Column(modifier = Modifier.fillMaxWidth().background(RACK)) {
+        // Track name / mute row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            tracks.forEachIndexed { i, track ->
+                val isActive   = i == activeIndex
+                val trackColor = Color(when (i % 8) {
+                    0 -> 0xFFE84040L; 1 -> 0xFF3DDC84L; 2 -> 0xFF38BDF8L
+                    3 -> 0xFFA78BFAL; 4 -> 0xFFFF6B35L; 5 -> 0xFFF5C518L
+                    6 -> 0xFFF472B6L; else -> 0xFF94A3B8L
+                })
+                Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(if (track.muted) Color(0xFF5A1A1A) else Color(0xFF1A1A22))
-                        .clickable { onMuteToggle(i) }
-                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(when {
+                            track.muted -> Color(0xFF2A1A1A)
+                            isActive    -> Color(0xFF28283A)
+                            else        -> RACK
+                        })
+                        .clickable { onSelect(i) }
+                        .padding(start = 8.dp, end = 4.dp,
+                            top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(text = "M", color = if (track.muted) ACCENT else TEXT_DIM,
-                        fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Text(
+                        text = track.name,
+                        color = when {
+                            track.muted -> TEXT_DIM.copy(alpha = 0.4f)
+                            isActive    -> trackColor
+                            else        -> TEXT_DIM
+                        },
+                        fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(
+                                if (track.muted) Color(0xFF5A1A1A)
+                                else Color(0xFF1A1A22)
+                            )
+                            .clickable { onMuteToggle(i) }
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "M",
+                            color = if (track.muted) ACCENT else TEXT_DIM,
+                            fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
                 }
+            }
+        }
+
+        // Volume sliders — compact row, one per track, colour-coded
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 0.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tracks.forEachIndexed { i, track ->
+                val trackColor = Color(when (i % 8) {
+                    0 -> 0xFFE84040L; 1 -> 0xFF3DDC84L; 2 -> 0xFF38BDF8L
+                    3 -> 0xFFA78BFAL; 4 -> 0xFFFF6B35L; 5 -> 0xFFF5C518L
+                    6 -> 0xFFF472B6L; else -> 0xFF94A3B8L
+                })
+                Slider(
+                    value          = track.volume,
+                    onValueChange  = { onVolumeChange(i, it) },
+                    valueRange     = 0f..1f,
+                    modifier       = Modifier.weight(1f).height(28.dp),
+                    colors         = SliderDefaults.colors(
+                        thumbColor         = trackColor,
+                        activeTrackColor   = trackColor.copy(alpha = 0.8f),
+                        inactiveTrackColor = BORDER
+                    )
+                )
             }
         }
     }
@@ -342,7 +402,9 @@ fun TrackSelector(
 @Composable
 fun StatusBar(uiState: PianoRollUiState, bpm: Int, totalBars: Int) {
     Row(
-        modifier = Modifier.fillMaxWidth().height(22.dp).background(BG).padding(horizontal = 10.dp),
+        modifier = Modifier
+            .fillMaxWidth().height(22.dp)
+            .background(BG).padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -355,7 +417,9 @@ fun StatusBar(uiState: PianoRollUiState, bpm: Int, totalBars: Int) {
             StatusItem("SEL", "${uiState.selectedIds.size}", PURPLE)
         }
         if (uiState.loopEnabled) {
-            StatusItem("LOOP", "${uiState.loopStart.toInt()+1}>${uiState.loopEnd.toInt()}", GREEN)
+            StatusItem("LOOP",
+                "${uiState.loopStart.toInt() + 1}>${uiState.loopEnd.toInt()}",
+                GREEN)
         }
     }
 }
@@ -363,7 +427,9 @@ fun StatusBar(uiState: PianoRollUiState, bpm: Int, totalBars: Int) {
 @Composable
 fun StatusItem(label: String, value: String, valueColor: Color = ACCENT2) {
     Row {
-        Text(text = "$label: ", color = TEXT_DIM, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-        Text(text = value, color = valueColor, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+        Text("$label: ", color = TEXT_DIM, fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace)
+        Text(value, color = valueColor, fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace)
     }
 }

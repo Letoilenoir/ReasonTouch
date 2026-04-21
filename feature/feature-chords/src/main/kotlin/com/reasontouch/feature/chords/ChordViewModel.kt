@@ -282,6 +282,58 @@ class ChordViewModel @Inject constructor(
         }
     }
 
+    private val _bassGenerating = MutableStateFlow(false)
+    val bassGenerating: StateFlow<Boolean> = _bassGenerating.asStateFlow()
+
+    /**
+     * Generate bass notes from the current progression.
+     * Finds the BASS track automatically.
+     * appendMode: if true, adds after existing bass content rather than replacing it.
+     */
+    fun generateBass(style: BassStyle, appendMode: Boolean) {
+        viewModelScope.launch {
+            val bars = progression.value
+            if (bars.isEmpty()) {
+                _statusMessage.value = "Add bars to the progression first"
+                return@launch
+            }
+
+            val trackList  = tracks.value
+            val bassTrack  = trackList.firstOrNull { it.name.uppercase() == "BASS" }
+                ?: trackList.firstOrNull()
+                ?: return@launch
+
+            _bassGenerating.value = true
+
+            val appendOffset = if (appendMode) {
+                val lastBeat    = getLastBeatOnTrack(bassTrack.id)
+                val beatsPerBar = _barDuration.value.toFloat()
+                if (lastBeat <= 0f) 0f
+                else {
+                    val barsUsed = kotlin.math.ceil(lastBeat / beatsPerBar).toInt()
+                    barsUsed * beatsPerBar
+                }
+            } else {
+                // Overwrite — clear existing bass notes first
+                repository.deleteNotesForTrack(bassTrack.id)
+                0f
+            }
+
+            val notes = BassGenerator.generate(
+                chords        = bars,
+                style         = style,
+                targetTrackId = bassTrack.id,
+                beatsPerBar   = _barDuration.value.toFloat(),
+                appendOffset  = appendOffset,
+                snapValue     = 0.25f
+            )
+
+            repository.saveNotes(notes)
+            _bassGenerating.value = false
+            _statusMessage.value  = "Bass generated: ${style.label} (${notes.size} notes)"
+        }
+    }
+
     fun dismissHarmonyPanel() {
         _harmonyState.value = HarmonyState()
     }

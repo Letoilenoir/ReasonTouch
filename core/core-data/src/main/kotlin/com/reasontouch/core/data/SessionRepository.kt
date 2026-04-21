@@ -83,13 +83,13 @@ class SessionRepository @Inject constructor(
 
         val defaultTracks = listOf(
             MidiTrack(sessionId = session.id, index = 0, name = "BASS",
-                voice = "saw", color = 0xFFE84040, midiChannel = 0),
+                voice = "saw",    color = 0xFFE84040, midiChannel = 0, volume = 0.90f),
             MidiTrack(sessionId = session.id, index = 1, name = "LEAD",
-                voice = "sine", color = 0xFF3DDC84, midiChannel = 1),
+                voice = "sine",   color = 0xFF3DDC84, midiChannel = 1, volume = 0.85f),
             MidiTrack(sessionId = session.id, index = 2, name = "CHORD",
-                voice = "square", color = 0xFF38BDF8, midiChannel = 2),
+                voice = "square", color = 0xFF38BDF8, midiChannel = 2, volume = 0.65f),
             MidiTrack(sessionId = session.id, index = 3, name = "PAD",
-                voice = "pwm", color = 0xFFA78BFA, midiChannel = 3)
+                voice = "pwm",    color = 0xFFA78BFA, midiChannel = 3, volume = 0.55f)
         )
         trackDao.insertTracks(defaultTracks)
         return session

@@ -104,6 +104,13 @@ class PianoRollViewModel @Inject constructor(
 
     fun setActiveTrack(index: Int) { _activeTrackIndex.value = index; updateActiveNotes() }
 
+    fun setTrackVolume(index: Int, volume: Float) {
+        viewModelScope.launch {
+            val track = tracks.value.getOrNull(index) ?: return@launch
+            repository.updateTrack(track.copy(volume = volume.coerceIn(0f, 1f)))
+        }
+    }
+
     fun muteTrack(index: Int) {
         viewModelScope.launch {
             val track = tracks.value.getOrNull(index) ?: return@launch
@@ -198,12 +205,19 @@ class PianoRollViewModel @Inject constructor(
                     .forEach { note ->
                         val delayMs = ((note.beat - fromBeat) * beatDurMs).toLong()
                         val durSec  = chordRingDuration(note, clusterBeats, beatDurMs)
+                        // Capture track ID so we can look up live volume at fire time
+                        val trackId = track.id
                         viewModelScope.launch(Dispatchers.IO) {
                             val waitMs = timeOriginMs + delayMs - System.currentTimeMillis()
                             if (waitMs > 0) delay(waitMs)
                             if (_isPlaying.value) {
+                                // Sample volume at the moment the note fires, not at schedule time
+                                val liveVolume = tracks.value
+                                    .firstOrNull { it.id == trackId }?.volume ?: 1f
+                                val scaledVel  = (note.velocity * liveVolume)
+                                    .toInt().coerceIn(1, 127)
                                 val midi = (108 - note.pitch).coerceIn(0, 127)
-                                sf2Player.playNote(midi, durSec, note.velocity, gmProgram)
+                                sf2Player.playNote(midi, durSec, scaledVel, gmProgram)
                             }
                         }
                     }

@@ -35,11 +35,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -73,37 +75,41 @@ private val DOWN_COL = Color(0xFF1A3A5A)
 private val UP_COL   = Color(0xFF2A1A3A)
 private val PURPLE   = Color(0xFFA78BFA)
 private val GOLD     = Color(0xFFF5C518)
+private val BLUE     = Color(0xFF38BDF8)
 
 @Composable
 fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) {
-    var showSettings   by remember { mutableStateOf(false) }
-    var showSendDialog by remember { mutableStateOf(false) }
-    val progression    by viewModel.progression.collectAsState()
-    val tracks         by viewModel.tracks.collectAsState()
-    val selectedChord  by viewModel.selectedChord.collectAsState()
-    val selectedPosition by viewModel.selectedPosition.collectAsState()
-    val statusMessage  by viewModel.statusMessage.collectAsState()
-    val harmonyState   by viewModel.harmonyState.collectAsState()
+    var showSettings      by remember { mutableStateOf(false) }
+    var showSendDialog    by remember { mutableStateOf(false) }
+    var showBassSheet     by remember { mutableStateOf(false) }
+    val progression       by viewModel.progression.collectAsState()
+    val tracks            by viewModel.tracks.collectAsState()
+    val selectedChord     by viewModel.selectedChord.collectAsState()
+    val selectedPosition  by viewModel.selectedPosition.collectAsState()
+    val statusMessage     by viewModel.statusMessage.collectAsState()
+    val harmonyState      by viewModel.harmonyState.collectAsState()
+    val bassGenerating    by viewModel.bassGenerating.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize().background(BG)) {
 
         ChordToolbar(
-            showSettings      = showSettings,
-            onToggleSettings  = { showSettings = !showSettings },
-            onSendToRoll      = { showSendDialog = true },
-            onSuggest         = viewModel::analyseProgression,
-            hasBars           = progression.isNotEmpty(),
+            showSettings       = showSettings,
+            onToggleSettings   = { showSettings = !showSettings },
+            onSendToRoll       = { showSendDialog = true },
+            onSuggest          = viewModel::analyseProgression,
+            onBass             = { showBassSheet = true },
+            bassGenerating     = bassGenerating,
+            hasBars            = progression.isNotEmpty(),
             showingSuggestions = harmonyState.showPanel
         )
 
-        // Harmony suggestion panel — slides in below toolbar
         AnimatedVisibility(
             visible = harmonyState.showPanel && !showSettings,
             enter   = expandVertically() + fadeIn(),
             exit    = shrinkVertically() + fadeOut()
         ) {
             HarmonyPanel(
-                state      = harmonyState,
+                state       = harmonyState,
                 onSelectKey = viewModel::selectKey,
                 onAddChord  = viewModel::addSuggestedChord,
                 onAudition  = viewModel::auditionSuggestion,
@@ -130,6 +136,16 @@ fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) 
         )
     }
 
+    if (showBassSheet) {
+        BassStyleSheet(
+            onGenerate = { style, append ->
+                viewModel.generateBass(style, append)
+                showBassSheet = false
+            },
+            onDismiss = { showBassSheet = false }
+        )
+    }
+
     if (showSendDialog) {
         SendToPianoRollDialog(
             tracks    = tracks,
@@ -142,7 +158,116 @@ fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) 
     }
 }
 
-// ── Harmony suggestion panel ──────────────────────────────────────────────────
+// ── Toolbar ───────────────────────────────────────────────────────────────────
+
+@Composable
+fun ChordToolbar(
+    showSettings:       Boolean,
+    onToggleSettings:   () -> Unit,
+    onSendToRoll:       () -> Unit,
+    onSuggest:          () -> Unit,
+    onBass:             () -> Unit,
+    bassGenerating:     Boolean,
+    hasBars:            Boolean,
+    showingSuggestions: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .background(RACK)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = if (showSettings) "SETTINGS" else "CHORD GENERATOR",
+            color = ACCENT, fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace, letterSpacing = 2.sp
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (hasBars && !showSettings) {
+                // Harmony suggest
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            if (showingSuggestions) PURPLE.copy(alpha = 0.2f)
+                            else Color(0xFF1E1A2E)
+                        )
+                        .border(1.dp,
+                            if (showingSuggestions) PURPLE else PURPLE.copy(alpha = 0.4f),
+                            RoundedCornerShape(4.dp))
+                        .clickable(onClick = onSuggest)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "\uD83E\uDDE0 SUGGEST",
+                        color = PURPLE, fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                // Bass generator
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFF1A2A3A))
+                        .border(1.dp,
+                            BLUE.copy(alpha = if (bassGenerating) 1f else 0.6f),
+                            RoundedCornerShape(4.dp))
+                        .clickable(enabled = !bassGenerating, onClick = onBass)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = if (bassGenerating) "..." else "\uD83C\uDFB8 BASS",
+                        color = BLUE, fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                // Send to piano roll
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFF1A3A2A))
+                        .border(1.dp, GREEN, RoundedCornerShape(4.dp))
+                        .clickable(onClick = onSendToRoll)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "\u2192 ROLL",
+                        color = GREEN, fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+            // Settings toggle
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (showSettings) ACCENT else PANEL)
+                    .border(1.dp,
+                        if (showSettings) ACCENT else BORDER,
+                        RoundedCornerShape(4.dp))
+                    .clickable(onClick = onToggleSettings)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = if (showSettings) "X CLOSE" else "SETTINGS",
+                    color = if (showSettings) Color.White else TEXT_DIM,
+                    fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace, letterSpacing = 1.sp
+                )
+            }
+        }
+    }
+    Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(ACCENT))
+}
+
+// ── Harmony panel ─────────────────────────────────────────────────────────────
 
 @Composable
 fun HarmonyPanel(
@@ -156,14 +281,9 @@ fun HarmonyPanel(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFF1A1A28))
-            .border(
-                width = 1.dp,
-                color = PURPLE.copy(alpha = 0.4f),
-                shape = RoundedCornerShape(0.dp)
-            )
+            .border(1.dp, PURPLE.copy(alpha = 0.4f), RoundedCornerShape(0.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -171,11 +291,9 @@ fun HarmonyPanel(
         ) {
             Text(
                 text = "\uD83E\uDDE0  HARMONY ANALYSIS",
-                color = PURPLE,
-                fontSize = 11.sp,
+                color = PURPLE, fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.sp
+                fontFamily = FontFamily.Monospace, letterSpacing = 1.sp
             )
             Box(
                 modifier = Modifier
@@ -183,12 +301,10 @@ fun HarmonyPanel(
                     .clickable(onClick = onDismiss)
                     .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
-                Text("✕", color = TEXT_DIM, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                Text("X", color = TEXT_DIM, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
             }
         }
-
         Spacer(modifier = Modifier.height(8.dp))
-
         when {
             state.isAnalysing -> {
                 Row(
@@ -197,46 +313,39 @@ fun HarmonyPanel(
                 ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(14.dp),
-                        color = PURPLE,
-                        strokeWidth = 2.dp
+                        color = PURPLE, strokeWidth = 2.dp
                     )
                     Text("Analysing progression...", color = TEXT_DIM,
                         fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                 }
             }
-
             state.keyCandidates.isEmpty() -> {
-                Text("No key detected — add more chords and try again",
-                    color = TEXT_DIM, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                Text("No key detected - add more chords and try again",
+                    color = TEXT_DIM, fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace)
             }
-
             else -> {
-                // Step 1 — Key selection
                 Text(
-                    text = if (state.selectedKey == null)
-                        "SELECT KEY" else "KEY",
+                    text = if (state.selectedKey == null) "SELECT KEY" else "KEY",
                     color = TEXT_DIM, fontSize = 9.sp,
                     fontFamily = FontFamily.Monospace, letterSpacing = 2.sp
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(state.keyCandidates) { candidate ->
-                        val isSelected = state.selectedKey == candidate
-                        val confidence = (candidate.confidence * 100).toInt()
-                        val borderCol  = if (candidate.isMinor) PURPLE else GOLD
+                        val isSelected  = state.selectedKey == candidate
+                        val confidence  = (candidate.confidence * 100).toInt()
+                        val borderCol   = if (candidate.isMinor) PURPLE else GOLD
                         Column(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(
-                                    if (isSelected)
-                                        borderCol.copy(alpha = 0.2f)
+                                    if (isSelected) borderCol.copy(alpha = 0.2f)
                                     else Color(0xFF1E1E2A)
                                 )
-                                .border(
-                                    1.dp,
+                                .border(1.dp,
                                     if (isSelected) borderCol else BORDER,
-                                    RoundedCornerShape(6.dp)
-                                )
+                                    RoundedCornerShape(6.dp))
                                 .clickable { onSelectKey(candidate) }
                                 .padding(horizontal = 14.dp, vertical = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -244,27 +353,22 @@ fun HarmonyPanel(
                             Text(
                                 text = "${candidate.root.label} ${if (candidate.isMinor) "Minor" else "Major"}",
                                 color = if (isSelected) borderCol else TEXT,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp, fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace
                             )
                             Text(
                                 text = if (candidate.isMinor) "Dark" else "Bright",
-                                color = TEXT_DIM,
-                                fontSize = 10.sp,
+                                color = TEXT_DIM, fontSize = 10.sp,
                                 fontFamily = FontFamily.Monospace
                             )
                             Text(
                                 text = "$confidence% match",
                                 color = if (isSelected) borderCol else TEXT_DIM,
-                                fontSize = 9.sp,
-                                fontFamily = FontFamily.Monospace
+                                fontSize = 9.sp, fontFamily = FontFamily.Monospace
                             )
                         }
                     }
                 }
-
-                // Step 2 — Chord suggestions (appears after key selected)
                 if (state.selectedKey != null && state.suggestions.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
@@ -284,22 +388,25 @@ fun HarmonyPanel(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
                                     .background(funcColor.copy(alpha = 0.12f))
-                                    .border(1.dp, funcColor.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-                                    .clickable { onAudition(suggestion); onAddChord(suggestion) }
+                                    .border(1.dp,
+                                        funcColor.copy(alpha = 0.5f),
+                                        RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        onAudition(suggestion)
+                                        onAddChord(suggestion)
+                                    }
                                     .padding(horizontal = 14.dp, vertical = 8.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Text(
                                     text = suggestion.chord.label,
-                                    color = TEXT,
-                                    fontSize = 16.sp,
+                                    color = TEXT, fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = FontFamily.Monospace
                                 )
                                 Text(
                                     text = suggestion.description,
-                                    color = funcColor,
-                                    fontSize = 9.sp,
+                                    color = funcColor, fontSize = 9.sp,
                                     fontFamily = FontFamily.Monospace,
                                     textAlign = TextAlign.Center
                                 )
@@ -318,99 +425,132 @@ fun HarmonyPanel(
     }
 }
 
-// ── Toolbar ───────────────────────────────────────────────────────────────────
+// ── Bass style sheet ──────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChordToolbar(
-    showSettings:       Boolean,
-    onToggleSettings:   () -> Unit,
-    onSendToRoll:       () -> Unit,
-    onSuggest:          () -> Unit,
-    hasBars:            Boolean,
-    showingSuggestions: Boolean
+fun BassStyleSheet(
+    onGenerate: (BassStyle, Boolean) -> Unit,
+    onDismiss:  () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .background(RACK)
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+    var appendMode by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState       = sheetState,
+        containerColor   = Color(0xFF1A1A22),
+        dragHandle       = null
     ) {
-        Text(
-            text = if (showSettings) "SETTINGS" else "CHORD GENERATOR",
-            color = ACCENT,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 2.sp
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            // Suggest button — only when there are bars and not in settings
-            if (hasBars && !showSettings) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(
-                            if (showingSuggestions)
-                                PURPLE.copy(alpha = 0.2f) else Color(0xFF1E1A2E)
-                        )
-                        .border(
-                            1.dp,
-                            if (showingSuggestions) PURPLE else PURPLE.copy(alpha = 0.4f),
-                            RoundedCornerShape(4.dp)
-                        )
-                        .clickable(onClick = onSuggest)
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "\uD83E\uDDE0 SUGGEST",
-                        color = PURPLE,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-                // Send to Roll
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xFF1A3A2A))
-                        .border(1.dp, GREEN, RoundedCornerShape(4.dp))
-                        .clickable(onClick = onSendToRoll)
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "\u2192 ROLL",
-                        color = GREEN,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-            // Settings toggle
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(if (showSettings) ACCENT else PANEL)
-                    .border(1.dp, if (showSettings) ACCENT else BORDER, RoundedCornerShape(4.dp))
-                    .clickable(onClick = onToggleSettings)
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 20.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = if (showSettings) "X CLOSE" else "SETTINGS",
-                    color = if (showSettings) Color.White else TEXT_DIM,
-                    fontSize = 12.sp,
+                    text = "\uD83C\uDFB8  BASS GENERATOR",
+                    color = BLUE, fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.sp
+                    fontFamily = FontFamily.Monospace, letterSpacing = 1.sp
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(3.dp))
+                        .clickable(onClick = onDismiss)
+                        .padding(8.dp)
+                ) {
+                    Text("X", color = TEXT_DIM, fontSize = 14.sp,
+                        fontFamily = FontFamily.Monospace)
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Generates a bass line from your chord progression",
+                color = TEXT_DIM, fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            BassStyle.values().forEach { style ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFF1E2A3A))
+                        .border(1.dp, BLUE.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                        .clickable { onGenerate(style, appendMode) }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = style.label,
+                            color = BLUE, fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = style.description,
+                            color = TEXT_DIM, fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    Text(
+                        text = ">",
+                        color = BLUE.copy(alpha = 0.6f),
+                        fontSize = 14.sp, fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (appendMode) Color(0xFF1A2A3A) else Color(0xFF16161A))
+                    .border(1.dp,
+                        if (appendMode) BLUE else BORDER,
+                        RoundedCornerShape(6.dp))
+                    .clickable { appendMode = !appendMode }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "APPEND TO EXISTING",
+                        color = if (appendMode) BLUE else TEXT_DIM,
+                        fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = if (appendMode) "Adds after existing bass notes"
+                               else "Replaces existing bass track",
+                        color = TEXT_DIM, fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                Switch(
+                    checked = appendMode,
+                    onCheckedChange = { appendMode = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = BLUE
+                    )
                 )
             }
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
-    Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(ACCENT))
 }
 
 // ── Fixed bottom bar ──────────────────────────────────────────────────────────
@@ -428,8 +568,8 @@ fun FixedBottomBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFF16161A))
-            .border(width = 1.dp, color = BORDER,
-                shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+            .border(1.dp, BORDER,
+                RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
     ) {
         if (progression.isNotEmpty()) {
             Row(
@@ -458,20 +598,18 @@ fun FixedBottomBar(
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
                     Text("CLR", color = ACCENT, fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace)
                 }
             }
         }
-
         statusMessage?.let { msg ->
             Text(
-                text = msg,
-                color = ACCENT2, fontSize = 11.sp,
+                text = msg, color = ACCENT2, fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
             )
         }
-
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -485,8 +623,8 @@ fun FixedBottomBar(
             Text(
                 text = "+ ADD BAR  ${chordName.uppercase()}",
                 color = Color.White, fontSize = 14.sp,
-                fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.sp
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace, letterSpacing = 1.sp
             )
         }
     }
@@ -503,9 +641,11 @@ fun ProgressionChip(bar: ChordEvent, onRemove: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Text("${bar.barIndex + 1}", color = ACCENT2, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+        Text("${bar.barIndex + 1}", color = ACCENT2, fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace)
         Text(bar.chordName.uppercase(), color = TEXT, fontSize = 11.sp,
-            fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 1)
+            fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace,
+            maxLines = 1)
         Box(
             modifier = Modifier
                 .size(18.dp)
@@ -514,8 +654,8 @@ fun ProgressionChip(bar: ChordEvent, onRemove: () -> Unit) {
                 .clickable(onClick = onRemove),
             contentAlignment = Alignment.Center
         ) {
-            Text("x", color = ACCENT, fontSize = 10.sp, fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold)
+            Text("x", color = ACCENT, fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -635,7 +775,8 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                             onValueChange = {},
                             readOnly = true,
                             trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = strumDropdownExpanded)
+                                ExposedDropdownMenuDefaults.TrailingIcon(
+                                    expanded = strumDropdownExpanded)
                             },
                             colors = TextFieldDefaults.colors(
                                 unfocusedContainerColor = PANEL,
@@ -661,11 +802,14 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                                     text = {
                                         Column {
                                             Text(preset.label,
-                                                color = if (preset.beatsPerString == strumSpeed) GREEN else TEXT,
-                                                fontSize = 12.sp, fontFamily = FontFamily.Monospace,
+                                                color = if (preset.beatsPerString == strumSpeed)
+                                                    GREEN else TEXT,
+                                                fontSize = 12.sp,
+                                                fontFamily = FontFamily.Monospace,
                                                 fontWeight = FontWeight.Bold)
-                                            Text(preset.description, color = TEXT_DIM,
-                                                fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                                            Text(preset.description,
+                                                color = TEXT_DIM, fontSize = 10.sp,
+                                                fontFamily = FontFamily.Monospace)
                                         }
                                     },
                                     onClick = {
@@ -692,7 +836,8 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                         onValueChange = {},
                         readOnly = true,
                         trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = gmDropdownExpanded)
+                            ExposedDropdownMenuDefaults.TrailingIcon(
+                                expanded = gmDropdownExpanded)
                         },
                         colors = TextFieldDefaults.colors(
                             unfocusedContainerColor = PANEL,
@@ -719,11 +864,13 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                                     Column {
                                         Text(gm.label,
                                             color = if (gm.program == instrument.program)
-                                                Color(0xFF38BDF8) else TEXT,
-                                            fontSize = 12.sp, fontFamily = FontFamily.Monospace,
+                                                BLUE else TEXT,
+                                            fontSize = 12.sp,
+                                            fontFamily = FontFamily.Monospace,
                                             fontWeight = FontWeight.Bold)
-                                        Text("GM ${gm.program + 1}", color = TEXT_DIM,
-                                            fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                                        Text("GM ${gm.program + 1}",
+                                            color = TEXT_DIM, fontSize = 10.sp,
+                                            fontFamily = FontFamily.Monospace)
                                     }
                                 },
                                 onClick = {
@@ -765,11 +912,14 @@ fun CategoryFilter(categories: List<String>, selected: String, onSelect: (String
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
                     .background(if (isSelected) ACCENT else PANEL)
-                    .border(1.dp, if (isSelected) ACCENT else BORDER, RoundedCornerShape(20.dp))
+                    .border(1.dp,
+                        if (isSelected) ACCENT else BORDER,
+                        RoundedCornerShape(20.dp))
                     .clickable { onSelect(cat) }
                     .padding(horizontal = 14.dp, vertical = 7.dp)
             ) {
-                Text(cat, color = if (isSelected) Color.White else TEXT_DIM,
+                Text(cat,
+                    color = if (isSelected) Color.White else TEXT_DIM,
                     fontSize = 12.sp, fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace)
             }
@@ -802,12 +952,15 @@ fun ChordGrid(chords: List<String>, selected: String, onSelect: (String) -> Unit
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
                     .background(bgColor)
-                    .border(1.dp, if (isSelected) ACCENT else BORDER, RoundedCornerShape(4.dp))
+                    .border(1.dp,
+                        if (isSelected) ACCENT else BORDER,
+                        RoundedCornerShape(4.dp))
                     .clickable { onSelect(chord) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(chord, color = if (isSelected) Color.White else TEXT,
+                Text(chord,
+                    color = if (isSelected) Color.White else TEXT,
                     fontSize = 13.sp, fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace)
             }
@@ -828,12 +981,13 @@ fun PositionSelector(positions: List<String>, selected: String, onSelect: (Strin
                     .clip(RoundedCornerShape(4.dp))
                     .background(if (isSelected) Color(0xFF1A3A5A) else PANEL)
                     .border(1.dp,
-                        if (isSelected) Color(0xFF38BDF8) else BORDER,
+                        if (isSelected) BLUE else BORDER,
                         RoundedCornerShape(4.dp))
                     .clickable { onSelect(pos) }
                     .padding(horizontal = 14.dp, vertical = 8.dp)
             ) {
-                Text(pos, color = if (isSelected) Color(0xFF38BDF8) else TEXT_DIM,
+                Text(pos,
+                    color = if (isSelected) BLUE else TEXT_DIM,
                     fontSize = 12.sp, fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace)
             }
@@ -848,13 +1002,16 @@ fun PatternGrid(steps: List<StepState>, onCycleStep: (Int) -> Unit) {
             listOf("B1","B2","B3","B4").forEach { label ->
                 Text(label, color = TEXT_DIM, fontSize = 9.sp,
                     fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.weight(1f), textAlign = TextAlign.Start)
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Start)
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             (0 until 4).forEach { beat ->
-                Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     (0 until 4).forEach { sub ->
                         StepButton(
                             state    = steps[beat * 4 + sub],
@@ -867,7 +1024,7 @@ fun PatternGrid(steps: List<StepState>, onCycleStep: (Int) -> Unit) {
         }
         Spacer(modifier = Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StepLegendItem(color = Color(0xFF38BDF8), label = "D = Down")
+            StepLegendItem(color = BLUE,              label = "D = Down")
             StepLegendItem(color = Color(0xFFA78BFA), label = "U = Up")
             StepLegendItem(color = BORDER,            label = ". = Off")
         }
@@ -877,9 +1034,9 @@ fun PatternGrid(steps: List<StepState>, onCycleStep: (Int) -> Unit) {
 @Composable
 fun StepButton(state: StepState, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val (bg, fg, label) = when (state) {
-        StepState.DOWN -> Triple(DOWN_COL, Color(0xFF38BDF8), "D")
-        StepState.UP   -> Triple(UP_COL,   Color(0xFFA78BFA), "U")
-        StepState.OFF  -> Triple(RACK,     TEXT_DIM,          ".")
+        StepState.DOWN -> Triple(DOWN_COL, BLUE,              "D")
+        StepState.UP   -> Triple(UP_COL,  Color(0xFFA78BFA), "U")
+        StepState.OFF  -> Triple(RACK,    TEXT_DIM,          ".")
     }
     Box(
         modifier = modifier
@@ -918,7 +1075,9 @@ fun PresetPatternsDropdown(onApply: (StepPattern) -> Unit) {
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         ExposedDropdownMenuBox(
@@ -934,8 +1093,10 @@ fun PresetPatternsDropdown(onApply: (StepPattern) -> Unit) {
                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                 },
                 colors = TextFieldDefaults.colors(
-                    unfocusedContainerColor = PANEL, focusedContainerColor = PANEL,
-                    unfocusedTextColor = TEXT, focusedTextColor = TEXT,
+                    unfocusedContainerColor = PANEL,
+                    focusedContainerColor   = PANEL,
+                    unfocusedTextColor      = TEXT,
+                    focusedTextColor        = TEXT,
                     unfocusedIndicatorColor = Color.Transparent,
                     focusedIndicatorColor   = Color.Transparent
                 ),
@@ -952,10 +1113,8 @@ fun PresetPatternsDropdown(onApply: (StepPattern) -> Unit) {
                     if (item.pattern == null) {
                         Text(
                             text = item.group.uppercase(),
-                            color = ACCENT2,
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 2.sp,
+                            color = ACCENT2, fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace, letterSpacing = 2.sp,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                         )
                     } else {
@@ -1031,27 +1190,32 @@ fun SendToPianoRollDialog(
         titleContentColor = GREEN,
         textContentColor  = TEXT,
         title = {
-            Text("SEND TO PIANO ROLL", fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 14.sp)
+            Text("SEND TO PIANO ROLL",
+                fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp, fontSize = 14.sp)
         },
         text = {
             Column {
                 Text("MODE", color = TEXT_DIM, fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace, letterSpacing = 2.sp,
                     modifier = Modifier.padding(bottom = 6.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(false to "BLOCK" to "All notes together",
                            true  to "STRUM" to "Apply pattern timing")
                         .forEach { (pair, desc) ->
                         val (mode, modeLabel) = pair
                         val active = useStrum == mode
-                        val col    = if (mode) GREEN else Color(0xFF38BDF8)
+                        val col    = if (mode) GREEN else BLUE
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(if (active) Color(0xFF1A2A1A) else Color(0xFF222228))
-                                .border(1.dp, if (active) col else BORDER, RoundedCornerShape(4.dp))
+                                .background(
+                                    if (active) Color(0xFF1A2A1A) else Color(0xFF222228))
+                                .border(1.dp,
+                                    if (active) col else BORDER,
+                                    RoundedCornerShape(4.dp))
                                 .clickable { useStrum = mode }
                                 .padding(horizontal = 10.dp, vertical = 10.dp),
                             contentAlignment = Alignment.Center
@@ -1084,14 +1248,18 @@ fun SendToPianoRollDialog(
                             .fillMaxWidth()
                             .padding(vertical = 3.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(if (isSelected) Color(0xFF28283A) else BG)
-                            .border(1.dp, if (isSelected) trackColor else BORDER, RoundedCornerShape(4.dp))
+                            .background(
+                                if (isSelected) Color(0xFF28283A) else BG)
+                            .border(1.dp,
+                                if (isSelected) trackColor else BORDER,
+                                RoundedCornerShape(4.dp))
                             .clickable { selectedTrack = i }
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Box(modifier = Modifier.width(3.dp).height(20.dp)
+                        Box(modifier = Modifier
+                            .width(3.dp).height(20.dp)
                             .background(trackColor, RoundedCornerShape(2.dp)))
                         Text(track.name,
                             color = if (isSelected) trackColor else TEXT_DIM,
@@ -1104,9 +1272,10 @@ fun SendToPianoRollDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(4.dp))
-                        .background(if (appendMode) Color(0xFF1A2A3A) else BG)
+                        .background(
+                            if (appendMode) Color(0xFF1A2A3A) else BG)
                         .border(1.dp,
-                            if (appendMode) Color(0xFF38BDF8) else BORDER,
+                            if (appendMode) BLUE else BORDER,
                             RoundedCornerShape(4.dp))
                         .clickable { appendMode = !appendMode }
                         .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -1115,7 +1284,7 @@ fun SendToPianoRollDialog(
                 ) {
                     Column {
                         Text("APPEND TO EXISTING",
-                            color = if (appendMode) Color(0xFF38BDF8) else TEXT_DIM,
+                            color = if (appendMode) BLUE else TEXT_DIM,
                             fontSize = 12.sp, fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace)
                         Text(
@@ -1129,7 +1298,7 @@ fun SendToPianoRollDialog(
                         onCheckedChange = { appendMode = it },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
-                            checkedTrackColor = Color(0xFF38BDF8)
+                            checkedTrackColor = BLUE
                         )
                     )
                 }
