@@ -8,4 +8,7 @@ sealed class Screen(val route: String) {
     object PianoRoll : Screen("piano_roll/{sessionId}") {
         fun createRoute(sessionId: String) = "piano_roll/$sessionId"
     }
+    object SessionSettings : Screen("session_settings/{sessionId}") {
+        fun createRoute(sessionId: String) = "session_settings/$sessionId"
+    }
 }

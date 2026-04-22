@@ -1180,8 +1180,9 @@ fun SendToPianoRollDialog(
     onConfirm: (trackIndex: Int, useStrum: Boolean, appendMode: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var selectedTrack by remember { mutableStateOf(0) }
-    var useStrum      by remember { mutableStateOf(false) }
+    val chordTrackIndex = tracks.indexOfFirst { it.name.uppercase() == "CHORD" }.takeIf { it >= 0 } ?: 2
+    var selectedTrack by remember { mutableStateOf(chordTrackIndex) }
+    var useStrum      by remember { mutableStateOf(true) }
     var appendMode    by remember { mutableStateOf(false) }
 
     androidx.compose.material3.AlertDialog(

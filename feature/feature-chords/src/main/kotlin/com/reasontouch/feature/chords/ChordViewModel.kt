@@ -229,6 +229,10 @@ class ChordViewModel @Inject constructor(
      * Finds the best matching chord in GuitarVoicings or falls back to
      * the first available voicing for that root.
      */
+    private val SHARP_TO_FLAT = mapOf(
+        "C#" to "Db", "D#" to "Eb", "F#" to "Gb", "G#" to "Ab", "A#" to "Bb"
+    )
+
     fun addSuggestedChord(suggestion: ChordSuggestion) {
         val rootLabel    = suggestion.chord.root.label
         val qualitySuffix = when (suggestion.chord.quality) {
@@ -244,11 +248,24 @@ class ChordViewModel @Inject constructor(
         }
         val chordKey = "$rootLabel$qualitySuffix"
 
-        // Find matching chord in GuitarVoicings
-        val voicingMap = GuitarVoicings.voicings[chordKey]
-            ?: GuitarVoicings.voicings.entries
-                .firstOrNull { it.key.startsWith(rootLabel) }
-                ?.value
+        // Try sharp form first, then flat enharmonic equivalent
+        val flatRoot    = SHARP_TO_FLAT[rootLabel] ?: rootLabel
+        val flatChordKey = "$flatRoot$qualitySuffix"
+
+        // Find voicing — try sharp, then flat, then prefix match
+        // Also track which key was actually matched for correct display name
+        val voicingEntry = when {
+            GuitarVoicings.voicings.containsKey(chordKey)     ->
+                chordKey to GuitarVoicings.voicings[chordKey]!!
+            GuitarVoicings.voicings.containsKey(flatChordKey) ->
+                flatChordKey to GuitarVoicings.voicings[flatChordKey]!!
+            else -> GuitarVoicings.voicings.entries
+                .firstOrNull {
+                    it.key.startsWith(rootLabel) || it.key.startsWith(flatRoot)
+                }?.let { it.key to it.value }
+        }
+        val resolvedKey = voicingEntry?.first
+        val voicingMap  = voicingEntry?.second
 
         if (voicingMap == null) {
             _statusMessage.value = "No voicing found for ${suggestion.chord.label} â€” tap to add manually"
@@ -261,10 +278,10 @@ class ChordViewModel @Inject constructor(
         viewModelScope.launch {
             val barIndex = progression.value.size
             val chordEvent = ChordEvent(
-                id             = UUID.randomUUID().toString(),
-                sessionId      = sessionId,
-                barIndex       = barIndex,
-                chordName      = "$chordKey $pos",
+                id        = UUID.randomUUID().toString(),
+                sessionId = sessionId,
+                barIndex  = barIndex,
+                chordName = "${resolvedKey ?: chordKey} $pos",
                 rootMidi       = notes.firstOrNull { it != null } ?: 0,
                 midiNotes      = notes.filterNotNull().joinToString(","),
                 voicing        = pos,
@@ -275,7 +292,7 @@ class ChordViewModel @Inject constructor(
             // Refresh suggestions based on new last chord
             val selectedKey = _harmonyState.value.selectedKey
             if (selectedKey != null) {
-                val newSuggestions = ChordSuggestionEngine.suggest(selectedKey, chordKey)
+                val newSuggestions = ChordSuggestionEngine.suggest(selectedKey, resolvedKey ?: chordKey)
                 _harmonyState.value = _harmonyState.value.copy(suggestions = newSuggestions)
             }
             _statusMessage.value = null
