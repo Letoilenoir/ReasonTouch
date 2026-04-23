@@ -74,6 +74,25 @@ data class KeyCandidate(
 
 // ── Scale intervals ───────────────────────────────────────────────────────────
 
+private val SHARP_TO_FLAT_DISPLAY = mapOf(
+    "C#" to "Db", "D#" to "Eb", "F#" to "Gb", "G#" to "Ab", "A#" to "Bb"
+)
+
+fun TheoryChord.guitarLabel(): String {
+    val flatRoot = SHARP_TO_FLAT_DISPLAY[root.label] ?: root.label
+    return when (quality) {
+        ChordQuality.MAJ  -> flatRoot
+        ChordQuality.MIN  -> "${flatRoot}m"
+        ChordQuality.DIM  -> "${flatRoot}dim"
+        ChordQuality.AUG  -> "${flatRoot}aug"
+        ChordQuality.DOM7 -> "${flatRoot}7"
+        ChordQuality.MAJ7 -> "${flatRoot}maj7"
+        ChordQuality.MIN7 -> "${flatRoot}m7"
+        ChordQuality.SUS2 -> "${flatRoot}sus2"
+        ChordQuality.SUS4 -> "${flatRoot}sus4"
+    }
+}
+
 object MusicTheory {
 
     // Semitone intervals from root for major and natural minor scales

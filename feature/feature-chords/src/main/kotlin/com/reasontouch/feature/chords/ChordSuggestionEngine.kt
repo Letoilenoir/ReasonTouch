@@ -1,23 +1,17 @@
 package com.reasontouch.feature.chords
 
-/**
- * Generates next chord suggestions given a selected key and the last
- * chord in the progression.
- *
- * Uses functional harmony transition rules:
- *   Tonic       → Predominant or Dominant
- *   Predominant → Dominant
- *   Dominant    → Tonic (strong) or Predominant (deceptive)
- *
- * Returns up to 4 suggestions, weighted by musical probability.
- * Each suggestion includes the TheoryChord and a descriptive label.
- */
-
 data class ChordSuggestion(
     val chord:       TheoryChord,
-    val degree:      Int,           // scale degree 1-7
+    val degree:      Int,
     val function:    HarmonicFunction,
-    val description: String         // e.g. "IV — Predominant", "V — Dominant (strong)"
+    val description: String,
+    val isBorrowed:  Boolean = false
+)
+
+data class BorrowedChord(
+    val chord:       TheoryChord,
+    val symbol:      String,
+    val description: String
 )
 
 object ChordSuggestionEngine {
@@ -25,7 +19,7 @@ object ChordSuggestionEngine {
     private const val MAX_SUGGESTIONS = 4
 
     fun suggest(
-        key:       KeyCandidate,
+        key:           KeyCandidate,
         lastChordName: String?
     ): List<ChordSuggestion> {
         val diatonic     = MusicTheory.diatonicChords(key.root, key.isMinor)
@@ -35,13 +29,11 @@ object ChordSuggestionEngine {
         }
         val lastFunction = lastDegree?.let {
             MusicTheory.function(it, key.isMinor)
-        } ?: HarmonicFunction.TONIC  // default to tonic if unknown
+        } ?: HarmonicFunction.TONIC
 
-        // Determine valid next functions based on transitions
         val nextFunctions = MusicTheory.TRANSITIONS[lastFunction]
             ?: listOf(HarmonicFunction.PREDOMINANT, HarmonicFunction.DOMINANT)
 
-        // Collect candidate chords by function, weighted
         val candidates = mutableListOf<Pair<ChordSuggestion, Float>>()
 
         diatonic.forEachIndexed { idx, chord ->
@@ -49,32 +41,22 @@ object ChordSuggestionEngine {
             val function = MusicTheory.function(degree, key.isMinor)
 
             if (function in nextFunctions) {
-                // Weight from transition table
-                val transitionWeights = MusicTheory.TRANSITION_WEIGHTS[lastFunction] ?: emptyMap()
-                val baseWeight = transitionWeights[function] ?: 0.5f
-
-                // Tonic degree gets extra weight for strong resolution feel
+                val transitionWeights = MusicTheory.TRANSITION_WEIGHTS[lastFunction]
+                    ?: emptyMap()
+                val baseWeight   = transitionWeights[function] ?: 0.5f
                 val degreeWeight = when (degree) {
-                    1    -> 1.3f  // tonic
-                    5    -> 1.2f  // dominant
-                    4    -> 1.1f  // subdominant
-                    else -> 1.0f
+                    1 -> 1.3f; 5 -> 1.2f; 4 -> 1.1f; else -> 1.0f
                 }
-
-                val weight = baseWeight * degreeWeight
-
-                val romanNumeral = romanNumeral(degree, key.isMinor, chord.quality)
-                val funcLabel    = function.name.lowercase()
+                val weight    = baseWeight * degreeWeight
+                val roman     = romanNumeral(degree, key.isMinor, chord.quality)
+                val funcLabel = function.name.lowercase()
                     .replaceFirstChar { it.uppercase() }
-                val description  = "$romanNumeral — $funcLabel"
-
                 candidates.add(
-                    ChordSuggestion(chord, degree, function, description) to weight
+                    ChordSuggestion(chord, degree, function, "$roman — $funcLabel") to weight
                 )
             }
         }
 
-        // Sort by weight, take top N, deduplicate
         return candidates
             .sortedByDescending { it.second }
             .map { it.first }
@@ -82,24 +64,77 @@ object ChordSuggestionEngine {
             .take(MAX_SUGGESTIONS)
     }
 
-    /** Also generate "all diatonic" suggestions for when no last chord exists */
     fun suggestAll(key: KeyCandidate): List<ChordSuggestion> {
         val diatonic = MusicTheory.diatonicChords(key.root, key.isMinor)
         return diatonic.mapIndexed { idx, chord ->
-            val degree   = idx + 1
-            val function = MusicTheory.function(degree, key.isMinor)
-            val roman    = romanNumeral(degree, key.isMinor, chord.quality)
-            val funcLabel = function.name.lowercase()
-                .replaceFirstChar { it.uppercase() }
+            val degree    = idx + 1
+            val function  = MusicTheory.function(degree, key.isMinor)
+            val roman     = romanNumeral(degree, key.isMinor, chord.quality)
+            val funcLabel = function.name.lowercase().replaceFirstChar { it.uppercase() }
             ChordSuggestion(chord, degree, function, "$roman — $funcLabel")
         }
+    }
+
+    /**
+     * Borrowed chords from the parallel key.
+     *
+     * Major key — borrows from parallel minor:
+     *   bVII  flat seventh  (e.g. Bb in C Major) — bold, anthemic
+     *   iv    minor fourth  (e.g. Fm in C Major) — dark, emotional
+     *   bVI   flat sixth    (e.g. Ab in C Major) — lush, cinematic
+     *
+     * Minor key — borrows from parallel major:
+     *   V     major dominant (e.g. E in Am)      — strong resolution
+     *   IV    major fourth   (e.g. D in Am)      — brighter feel
+     *   I     major tonic    (e.g. C in Am)      — Picardy third
+     */
+    fun borrowedChords(key: KeyCandidate): List<BorrowedChord> {
+        val result = mutableListOf<BorrowedChord>()
+        val root   = key.root
+
+        if (!key.isMinor) {
+            val minorDiatonic = MusicTheory.diatonicChords(root, isMinor = true)
+            result.add(BorrowedChord(
+                chord       = minorDiatonic[6],
+                symbol      = "\u266DVII",
+                description = "Parallel minor — bold, anthemic"
+            ))
+            result.add(BorrowedChord(
+                chord       = minorDiatonic[3],
+                symbol      = "iv",
+                description = "Parallel minor — dark, emotional"
+            ))
+            result.add(BorrowedChord(
+                chord       = minorDiatonic[5],
+                symbol      = "\u266DVI",
+                description = "Parallel minor — lush, cinematic"
+            ))
+        } else {
+            val majorDiatonic = MusicTheory.diatonicChords(root, isMinor = false)
+            result.add(BorrowedChord(
+                chord       = majorDiatonic[4],
+                symbol      = "V",
+                description = "Parallel major — strong resolution"
+            ))
+            result.add(BorrowedChord(
+                chord       = majorDiatonic[3],
+                symbol      = "IV",
+                description = "Parallel major — brighter feel"
+            ))
+            result.add(BorrowedChord(
+                chord       = majorDiatonic[0],
+                symbol      = "I",
+                description = "Picardy third — major tonic"
+            ))
+        }
+        return result
     }
 
     private fun romanNumeral(degree: Int, isMinor: Boolean, quality: ChordQuality): String {
         val base = listOf("I","II","III","IV","V","VI","VII")[degree - 1]
         return when (quality) {
             ChordQuality.MIN, ChordQuality.MIN7 -> base.lowercase()
-            ChordQuality.DIM                    -> "${base.lowercase()}°"
+            ChordQuality.DIM                    -> "${base.lowercase()}\u00B0"
             else                                -> base
         }
     }

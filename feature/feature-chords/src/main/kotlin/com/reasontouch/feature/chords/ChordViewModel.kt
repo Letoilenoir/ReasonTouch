@@ -193,7 +193,7 @@ class ChordViewModel @Inject constructor(
         viewModelScope.launch {
             // Extract chord names from progression (just the chord part, not voicing)
             val chordNames = bars.map { it.chordName.trim().split(" ").first() }
-            val candidates = KeyDetector.detect(chordNames)
+            val candidates = KeyDetector.detect(chordNames, _harmonyState.value.moodBias)
 
             _harmonyState.value = _harmonyState.value.copy(
                 isAnalysing   = false,
@@ -218,9 +218,12 @@ class ChordViewModel @Inject constructor(
             ChordSuggestionEngine.suggestAll(candidate)
         }
 
+        val borrowed = ChordSuggestionEngine.borrowedChords(candidate)
+
         _harmonyState.value = _harmonyState.value.copy(
-            selectedKey = candidate,
-            suggestions = suggestions
+            selectedKey    = candidate,
+            suggestions    = suggestions,
+            borrowedChords = borrowed
         )
     }
 
@@ -293,7 +296,11 @@ class ChordViewModel @Inject constructor(
             val selectedKey = _harmonyState.value.selectedKey
             if (selectedKey != null) {
                 val newSuggestions = ChordSuggestionEngine.suggest(selectedKey, resolvedKey ?: chordKey)
-                _harmonyState.value = _harmonyState.value.copy(suggestions = newSuggestions)
+                val newBorrowed    = ChordSuggestionEngine.borrowedChords(selectedKey)
+                _harmonyState.value = _harmonyState.value.copy(
+                    suggestions    = newSuggestions,
+                    borrowedChords = newBorrowed
+                )
             }
             _statusMessage.value = null
         }
@@ -348,6 +355,103 @@ class ChordViewModel @Inject constructor(
             repository.saveNotes(notes)
             _bassGenerating.value = false
             _statusMessage.value  = "Bass generated: ${style.label} (${notes.size} notes)"
+        }
+    }
+
+    fun auditionBorrowed(borrowed: BorrowedChord) {
+        val gmProgram  = _instrument.value.program
+        val strumDelay = if (_strumEnabled.value) (_strumSpeed.value * 1000).toLong() else 0L
+        sf2Player.playChord(borrowed.chord.midiNotes, 0.5f, 90, gmProgram, strumDelay)
+    }
+
+    fun addBorrowedChord(borrowed: BorrowedChord) {
+        val rootLabel     = borrowed.chord.root.label
+        val flatRoot      = SHARP_TO_FLAT[rootLabel] ?: rootLabel
+        val qualitySuffix = when (borrowed.chord.quality) {
+            ChordQuality.MIN  -> "m"
+            ChordQuality.DIM  -> "dim"
+            ChordQuality.AUG  -> "aug"
+            ChordQuality.DOM7 -> "7"
+            ChordQuality.MAJ7 -> "maj7"
+            ChordQuality.MIN7 -> "m7"
+            ChordQuality.SUS2 -> "sus2"
+            ChordQuality.SUS4 -> "sus4"
+            ChordQuality.MAJ  -> ""
+        }
+        val chordKey     = "$rootLabel$qualitySuffix"
+        val flatChordKey = "$flatRoot$qualitySuffix"
+
+        val voicingEntry = when {
+            GuitarVoicings.voicings.containsKey(chordKey)     ->
+                chordKey to GuitarVoicings.voicings[chordKey]!!
+            GuitarVoicings.voicings.containsKey(flatChordKey) ->
+                flatChordKey to GuitarVoicings.voicings[flatChordKey]!!
+            else -> GuitarVoicings.voicings.entries
+                .firstOrNull {
+                    it.key.startsWith(rootLabel) || it.key.startsWith(flatRoot)
+                }?.let { it.key to it.value }
+        }
+
+        val resolvedKey = voicingEntry?.first
+        val voicingMap  = voicingEntry?.second
+
+        if (voicingMap == null) {
+            _statusMessage.value =
+                "No voicing for ${borrowed.chord.guitarLabel()} — add manually"
+            return
+        }
+
+        val pos   = voicingMap.keys.first()
+        val notes = voicingMap[pos] ?: return
+
+        viewModelScope.launch {
+            val barIndex = progression.value.size
+            val chordEvent = ChordEvent(
+                id             = UUID.randomUUID().toString(),
+                sessionId      = sessionId,
+                barIndex       = barIndex,
+                chordName      = "${resolvedKey ?: chordKey} $pos",
+                rootMidi       = notes.firstOrNull { it != null } ?: 0,
+                midiNotes      = notes.filterNotNull().joinToString(","),
+                voicing        = pos,
+                strumPatternId = null
+            )
+            repository.saveChord(chordEvent)
+
+            // Refresh suggestions for the new last chord
+            val selectedKey = _harmonyState.value.selectedKey
+            if (selectedKey != null) {
+                val newSuggestions = ChordSuggestionEngine.suggest(
+                    selectedKey, resolvedKey ?: chordKey)
+                val newBorrowed = ChordSuggestionEngine.borrowedChords(selectedKey)
+                _harmonyState.value = _harmonyState.value.copy(
+                    suggestions    = newSuggestions,
+                    borrowedChords = newBorrowed
+                )
+            }
+            _statusMessage.value = null
+        }
+    }
+
+    fun setMoodBias(bias: Float) {
+        val bars = progression.value
+        if (bars.isEmpty()) return
+
+        _harmonyState.value = _harmonyState.value.copy(
+            moodBias      = bias,
+            isAnalysing   = true,
+            selectedKey   = null,
+            suggestions   = emptyList(),
+            borrowedChords = emptyList()
+        )
+
+        viewModelScope.launch {
+            val chordNames = bars.map { it.chordName.trim().split(" ").first() }
+            val candidates = KeyDetector.detect(chordNames, bias)
+            _harmonyState.value = _harmonyState.value.copy(
+                isAnalysing   = false,
+                keyCandidates = candidates
+            )
         }
     }
 
