@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -56,13 +57,18 @@ class ChordViewModel @Inject constructor(
     private val _stepStates = MutableStateFlow(List(16) { StepState.OFF })
     val stepStates: StateFlow<List<StepState>> = _stepStates.asStateFlow()
 
-    private val _tempo        = MutableStateFlow(120)
+    // _tempo removed — use bpm StateFlow (reads from session)
+    // BPM reads from session Ã¢â‚¬â€ single source of truth
+    val bpm: StateFlow<Int> = session
+        .map { it?.bpm ?: 120 }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 120)
+
     private val _barDuration  = MutableStateFlow(4.0)
     private val _strumSpeed   = MutableStateFlow(0.02)
     private val _strumEnabled = MutableStateFlow(true)
     private val _instrument   = MutableStateFlow(GM_GUITARS[1])
 
-    val tempo:        StateFlow<Int>          = _tempo.asStateFlow()
+    val tempo: StateFlow<Int> get() = bpm
     val barDuration:  StateFlow<Double>       = _barDuration.asStateFlow()
     val strumSpeed:   StateFlow<Double>       = _strumSpeed.asStateFlow()
     val strumEnabled: StateFlow<Boolean>      = _strumEnabled.asStateFlow()
@@ -71,7 +77,7 @@ class ChordViewModel @Inject constructor(
     private val _statusMessage = MutableStateFlow<String?>(null)
     val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
 
-    // ── Harmony suggestion state ──────────────────────────────────────────
+    // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Harmony suggestion state ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
     private val _harmonyState = MutableStateFlow(HarmonyState())
     val harmonyState: StateFlow<HarmonyState> = _harmonyState.asStateFlow()
 
@@ -99,7 +105,17 @@ class ChordViewModel @Inject constructor(
 
     fun applyPreset(pattern: StepPattern) { _stepStates.value = pattern.steps }
 
-    fun setTempo(bpm: Int)            { _tempo.value = bpm.coerceIn(20, 300) }
+    
+    fun setBpm(bpm: Int) {
+        viewModelScope.launch {
+            val current = session.value ?: return@launch
+            repository.updateSession(current.copy(
+                bpm = bpm.coerceIn(20, 300),
+                updatedAt = System.currentTimeMillis()
+            ))
+        }
+    }
+
     fun setBarDuration(beats: Double) { _barDuration.value = beats.coerceIn(0.5, 32.0) }
     fun setStrumSpeed(v: Double)      { _strumSpeed.value = v.coerceAtLeast(0.0) }
     fun setStrumEnabled(v: Boolean)   { _strumEnabled.value = v }
@@ -151,7 +167,10 @@ class ChordViewModel @Inject constructor(
         val midiNotes  = notes.filterNotNull()
         val gmProgram  = _instrument.value.program
         val strumDelay = if (_strumEnabled.value) (_strumSpeed.value * 1000).toLong() else 0L
-        sf2Player.playChord(midiNotes, 0.5f, 90, gmProgram, strumDelay)
+        // Ring duration scales with tempo Ã¢â‚¬â€ shorter at faster tempos
+        val beatDurSec = 60f / (bpm.value.coerceAtLeast(20)).toFloat()
+        val ringDur    = (beatDurSec * 2f).coerceIn(0.3f, 1.2f)
+        sf2Player.playChord(midiNotes, ringDur, 90, gmProgram, strumDelay)
     }
 
     /** Audition a suggestion chord directly from its MIDI notes */
@@ -168,7 +187,7 @@ class ChordViewModel @Inject constructor(
         return (baseVel - t * (baseVel - taperVel)).toInt().coerceIn(40, 127)
     }
 
-    // ── Harmony analysis ──────────────────────────────────────────────────
+    // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Harmony analysis ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
 
     /**
      * Analyses the current progression and detects candidate keys.
@@ -228,7 +247,7 @@ class ChordViewModel @Inject constructor(
     }
 
     /**
-     * User taps a suggestion — adds it as the next bar in the progression.
+     * User taps a suggestion ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â adds it as the next bar in the progression.
      * Finds the best matching chord in GuitarVoicings or falls back to
      * the first available voicing for that root.
      */
@@ -255,7 +274,7 @@ class ChordViewModel @Inject constructor(
         val flatRoot    = SHARP_TO_FLAT[rootLabel] ?: rootLabel
         val flatChordKey = "$flatRoot$qualitySuffix"
 
-        // Find voicing � try sharp, then flat, then prefix match
+        // Find voicing Ã¢â‚¬â€ try sharp, then flat, then prefix match
         // Also track which key was actually matched for correct display name
         val voicingEntry = when {
             GuitarVoicings.voicings.containsKey(chordKey)     ->
@@ -271,7 +290,7 @@ class ChordViewModel @Inject constructor(
         val voicingMap  = voicingEntry?.second
 
         if (voicingMap == null) {
-            _statusMessage.value = "No voicing found for ${suggestion.chord.label} — tap to add manually"
+            _statusMessage.value = "No voicing found for ${suggestion.chord.label} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â tap to add manually"
             return
         }
 
@@ -338,7 +357,7 @@ class ChordViewModel @Inject constructor(
                     barsUsed * beatsPerBar
                 }
             } else {
-                // Overwrite � clear existing bass notes first
+                // Overwrite Ã¢â‚¬â€ clear existing bass notes first
                 repository.deleteNotesForTrack(bassTrack.id)
                 0f
             }
@@ -397,7 +416,7 @@ class ChordViewModel @Inject constructor(
 
         if (voicingMap == null) {
             _statusMessage.value =
-                "No voicing for ${borrowed.chord.guitarLabel()} � add manually"
+                "No voicing for ${borrowed.chord.guitarLabel()} Ã¢â‚¬â€ add manually"
             return
         }
 
@@ -562,7 +581,7 @@ class ChordViewModel @Inject constructor(
             notes         = Array<Int?>(6) { i -> notes.getOrNull(i) },
             steps         = _stepStates.value,
             durationBeats = _barDuration.value,
-            tempoBpm      = _tempo.value,
+            tempoBpm      = bpm.value,
             strumSpeed    = if (_strumEnabled.value) _strumSpeed.value else 0.0,
             gmProgram     = _instrument.value.program
         )
