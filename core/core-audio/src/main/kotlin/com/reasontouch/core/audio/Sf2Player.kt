@@ -43,6 +43,69 @@ class Sf2Player(assetManager: AssetManager) {
         }
     }
 
+    fun playDrum(
+        midiNote:    Int,
+        durationSec: Float = 0.25f,
+        velocity:    Int   = 100
+    ) {
+        scope.launch(Dispatchers.Default) {
+            try {
+
+                val result = parser.findDrumSample(midiNote)
+                if (result == null) {
+                    android.util.Log.e("DRUM", "No drum sample found for midiNote=$midiNote")
+                    return@launch
+                }
+
+                val (header, rawSamples) = result
+
+                android.util.Log.d(
+                    "DRUM",
+                    "Using sample=${header.name}, rate=${header.sampleRate}, " +
+                            "root=${header.originalPitch}, size=${rawSamples.size}, " +
+                            "loop=${header.hasLoop}"
+                )
+
+                // Drums play at recorded pitch
+                val pitchRatio = header.sampleRate.toFloat() / OUTPUT_SAMPLE_RATE
+                val totalSec       = durationSec + RELEASE_SEC
+                val outputSamples  = (totalSec * OUTPUT_SAMPLE_RATE).toInt()
+                val sustainSamples = (durationSec * OUTPUT_SAMPLE_RATE).toInt()
+                val out      = ShortArray(outputSamples)
+                val velScale = (velocity / 127f).coerceIn(0f, 1f)
+                val hasLoop      = header.hasLoop
+                val loopStartRel = header.relLoopStart
+                val loopEndRel   = header.relLoopEnd
+                val loopLen      = (loopEndRel - loopStartRel).coerceAtLeast(1)
+                var srcPos = 0.0
+                for (i in 0 until outputSamples) {
+                    val idx0 = srcPos.toInt()
+                    val frac = (srcPos - idx0).toFloat()
+                    val actualIdx = if (hasLoop && idx0 >= loopEndRel)
+                        loopStartRel + ((idx0 - loopStartRel) % loopLen)
+                    else idx0
+                    if (actualIdx >= rawSamples.size) break
+                    val s0 = rawSamples[actualIdx].toFloat()
+                    val s1 = if (actualIdx + 1 < rawSamples.size)
+                                 rawSamples[actualIdx + 1].toFloat() else s0
+                    val sample = s0 + frac * (s1 - s0)
+                    val env    = envelope(i, sustainSamples, outputSamples)
+                    out[i] = (sample * env * velScale)
+                        .toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+                    srcPos += pitchRatio
+                }
+                val track = buildTrack(out.size)
+                track.write(out, 0, out.size)
+                synchronized(trackLock) { activeTracks.add(track) }
+                track.play()
+                val durationMs = (out.size.toLong() * 1000L / OUTPUT_SAMPLE_RATE) + 50L
+                delay(durationMs)
+                track.stop()
+                track.release()
+                synchronized(trackLock) { activeTracks.remove(track) }
+            } catch (e: Exception) { }
+        }
+    }
     fun playChord(
         midiNotes:    List<Int>,
         durationSec:  Float = 0.5f,

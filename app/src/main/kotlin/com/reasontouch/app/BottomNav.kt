@@ -3,6 +3,7 @@ package com.reasontouch.app
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,10 +21,11 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun BottomNav(
-    currentRoute: String,
-    onChordsClick: () -> Unit,
+    currentRoute:     String,
+    onChordsClick:    () -> Unit,
     onPianoRollClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onDrumsClick:     () -> Unit,
+    modifier:         Modifier = Modifier
 ) {
     Row(
         modifier = modifier
@@ -33,15 +35,21 @@ fun BottomNav(
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         BottomNavTab(
-            label = "??  CHORDS",
+            label    = "CHORDS",
             selected = currentRoute.startsWith("chords"),
-            onClick = onChordsClick,
+            onClick  = onChordsClick,
             modifier = Modifier.weight(1f)
         )
         BottomNavTab(
-            label = "??  ARRANGE",
+            label    = "ARRANGE",
             selected = currentRoute.startsWith("piano_roll"),
-            onClick = onPianoRollClick,
+            onClick  = onPianoRollClick,
+            modifier = Modifier.weight(1f)
+        )
+        BottomNavTab(
+            label    = "DRUMS",
+            selected = currentRoute.startsWith("drums"),
+            onClick  = onDrumsClick,
             modifier = Modifier.weight(1f)
         )
     }
@@ -49,25 +57,22 @@ fun BottomNav(
 
 @Composable
 fun BottomNavTab(
-    label: String,
+    label:    String,
     selected: Boolean,
-    onClick: () -> Unit,
+    onClick:  () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .height(56.dp)
             .clickable(onClick = onClick)
-            .background(
-                if (selected) Color(0xFF2A2A38) else Color(0xFF222228)
-            )
+            .background(if (selected) Color(0xFF2A2A38) else Color(0xFF222228))
             .padding(top = if (selected) 0.dp else 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         if (selected) {
-            // Active indicator line at top
-            androidx.compose.foundation.layout.Box(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(2.dp)

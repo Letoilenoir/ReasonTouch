@@ -43,6 +43,7 @@ private val RACK   = Color(0xFF222228)
 private val PANEL  = Color(0xFF2A2A32)
 private val BORDER = Color(0xFF3A3A45)
 private val ACCENT = Color(0xFFE84040)
+private val GREEN  = Color(0xFF3DDC84)
 private val TEXT_DIM = Color(0xFF666675)
 
 @Composable
@@ -52,12 +53,11 @@ fun ReasonTouchApp(repository: SessionRepository) {
     val currentRoute      = navBackStackEntry?.destination?.route ?: ""
     val application       = LocalContext.current.applicationContext as Application
 
-    var bpm        by remember { mutableStateOf(120) }
-    var isPlaying  by remember { mutableStateOf(false) }
     var showExport by remember { mutableStateOf(false) }
 
     val showChrome       = currentRoute.startsWith("chords/") ||
-                           currentRoute.startsWith("piano_roll/")
+                           currentRoute.startsWith("piano_roll/") ||
+                           currentRoute.startsWith("drums/")
     val currentSessionId = navBackStackEntry?.arguments?.getString("sessionId") ?: ""
 
     Column(
@@ -87,26 +87,31 @@ fun ReasonTouchApp(repository: SessionRepository) {
                     ?.getString("sessionId") ?: return@composable
                 com.reasontouch.feature.pianoroll.PianoRollScreen(sessionId = sessionId)
             }
-            composable(Screen.SessionSettings.route) { backStackEntry ->
+            composable(Screen.Drums.route) { backStackEntry ->
                 val sessionId = backStackEntry.arguments
                     ?.getString("sessionId") ?: return@composable
-                SessionSettingsScreen(
-                    onBack = { navController.popBackStack() }
+                com.reasontouch.feature.drums.DrumScreen(
+                    sessionId        = sessionId,
+                    onNavigateToRoll = {
+                        navController.navigate(Screen.PianoRoll.createRoute(sessionId)) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
+            }
+            composable(Screen.SessionSettings.route) {
+                SessionSettingsScreen(onBack = { navController.popBackStack() })
             }
         }
 
         if (showChrome) {
-            // Chrome bar — MIDI export + session settings
+            // Chrome bar
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(40.dp)
-                    .background(RACK)
-                    .padding(horizontal = 12.dp),
+                    .fillMaxWidth().height(40.dp)
+                    .background(RACK).padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Session settings button
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
@@ -121,31 +126,20 @@ fun ReasonTouchApp(repository: SessionRepository) {
                         }
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Text(
-                        text = "\u2699 SESSION",
-                        color = TEXT_DIM, fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
+                    Text("\u2699 SESSION", color = TEXT_DIM, fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                 }
-
                 Box(modifier = Modifier.weight(1f))
-
-                // MIDI Export button
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
                         .background(Color(0xFF1A3A2A))
-                        .border(1.dp, Color(0xFF3DDC84), RoundedCornerShape(4.dp))
+                        .border(1.dp, GREEN, RoundedCornerShape(4.dp))
                         .clickable { showExport = true }
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Text(
-                        text = "\u2193 MIDI",
-                        color = Color(0xFF3DDC84), fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
+                    Text("\u2193 MIDI", color = GREEN, fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                 }
             }
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(BORDER))
@@ -153,16 +147,23 @@ fun ReasonTouchApp(repository: SessionRepository) {
             BottomNav(
                 currentRoute     = currentRoute,
                 onChordsClick    = {
-                    val sessionId = navBackStackEntry
+                    val sid = navBackStackEntry
                         ?.arguments?.getString("sessionId") ?: return@BottomNav
-                    navController.navigate(Screen.Chords.createRoute(sessionId)) {
+                    navController.navigate(Screen.Chords.createRoute(sid)) {
                         launchSingleTop = true; restoreState = true
                     }
                 },
                 onPianoRollClick = {
-                    val sessionId = navBackStackEntry
+                    val sid = navBackStackEntry
                         ?.arguments?.getString("sessionId") ?: return@BottomNav
-                    navController.navigate(Screen.PianoRoll.createRoute(sessionId)) {
+                    navController.navigate(Screen.PianoRoll.createRoute(sid)) {
+                        launchSingleTop = true; restoreState = true
+                    }
+                },
+                onDrumsClick     = {
+                    val sid = navBackStackEntry
+                        ?.arguments?.getString("sessionId") ?: return@BottomNav
+                    navController.navigate(Screen.Drums.createRoute(sid)) {
                         launchSingleTop = true; restoreState = true
                     }
                 }

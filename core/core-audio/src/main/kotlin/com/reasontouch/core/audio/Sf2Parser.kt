@@ -1,6 +1,7 @@
 package com.reasontouch.core.audio
 
 import android.content.res.AssetManager
+import android.util.Log
 import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -48,73 +49,232 @@ class Sf2Parser(assetManager: AssetManager, fileName: String = "TimGM6mb.sf2") {
         assetManager.open(fileName).use { parse(it) }
     }
 
+    fun findDrumSample(midiNote: Int): Pair<SampleHeader, ShortArray>? {
+
+        Log.d("SF2", "---- Drum preset scan for midiNote=$midiNote ----")
+
+        presets.forEach {
+            Log.d(
+                "SF2",
+                "Preset name=${it.name}, bank=${it.bank}, program=${it.program}"
+            )
+        }
+
+        // Broader percussion search
+        val preset =
+            presets.firstOrNull { it.bank == 128 && it.program == 0 }
+                ?: presets.firstOrNull { it.bank == 128 }
+                ?: presets.firstOrNull { it.bank == 127 }
+                ?: presets.firstOrNull { it.bank >= 120 }
+                ?: presets.firstOrNull {
+                    it.name.contains("drum", ignoreCase = true) ||
+                            it.name.contains("perc", ignoreCase = true) ||
+                            it.name.contains("kit", ignoreCase = true)
+                }
+                ?: run {
+                    Log.e("SF2", "No drum preset found")
+                    return null
+                }
+
+        Log.d(
+            "SF2",
+            "Using drum preset: ${preset.name}, bank=${preset.bank}, program=${preset.program}"
+        )
+
+        val pBagStart = preset.bagIndex
+        val pBagEnd = presets.getOrNull(presets.indexOf(preset) + 1)?.bagIndex
+            ?: presetBags.size
+
+        var instIndex = -1
+        for (bi in pBagStart until pBagEnd) {
+            val bag = presetBags.getOrNull(bi) ?: break
+            val genEnd = presetBags.getOrNull(bi + 1)?.genIndex ?: presetGens.size
+
+            for (gi in bag.genIndex until genEnd) {
+                val gen = presetGens.getOrNull(gi) ?: break
+                if (gen.oper == 41) instIndex = gen.value.toInt() and 0xFFFF
+            }
+        }
+
+        if (instIndex < 0) {
+            Log.e("SF2", "No instrument found for drum preset")
+            return null
+        }
+
+        val inst = instruments.getOrNull(instIndex) ?: return null
+        val iBagStart = inst.bagIndex
+        val iBagEnd = instruments.getOrNull(instIndex + 1)?.bagIndex ?: instBags.size
+
+        var bestSampleIndex = -1
+        var bestRootOverride = -1
+
+        for (bi in iBagStart until iBagEnd) {
+            val bag = instBags.getOrNull(bi) ?: break
+            val genEnd = instBags.getOrNull(bi + 1)?.genIndex ?: instGens.size
+
+            var loKey = 0
+            var hiKey = 127
+            var sampleId = -1
+            var rootOverride = -1
+
+            for (gi in bag.genIndex until genEnd) {
+                val gen = instGens.getOrNull(gi) ?: break
+
+                when (gen.oper) {
+                    GEN_KEY_RANGE -> {
+                        val raw = gen.value.toInt() and 0xFFFF
+                        loKey = raw and 0xFF
+                        hiKey = (raw shr 8) and 0xFF
+                        if (hiKey < loKey) {
+                            val tmp = loKey
+                            loKey = hiKey
+                            hiKey = tmp
+                        }
+                    }
+
+                    GEN_SAMPLE_ID -> sampleId = gen.value.toInt() and 0xFFFF
+                    GEN_OVERRIDE_ROOT -> rootOverride = gen.value.toInt() and 0xFF
+                }
+            }
+
+            if (sampleId >= 0 && midiNote in loKey..hiKey) {
+                Log.d(
+                    "SF2",
+                    "Matched note=$midiNote sampleId=$sampleId range=$loKey-$hiKey"
+                )
+                bestSampleIndex = sampleId
+                bestRootOverride = rootOverride
+                break
+            }
+        }
+
+        if (bestSampleIndex < 0) {
+            Log.w("SF2", "No exact drum match for note=$midiNote, using fallback")
+
+            for (bi in iBagStart until iBagEnd) {
+                val bag = instBags.getOrNull(bi) ?: break
+                val genEnd = instBags.getOrNull(bi + 1)?.genIndex ?: instGens.size
+
+                for (gi in bag.genIndex until genEnd) {
+                    val gen = instGens.getOrNull(gi) ?: break
+                    if (gen.oper == GEN_SAMPLE_ID) {
+                        bestSampleIndex = gen.value.toInt() and 0xFFFF
+                        break
+                    }
+                }
+
+                if (bestSampleIndex >= 0) break
+            }
+        }
+
+        val header = sampleHeaders.getOrNull(bestSampleIndex) ?: run {
+            Log.e("SF2", "Still no drum sample found")
+            return null
+        }
+
+        if (header.sampleType == 0 || header.end <= header.start) {
+            Log.e("SF2", "Invalid sample header for ${header.name}")
+            return null
+        }
+
+        val finalHeader =
+            if (bestRootOverride >= 0)
+                header.copy(originalPitch = bestRootOverride)
+            else header
+
+        val len = (header.end - header.start).coerceAtLeast(0)
+        val pcm = ShortArray(len)
+
+        for (i in 0 until len) {
+            pcm[i] = sampleData.getOrElse(header.start + i) { 0 }
+        }
+
+        Log.d("SF2", "Loaded drum sample: ${header.name}, length=$len")
+
+        return Pair(finalHeader, pcm)
+    }
     fun findSample(gmProgram: Int, midiNote: Int): Pair<SampleHeader, ShortArray>? {
         val preset = presets.firstOrNull { it.program == gmProgram && it.bank == 0 }
             ?: presets.firstOrNull { it.bank == 0 }
             ?: return null
 
         val pBagStart = preset.bagIndex
-        val pBagEnd   = presets.getOrNull(presets.indexOf(preset) + 1)?.bagIndex
+        val pBagEnd = presets.getOrNull(presets.indexOf(preset) + 1)?.bagIndex
             ?: presetBags.size
 
         var instIndex = -1
+
         for (bi in pBagStart until pBagEnd) {
-            val bag    = presetBags.getOrNull(bi) ?: break
+            val bag = presetBags.getOrNull(bi) ?: break
             val genEnd = presetBags.getOrNull(bi + 1)?.genIndex ?: presetGens.size
+
             for (gi in bag.genIndex until genEnd) {
                 val gen = presetGens.getOrNull(gi) ?: break
                 if (gen.oper == 41) instIndex = gen.value.toInt() and 0xFFFF
             }
         }
+
         if (instIndex < 0) return null
 
-        val inst      = instruments.getOrNull(instIndex) ?: return null
+        val inst = instruments.getOrNull(instIndex) ?: return null
         val iBagStart = inst.bagIndex
-        val iBagEnd   = instruments.getOrNull(instIndex + 1)?.bagIndex ?: instBags.size
+        val iBagEnd = instruments.getOrNull(instIndex + 1)?.bagIndex ?: instBags.size
 
-        var bestSampleIndex  = -1
+        var bestSampleIndex = -1
         var bestRootOverride = -1
 
         for (bi in iBagStart until iBagEnd) {
-            val bag    = instBags.getOrNull(bi) ?: break
+            val bag = instBags.getOrNull(bi) ?: break
             val genEnd = instBags.getOrNull(bi + 1)?.genIndex ?: instGens.size
 
-            var loKey = 0; var hiKey = 127
-            var sampleId = -1; var rootOverride = -1
+            var loKey = 0
+            var hiKey = 127
+            var sampleId = -1
+            var rootOverride = -1
 
             for (gi in bag.genIndex until genEnd) {
                 val gen = instGens.getOrNull(gi) ?: break
+
                 when (gen.oper) {
-                    GEN_KEY_RANGE     -> {
-                        loKey = gen.value.toInt() and 0xFF
-                        hiKey = (gen.value.toInt() shr 8) and 0xFF
+                    GEN_KEY_RANGE -> {
+                        val raw = gen.value.toInt() and 0xFFFF
+                        loKey = raw and 0xFF
+                        hiKey = (raw shr 8) and 0xFF
+                        if (hiKey < loKey) {
+                            val t = loKey
+                            loKey = hiKey
+                            hiKey = t
+                        }
                     }
-                    GEN_SAMPLE_ID     -> sampleId     = gen.value.toInt() and 0xFFFF
+
+                    GEN_SAMPLE_ID -> sampleId = gen.value.toInt() and 0xFFFF
                     GEN_OVERRIDE_ROOT -> rootOverride = gen.value.toInt() and 0xFF
                 }
             }
 
-            if (midiNote in loKey..hiKey && sampleId >= 0) {
-                bestSampleIndex  = sampleId
+            if (sampleId >= 0 && midiNote in loKey..hiKey) {
+                bestSampleIndex = sampleId
                 bestRootOverride = rootOverride
                 break
             }
         }
 
         val header = sampleHeaders.getOrNull(bestSampleIndex) ?: return null
-        if (header.sampleType == 0 || header.end <= header.start) return null
 
-        val finalHeader = if (bestRootOverride >= 0)
-            header.copy(originalPitch = bestRootOverride) else header
+        val finalHeader =
+            if (bestRootOverride >= 0)
+                header.copy(originalPitch = bestRootOverride)
+            else header
 
         val len = (header.end - header.start).coerceAtLeast(0)
         val pcm = ShortArray(len)
+
         for (i in 0 until len) {
             pcm[i] = sampleData.getOrElse(header.start + i) { 0 }
         }
+
         return Pair(finalHeader, pcm)
     }
-
     private fun parse(stream: InputStream) {
         val bytes = stream.readBytes()
         val buf   = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)

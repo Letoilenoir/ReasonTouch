@@ -89,7 +89,9 @@ class SessionRepository @Inject constructor(
             MidiTrack(sessionId = session.id, index = 2, name = "CHORD",
                 voice = "square", color = 0xFF38BDF8, midiChannel = 2, volume = 0.65f),
             MidiTrack(sessionId = session.id, index = 3, name = "PAD",
-                voice = "pwm",    color = 0xFFA78BFA, midiChannel = 3, volume = 0.55f)
+                voice = "pwm",    color = 0xFFA78BFA, midiChannel = 3,  volume = 0.55f),
+            MidiTrack(sessionId = session.id, index = 4, name = "DRUMS",
+                voice = "saw",    color = 0xFFF5C518, midiChannel = 9,  volume = 0.90f)
         )
         trackDao.insertTracks(defaultTracks)
         return session
