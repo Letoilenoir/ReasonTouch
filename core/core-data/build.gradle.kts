@@ -9,7 +9,7 @@ android {
     namespace = "com.reasontouch.core.data"
     compileSdk = 36
 
-    defaultConfig { minSdk = 29 }
+    defaultConfig { minSdk = 26 }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

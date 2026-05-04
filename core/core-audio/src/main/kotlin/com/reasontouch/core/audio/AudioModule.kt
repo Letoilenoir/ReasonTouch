@@ -17,6 +17,11 @@ object AudioModule {
 
     @Provides
     @Singleton
+    fun provideDrumSamplePlayer(@dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context): DrumSamplePlayer =
+        DrumSamplePlayer(context.assets)
+
+    @Provides
+    @Singleton
     fun provideSf2Player(app: Application): Sf2Player =
         Sf2Player(app.assets)
 }

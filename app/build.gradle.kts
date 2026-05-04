@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.reasontouch.app"
-        minSdk = 29
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"

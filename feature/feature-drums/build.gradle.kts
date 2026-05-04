@@ -5,9 +5,8 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
-
 android {
-    namespace = "com.reasontouch.feature.export"
+    namespace = "com.reasontouch.feature.drums"
     compileSdk = 36
     defaultConfig { minSdk = 26 }
     compileOptions {
@@ -17,9 +16,9 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
 }
-
 dependencies {
     implementation(project(":core:core-data"))
+    implementation(project(":core:core-audio"))
     implementation(project(":core:core-midi"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

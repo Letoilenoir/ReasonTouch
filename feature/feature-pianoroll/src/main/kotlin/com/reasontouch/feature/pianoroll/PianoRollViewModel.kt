@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.reasontouch.core.audio.Sf2Player
 import com.reasontouch.core.audio.SynthEngine
+import com.reasontouch.core.audio.DrumSamplePlayer
 import com.reasontouch.core.data.ChordEvent
 import com.reasontouch.core.data.MidiTrack
 import com.reasontouch.core.data.NoteEvent
@@ -28,6 +29,7 @@ class PianoRollViewModel @Inject constructor(
     private val repository: SessionRepository,
     private val synthEngine: SynthEngine,
     private val sf2Player: Sf2Player,
+    private val drumSamplePlayer: DrumSamplePlayer,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -143,6 +145,10 @@ class PianoRollViewModel @Inject constructor(
         return (maxOf(barsNeeded, totalBars) * 4f)
     }
 
+    private fun isDrumTrack(track: MidiTrack) =
+        track.midiChannel == 9 ||
+        track.name.uppercase() in listOf("DRUMS", "DRUM")
+
     private fun gmProgramForTrack(track: MidiTrack): Int = when (track.name.uppercase()) {
         "BASS"  -> 32
         "LEAD"  -> 80
@@ -207,17 +213,21 @@ class PianoRollViewModel @Inject constructor(
                         val durSec  = chordRingDuration(note, clusterBeats, beatDurMs)
                         // Capture track ID so we can look up live volume at fire time
                         val trackId = track.id
+                        val isDrum   = isDrumTrack(track)
                         viewModelScope.launch(Dispatchers.IO) {
                             val waitMs = timeOriginMs + delayMs - System.currentTimeMillis()
                             if (waitMs > 0) delay(waitMs)
                             if (_isPlaying.value) {
-                                // Sample volume at the moment the note fires, not at schedule time
                                 val liveVolume = tracks.value
                                     .firstOrNull { it.id == trackId }?.volume ?: 1f
                                 val scaledVel  = (note.velocity * liveVolume)
                                     .toInt().coerceIn(1, 127)
                                 val midi = (108 - note.pitch).coerceIn(0, 127)
-                                sf2Player.playNote(midi, durSec, scaledVel, gmProgram)
+                                if (isDrum) {
+                                    drumSamplePlayer.play(midi, scaledVel)
+                                } else {
+                                    sf2Player.playNote(midi, durSec, scaledVel, gmProgram)
+                                }
                             }
                         }
                     }
@@ -417,8 +427,12 @@ class PianoRollViewModel @Inject constructor(
 
     fun auditionNote(pitch: Int, velocity: Int = 100) {
         val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
-        val gmProgram   = gmProgramForTrack(activeTrack)
-        sf2Player.playNote((108 - pitch).coerceIn(0, 127), 0.8f, velocity, gmProgram)
+        val midi = (108 - pitch).coerceIn(0, 127)
+        if (isDrumTrack(activeTrack)) {
+            drumSamplePlayer.play(midi, velocity)
+        } else {
+            sf2Player.playNote(midi, 0.8f, velocity, gmProgramForTrack(activeTrack))
+        }
     }
 
     fun bounceDown(sourceIndices: List<Int>, destIndex: Int, clearSources: Boolean) {

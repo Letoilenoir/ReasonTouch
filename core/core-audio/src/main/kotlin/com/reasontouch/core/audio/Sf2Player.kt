@@ -222,7 +222,11 @@ class Sf2Player(assetManager: AssetManager) {
             )
             .setBufferSizeInBytes(bufSize)
             .setTransferMode(AudioTrack.MODE_STATIC)
-            .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+            .also { builder ->
+                if (android.os.Build.VERSION.SDK_INT >= 26) {
+                    builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+                }
+            }
             .build()
     }
 
