@@ -3,6 +3,7 @@ package com.reasontouch.feature.drums
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.reasontouch.core.audio.DrumSamplePlayer
 import com.reasontouch.core.audio.Sf2Player
 import com.reasontouch.core.data.MidiTrack
 import com.reasontouch.core.data.NoteEvent
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -23,9 +25,9 @@ import javax.inject.Inject
 
 @HiltViewModel
 class DrumViewModel @Inject constructor(
-    private val repository: SessionRepository,
-    private val sf2Player:     Sf2Player,
-    private val drumPlayer:    com.reasontouch.core.audio.DrumSamplePlayer,
+    private val repository:  SessionRepository,
+    private val sf2Player:   Sf2Player,
+    private val drumPlayer:  DrumSamplePlayer,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -48,18 +50,22 @@ class DrumViewModel @Inject constructor(
 
     private var playbackJob: Job? = null
 
+    // ── Pattern editing ───────────────────────────────────────────────────
+
     fun toggleStep(laneIdx: Int, stepIdx: Int) {
         _pattern.value = _pattern.value.toggle(laneIdx, stepIdx)
         if (_pattern.value.isActive(laneIdx, stepIdx)) auditionLane(laneIdx)
     }
 
-    fun applyPreset(preset: DrumPattern)  { _pattern.value = preset }
-    fun clearPattern()                    { _pattern.value = _pattern.value.clear() }
+    fun applyPreset(preset: DrumPattern) { _pattern.value = preset }
+    fun clearPattern()                   { _pattern.value = _pattern.value.clear() }
 
     fun setStepCount(steps: Int) {
         _pattern.value = if (steps >= 32) _pattern.value.extendTo32()
                          else             _pattern.value.trimTo16()
     }
+
+    // ── Audition ──────────────────────────────────────────────────────────
 
     fun auditionLane(laneIdx: Int, velocity: Int = 100) {
         val lane = DrumKit.lanes.getOrNull(laneIdx) ?: return
@@ -68,24 +74,27 @@ class DrumViewModel @Inject constructor(
         }
     }
 
+    // ── Playback — reads pattern live each step for real-time editing ─────
+
     fun play() {
         if (_isPlaying.value) return
         _isPlaying.value = true
         val bpm    = session.value?.bpm ?: 120
         val stepMs = (60000.0 / bpm / 4.0).toLong()
-        val snap   = _pattern.value
 
         playbackJob = viewModelScope.launch(Dispatchers.IO) {
             var step = 0
             while (_isPlaying.value) {
                 _currentStep.value = step
+                // Read live each step — allows real-time pattern changes
+                val livePat = _pattern.value
                 DrumKit.lanes.forEachIndexed { laneIdx, lane ->
-                    if (snap.isActive(laneIdx, step)) {
-                        drumPlayer.play(lane.gmNote, snap.velocity(laneIdx, step))
+                    if (livePat.isActive(laneIdx, step)) {
+                        drumPlayer.play(lane.gmNote, livePat.velocity(laneIdx, step))
                     }
                 }
                 delay(stepMs)
-                step = (step + 1) % snap.steps
+                step = (step + 1) % livePat.steps
             }
             _currentStep.value = -1
         }
@@ -98,21 +107,27 @@ class DrumViewModel @Inject constructor(
         _currentStep.value = -1
     }
 
+    // ── Track management ──────────────────────────────────────────────────
+
     /**
-     * Find or create the DRUMS track for this session.
-     * Existing sessions created before the DRUMS track was added to
-     * createNewSession will get one created on first write.
+     * Find the DRUMS track by querying Room directly — avoids stale
+     * StateFlow which causes duplicate track creation on repeated writes.
+     * Creates the track only if genuinely absent from the DB.
      */
     private suspend fun getOrCreateDrumsTrack(): MidiTrack {
-        val existing = tracks.value.firstOrNull {
+        // Query Room directly for freshest data
+        val fresh = repository.getTracksForSession(sessionId).first()
+
+        val existing = fresh.firstOrNull {
+            it.midiChannel == 9 ||
             it.name.uppercase() in listOf("DRUMS", "DRUM")
         }
         if (existing != null) return existing
 
-        // Create a new DRUMS track for this session
+        // Not found — create once
         val newTrack = MidiTrack(
             sessionId   = sessionId,
-            index       = tracks.value.size,
+            index       = fresh.size,
             name        = "DRUMS",
             voice       = "saw",
             color       = 0xFFF5C518,
@@ -123,41 +138,66 @@ class DrumViewModel @Inject constructor(
         return newTrack
     }
 
-    fun writeToPianoRoll(appendMode: Boolean, onComplete: (String) -> Unit) {
-        viewModelScope.launch {
-            val drumTrack   = getOrCreateDrumsTrack()
-            val beatsPerBar = session.value?.timeSignatureNumerator ?: 4
-            val stepDur     = 1f / 4f
-            val pat         = _pattern.value
+    // ── Write to piano roll ───────────────────────────────────────────────
 
-            val patternBeats = pat.steps * stepDur  // total beats in one pattern pass
+    /**
+     * Writes the drum pattern to the DRUMS track, repeated for the full
+     * session length (totalBars). One pattern = 1 bar (4 beats / 16 steps).
+     *
+     * appendMode = true  → adds after existing content
+     * appendMode = false → clears track then writes from beat 0
+     */
+    fun writeToPianoRoll(appendMode: Boolean, onComplete: (String) -> Unit) {
+        stop()  // always stop playback before writing
+
+        viewModelScope.launch {
+            val drumTrack  = getOrCreateDrumsTrack()
+            val totalBars  = session.value?.totalBars ?: 4
+            val pat        = _pattern.value
+            val stepDur    = 1f / 4f                    // 16th note = 0.25 beats
+            val patternBeats = pat.steps * stepDur      // 16 steps = 4 beats = 1 bar
+
             val appendOffset = if (appendMode) {
-                val last = repository.getNotesForTrackOnce(drumTrack.id)
+                // Start after last existing note, rounded up to next pattern boundary
+                val lastBeat = repository.getNotesForTrackOnce(drumTrack.id)
                     .maxOfOrNull { it.beat + it.duration } ?: 0f
-                if (last <= 0f) 0f
-                else kotlin.math.ceil(last / patternBeats).toInt() * patternBeats
+                if (lastBeat <= 0f) 0f
+                else kotlin.math.ceil(lastBeat / patternBeats).toInt() * patternBeats
             } else {
                 repository.deleteNotesForTrack(drumTrack.id)
                 0f
             }
 
             val notes = mutableListOf<NoteEvent>()
-            DrumKit.lanes.forEachIndexed { li, lane ->
-                (0 until pat.steps).forEach { si ->
-                    if (pat.isActive(li, si)) {
-                        notes.add(NoteEvent(
-                            id       = UUID.randomUUID().toString(),
-                            trackId  = drumTrack.id,
-                            pitch    = lane.pitch,
-                            beat     = appendOffset + si * stepDur,
-                            duration = stepDur * 0.9f,
-                            velocity = pat.velocity(li, si)
-                        ))
+
+            // Repeat the pattern for every bar in the session
+            val barsToWrite = if (appendMode) {
+                // In append mode write totalBars worth from the offset
+                totalBars
+            } else {
+                totalBars
+            }
+
+            (0 until barsToWrite).forEach { barIdx ->
+                val barOffset = appendOffset + barIdx * patternBeats
+                DrumKit.lanes.forEachIndexed { li, lane ->
+                    (0 until pat.steps).forEach { si ->
+                        if (pat.isActive(li, si)) {
+                            notes.add(NoteEvent(
+                                id       = UUID.randomUUID().toString(),
+                                trackId  = drumTrack.id,
+                                pitch    = lane.pitch,
+                                beat     = barOffset + si * stepDur,
+                                duration = stepDur * 0.9f,
+                                velocity = pat.velocity(li, si)
+                            ))
+                        }
                     }
                 }
             }
+
             repository.saveNotes(notes)
-            onComplete("Written to ${drumTrack.name} (${notes.size} notes)")
+            onComplete("Written ${barsToWrite} bars to ${drumTrack.name} (${notes.size} notes)")
         }
     }
 }

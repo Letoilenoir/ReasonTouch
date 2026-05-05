@@ -23,12 +23,17 @@ dependencyResolutionManagement {
 rootProject.name = "ReasonTouch"
 
 include(":app")
+
+// Core
 include(":core:core-data")
 include(":core:core-midi")
 include(":core:core-audio")
 include(":core:core-ui")
+include(":core:core-music") // ✅ only this one
+
+// Features
 include(":feature:feature-chords")
 include(":feature:feature-pianoroll")
 include(":feature:feature-export")
-include(":feature:feature-drums")
-include(":feature:feature-drums")
+include(":feature:feature-drums") // ✅ only once
+
