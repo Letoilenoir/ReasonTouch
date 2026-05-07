@@ -89,7 +89,8 @@ fun Modifier.pianoRollGestures(
 
                     // Vertical anchor
                     val cy = event.changes.map { it.position.y }.average().toFloat()
-                    val pitchAtCy = state.yToPitch(cy)
+                    val pitchAtCy =
+                        (cy + state.scrollY - state.headerHeight) / state.noteHeight
 
                     // Horizontal zoom
                     state.pixelsPerBeat =
