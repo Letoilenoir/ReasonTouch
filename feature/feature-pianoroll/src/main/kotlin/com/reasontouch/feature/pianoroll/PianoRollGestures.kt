@@ -82,10 +82,33 @@ fun Modifier.pianoRollGestures(
 
                 val zoom = event.calculateZoom()
                 if (zoom != 1f) {
+
+                    // Horizontal anchor
                     val cx = event.changes.map { it.position.x }.average().toFloat()
                     val beatAtCx = state.xToBeat(cx)
-                    state.pixelsPerBeat = (state.pixelsPerBeat * zoom).coerceIn(20f, 400f)
-                    state.scrollX = (beatAtCx * state.pixelsPerBeat - cx).coerceAtLeast(0f)
+
+                    // Vertical anchor
+                    val cy = event.changes.map { it.position.y }.average().toFloat()
+                    val pitchAtCy = state.yToPitch(cy)
+
+                    // Horizontal zoom
+                    state.pixelsPerBeat =
+                        (state.pixelsPerBeat * zoom).coerceIn(20f, 400f)
+
+                    // Vertical zoom
+                    state.noteHeight =
+                        (state.noteHeight * zoom).coerceIn(12f, 64f)
+
+                    // Preserve horizontal focus
+                    state.scrollX =
+                        (beatAtCx * state.pixelsPerBeat - cx)
+                            .coerceAtLeast(0f)
+
+                    // Preserve vertical focus
+                    state.scrollY =
+                        (pitchAtCy * state.noteHeight - cy + state.headerHeight)
+                            .coerceAtLeast(0f)
+                    state.clampScroll(state.gridWidth, state.gridHeight)
                 }
                 event.changes.forEach { it.consume() }
 

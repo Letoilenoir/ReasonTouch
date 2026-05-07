@@ -12,7 +12,7 @@ class PianoRollState {
     var gridWidth by mutableStateOf(0f)
     var gridHeight by mutableStateOf(0f)
 
-    val noteHeight = 22f
+    var noteHeight by mutableStateOf(22f)
     val keyWidth = 64f
     val headerHeight = 24f
     val totalNotes = 88
