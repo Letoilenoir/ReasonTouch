@@ -69,8 +69,9 @@ private val BAR_OPTIONS = listOf(1, 2, 4, 8, 16, 32, 64)
 @Composable
 fun SessionSettingsScreen(
     onBack: () -> Unit,
+    onExportMidi: () -> Unit,
     viewModel: SessionSettingsViewModel = hiltViewModel()
-) {
+){
     val session      by viewModel.session.collectAsState()
     val focusManager = LocalFocusManager.current
 
@@ -107,7 +108,22 @@ fun SessionSettingsScreen(
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace, letterSpacing = 2.sp
             )
-            Box(modifier = Modifier.width(72.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF1A3A2A))
+                    .border(1.dp, GREEN, RoundedCornerShape(4.dp))
+                    .clickable(onClick = onExportMidi)
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    "↓ MIDI",
+                    color = GREEN,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
         }
         Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(ACCENT))
 

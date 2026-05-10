@@ -131,19 +131,26 @@ fun PianoRollScreen(
             onVolumeChange  = viewModel::setTrackVolume
         )
 
-        PianoRollCanvas(
-            state     = state,
-            uiState   = uiState,
-            viewModel = viewModel,
-            modifier  = Modifier.weight(1f).fillMaxWidth()
-        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
 
-        VelocityStripCanvas(
-            state     = state,
-            uiState   = uiState,
-            viewModel = viewModel,
-            modifier  = Modifier.fillMaxWidth().height(56.dp).background(RACK)
-        )
+            PianoRollCanvas(
+                state     = state,
+                uiState   = uiState,
+                viewModel = viewModel,
+                modifier  = Modifier.fillMaxSize()
+            )
+
+            VelocityOverlayTray(
+                state     = state,
+                uiState   = uiState,
+                viewModel = viewModel,
+                modifier  = Modifier.align(Alignment.BottomCenter)
+            )
+        }
 
         StatusBar(uiState = uiState, bpm = bpm, totalBars = totalBars)
     }
