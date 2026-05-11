@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,7 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.reasontouch.core.data.MidiTrack
+
 
 private val BG       = Color(0xFF1A1A1E)
 private val RACK     = Color(0xFF222228)
@@ -123,7 +121,7 @@ fun PianoRollScreen(
             )
         }
 
-        TrackSelector(
+        NeoTrackCardRow(
             tracks          = tracks,
             activeIndex     = activeIndex,
             onSelect        = viewModel::setActiveTrack,
@@ -152,7 +150,6 @@ fun PianoRollScreen(
             )
         }
 
-        StatusBar(uiState = uiState, bpm = bpm, totalBars = totalBars)
     }
 }
 
@@ -298,145 +295,5 @@ fun ToolChip(
             fontSize = 12.sp, fontWeight = FontWeight.Bold,
             fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default
         )
-    }
-}
-
-// ── Track selector with volume sliders ───────────────────────────────────────
-
-@Composable
-fun TrackSelector(
-    tracks:         List<MidiTrack>,
-    activeIndex:    Int,
-    onSelect:       (Int) -> Unit,
-    onMuteToggle:   (Int) -> Unit = {},
-    onVolumeChange: (Int, Float) -> Unit = { _, _ -> }
-) {
-    Column(modifier = Modifier.fillMaxWidth().background(RACK)) {
-        // Track name / mute row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(36.dp)
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            tracks.forEachIndexed { i, track ->
-                val isActive   = i == activeIndex
-                val trackColor = Color(when (i % 8) {
-                    0 -> 0xFFE84040L; 1 -> 0xFF3DDC84L; 2 -> 0xFF38BDF8L
-                    3 -> 0xFFA78BFAL; 4 -> 0xFFFF6B35L; 5 -> 0xFFF5C518L
-                    6 -> 0xFFF472B6L; else -> 0xFF94A3B8L
-                })
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(when {
-                            track.muted -> Color(0xFF2A1A1A)
-                            isActive    -> Color(0xFF28283A)
-                            else        -> RACK
-                        })
-                        .clickable { onSelect(i) }
-                        .padding(start = 8.dp, end = 4.dp,
-                            top = 4.dp, bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = track.name,
-                        color = when {
-                            track.muted -> TEXT_DIM.copy(alpha = 0.4f)
-                            isActive    -> trackColor
-                            else        -> TEXT_DIM
-                        },
-                        fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(
-                                if (track.muted) Color(0xFF5A1A1A)
-                                else Color(0xFF1A1A22)
-                            )
-                            .clickable { onMuteToggle(i) }
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "M",
-                            color = if (track.muted) ACCENT else TEXT_DIM,
-                            fontSize = 9.sp, fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-            }
-        }
-
-        // Volume sliders — compact row, one per track, colour-coded
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 0.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            tracks.forEachIndexed { i, track ->
-                val trackColor = Color(when (i % 8) {
-                    0 -> 0xFFE84040L; 1 -> 0xFF3DDC84L; 2 -> 0xFF38BDF8L
-                    3 -> 0xFFA78BFAL; 4 -> 0xFFFF6B35L; 5 -> 0xFFF5C518L
-                    6 -> 0xFFF472B6L; else -> 0xFF94A3B8L
-                })
-                Slider(
-                    value          = track.volume,
-                    onValueChange  = { onVolumeChange(i, it) },
-                    valueRange     = 0f..1f,
-                    modifier       = Modifier.weight(1f).height(28.dp),
-                    colors         = SliderDefaults.colors(
-                        thumbColor         = trackColor,
-                        activeTrackColor   = trackColor.copy(alpha = 0.8f),
-                        inactiveTrackColor = BORDER
-                    )
-                )
-            }
-        }
-    }
-    Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(BORDER))
-}
-
-// ── Status bar ────────────────────────────────────────────────────────────────
-
-@Composable
-fun StatusBar(uiState: PianoRollUiState, bpm: Int, totalBars: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth().height(22.dp)
-            .background(BG).padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        StatusItem("BPM",   "$bpm")
-        StatusItem("BARS",  "$totalBars")
-        StatusItem("NOTES", "${uiState.activeNotes.size}")
-        StatusItem("TRACK", uiState.activeTrack?.name ?: "")
-        StatusItem("TOOL",  uiState.currentTool.name)
-        if (uiState.hasSelection) {
-            StatusItem("SEL", "${uiState.selectedIds.size}", PURPLE)
-        }
-        if (uiState.loopEnabled) {
-            StatusItem("LOOP",
-                "${uiState.loopStart.toInt() + 1}>${uiState.loopEnd.toInt()}",
-                GREEN)
-        }
-    }
-}
-
-@Composable
-fun StatusItem(label: String, value: String, valueColor: Color = ACCENT2) {
-    Row {
-        Text("$label: ", color = TEXT_DIM, fontSize = 10.sp,
-            fontFamily = FontFamily.Monospace)
-        Text(value, color = valueColor, fontSize = 10.sp,
-            fontFamily = FontFamily.Monospace)
     }
 }
