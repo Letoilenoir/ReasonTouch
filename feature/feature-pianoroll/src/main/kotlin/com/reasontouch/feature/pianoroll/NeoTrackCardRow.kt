@@ -6,8 +6,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -20,8 +18,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reasontouch.core.data.MidiTrack
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.shadow
 
-private val CARD_BG     = Color(0xFF1E1E26)
+private val CARD_BG = Color(0xFF111118)
 private val CARD_BORDER = Color(0xFF343444)
 private val TEXT_DIM    = Color(0xFF77778A)
 
@@ -70,7 +72,7 @@ fun NeoTrackCard(
 
     val backgroundBrush = Brush.verticalGradient(
         colors = listOf(
-            color.copy(alpha = 0.28f),
+            color.copy(alpha = 0.10f),
             CARD_BG
         )
     )
@@ -78,10 +80,21 @@ fun NeoTrackCard(
     Column(
         modifier = Modifier
             .width(68.dp)
-            .height(64.dp)
+            .height(60.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(backgroundBrush)
-            .padding(horizontal = 6.dp, vertical = 5.dp)
+            .border(
+                width = 1.dp,
+                color = color.copy(alpha = 0.45f),
+                shape = RoundedCornerShape(14.dp)
+            )
+            .shadow(
+                elevation = if (active) 10.dp else 0.dp,
+                shape = RoundedCornerShape(14.dp),
+                ambientColor = color.copy(alpha = 0.35f),
+                spotColor = color.copy(alpha = 0.35f)
+            )
+            .padding(horizontal = 6.dp, vertical = 3.dp)
     ) {
 
         Row(
@@ -161,7 +174,7 @@ fun NeonFader(
     androidx.compose.foundation.Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .height(18.dp)
+            .height(20.dp)
             .pointerInput(Unit) {
                 detectDragGestures { change, _ ->
 
@@ -174,38 +187,91 @@ fun NeonFader(
             }
     ) {
 
-        val trackHeight = 4.dp.toPx()
-        val y = size.height / 2f
-
-        // Background track
+        val centerY = size.height / 2f
+        val railHeight = 6.dp.toPx()
+        val frameHeight = 14.dp.toPx()
+        // neon boundary frame
         drawRoundRect(
-            color = CARD_BORDER,
-            topLeft = androidx.compose.ui.geometry.Offset(0f, y - trackHeight / 2),
-            size = androidx.compose.ui.geometry.Size(size.width, trackHeight),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(100f, 100f)
+            color = color.copy(alpha = 0.22f),
+            topLeft = androidx.compose.ui.geometry.Offset(
+                0f,
+                centerY - frameHeight / 2
+            ),
+            size = androidx.compose.ui.geometry.Size(
+                size.width,
+                frameHeight
+            ),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(100f),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                width = 1.5.dp.toPx()
+            )
         )
 
-        // Active neon track
+        // recessed base rail
         drawRoundRect(
-            color = color.copy(alpha = 0.9f),
-            topLeft = androidx.compose.ui.geometry.Offset(0f, y - trackHeight / 2),
-            size = androidx.compose.ui.geometry.Size(size.width * value, trackHeight),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(100f, 100f)
+            color = Color(0xFF09090D),
+            topLeft = androidx.compose.ui.geometry.Offset(
+                0f,
+                centerY - railHeight / 2
+            ),
+            size = androidx.compose.ui.geometry.Size(
+                size.width,
+                railHeight
+            ),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(100f)
         )
 
-        // Glow
-        drawCircle(
-            color = color.copy(alpha = 0.25f),
-            radius = 12.dp.toPx(),
-            center = androidx.compose.ui.geometry.Offset(size.width * value, y)
+        // dim outer glow
+        drawRoundRect(
+            color = color.copy(alpha = 0.12f),
+            topLeft = androidx.compose.ui.geometry.Offset(
+                0f,
+                centerY - 8.dp.toPx() / 2
+            ),
+            size = androidx.compose.ui.geometry.Size(
+                size.width * value,
+                8.dp.toPx()
+            ),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(100f)
         )
 
-        // Thumb
-        drawCircle(
+        // bright neon line
+        drawRoundRect(
             color = color,
-            radius = 6.dp.toPx(),
-            center = androidx.compose.ui.geometry.Offset(size.width * value, y)
+            topLeft = androidx.compose.ui.geometry.Offset(
+                0f,
+                centerY - railHeight / 2
+            ),
+            size = androidx.compose.ui.geometry.Size(
+                size.width * value,
+                railHeight
+            ),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(100f)
         )
+        // LED-style segment dividers
+        val segmentCount = 6
+
+        repeat(segmentCount) { i ->
+
+            val segmentX =
+                (size.width * value / segmentCount) * i
+
+            drawLine(
+                color = Color.White.copy(alpha = 0.16f),
+                start = androidx.compose.ui.geometry.Offset(
+                    segmentX,
+                    centerY - 5.dp.toPx()
+                ),
+                end = androidx.compose.ui.geometry.Offset(
+                    segmentX,
+                    centerY + 5.dp.toPx()
+                ),
+                strokeWidth = 1.dp.toPx()
+            )
+        }
+
+
+
     }
 }
 private fun trackColor(index: Int): Color {
