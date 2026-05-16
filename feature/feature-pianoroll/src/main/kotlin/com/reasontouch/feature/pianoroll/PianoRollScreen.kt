@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.foundation.layout.Spacer
 
 
 private val BG       = Color(0xFF1A1A1E)
@@ -103,10 +104,7 @@ fun PianoRollScreen(
             uiState      = uiState,
             onTool       = viewModel::setTool,
             onSnapCycle  = { viewModel.setSnapIndex((snapIndex + 1) % viewModel.snapValues.size) },
-            onLoopToggle = viewModel::toggleLoop,
-            onPlay       = { viewModel.play(bpm, totalBars) },
-            onStop       = viewModel::stop,
-            onRewind     = viewModel::rewind
+            onLoopToggle = viewModel::toggleLoop
         )
 
         if (uiState.hasSelection) {
@@ -217,9 +215,7 @@ fun PianoRollToolbar(
     onTool:       (PianoRollViewModel.Tool) -> Unit,
     onSnapCycle:  () -> Unit,
     onLoopToggle: () -> Unit,
-    onPlay:       () -> Unit,
-    onStop:       () -> Unit,
-    onRewind:     () -> Unit
+
 ) {
     Row(
         modifier = Modifier
@@ -251,17 +247,7 @@ fun PianoRollToolbar(
             selectedText  = GREEN,
             onClick       = onLoopToggle
         )
-        Divider()
-        ToolChip(label = "<<", selected = false, onClick = onRewind)
-        ToolChip(
-            label         = if (uiState.isPlaying) "||" else ">",
-            selected      = uiState.isPlaying,
-            selectedColor = Color(0xFF1A3A2A),
-            selectedBorder = GREEN,
-            selectedText  = GREEN,
-            onClick       = onPlay
-        )
-        ToolChip(label = "[]", selected = false, onClick = onStop)
+
     }
     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(BORDER))
 }

@@ -15,6 +15,7 @@
             <option value="$PROJECT_DIR$/core/core-data" />
             <option value="$PROJECT_DIR$/core/core-midi" />
             <option value="$PROJECT_DIR$/core/core-music" />
+            <option value="$PROJECT_DIR$/core/core-playback" />
             <option value="$PROJECT_DIR$/core/core-ui" />
             <option value="$PROJECT_DIR$/feature" />
             <option value="$PROJECT_DIR$/feature/feature-chords" />

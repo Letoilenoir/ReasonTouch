@@ -37,3 +37,4 @@ include(":feature:feature-pianoroll")
 include(":feature:feature-export")
 include(":feature:feature-drums") // ✅ only once
 
+include(":core:core-playback")

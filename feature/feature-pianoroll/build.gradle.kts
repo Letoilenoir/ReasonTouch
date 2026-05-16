@@ -20,6 +20,8 @@ android {
 
 dependencies {
     implementation(project(":core:core-data"))
+    implementation(project(":core:core-playback"))
+    implementation(project(":core:core-playback"))
     implementation(project(":core:core-ui"))
     implementation(project(":core:core-audio"))
     implementation(project(":core:core-midi"))

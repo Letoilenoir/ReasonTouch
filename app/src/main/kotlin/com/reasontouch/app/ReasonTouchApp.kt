@@ -1,5 +1,7 @@
 package com.reasontouch.app
 
+import androidx.compose.runtime.collectAsState
+import androidx.hilt.navigation.compose.hiltViewModel
 import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -7,12 +9,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -38,11 +42,13 @@ import androidx.navigation.compose.rememberNavController
 import com.reasontouch.core.data.SessionRepository
 import com.reasontouch.feature.export.ExportDialog
 import com.reasontouch.feature.export.ExportViewModel
+import com.reasontouch.feature.pianoroll.TransportControls
+import com.reasontouch.core.playback.PlaybackViewModel
+
 
 private val RACK   = Color(0xFF222228)
 private val PANEL  = Color(0xFF2A2A32)
 private val BORDER = Color(0xFF3A3A45)
-private val GREEN  = Color(0xFF3DDC84)
 private val TEXT_DIM = Color(0xFF666675)
 
 @Composable
@@ -76,8 +82,10 @@ fun ReasonTouchApp(repository: SessionRepository) {
         ) {
 
             composable(Screen.SessionList.route) {
+
                 SessionListScreen(
                     onSessionSelected = { sessionId ->
+
                         navController.navigate(
                             Screen.Chords.createRoute(sessionId)
                         )
@@ -86,6 +94,7 @@ fun ReasonTouchApp(repository: SessionRepository) {
             }
 
             composable(Screen.Chords.route) { backStackEntry ->
+
                 val sessionId =
                     backStackEntry.arguments?.getString("sessionId")
                         ?: return@composable
@@ -96,6 +105,7 @@ fun ReasonTouchApp(repository: SessionRepository) {
             }
 
             composable(Screen.PianoRoll.route) { backStackEntry ->
+
                 val sessionId =
                     backStackEntry.arguments?.getString("sessionId")
                         ?: return@composable
@@ -113,7 +123,9 @@ fun ReasonTouchApp(repository: SessionRepository) {
 
                 com.reasontouch.feature.drums.DrumScreen(
                     sessionId = sessionId,
+
                     onNavigateToRoll = {
+
                         navController.navigate(
                             Screen.PianoRoll.createRoute(sessionId)
                         ) {
@@ -124,10 +136,12 @@ fun ReasonTouchApp(repository: SessionRepository) {
             }
 
             composable(Screen.SessionSettings.route) {
+
                 SessionSettingsScreen(
                     onBack = {
                         navController.popBackStack()
                     },
+
                     onExportMidi = {
                         showExport = true
                     }
@@ -147,6 +161,8 @@ fun ReasonTouchApp(repository: SessionRepository) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
+                // SESSION BUTTON
+
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
@@ -157,7 +173,9 @@ fun ReasonTouchApp(repository: SessionRepository) {
                             RoundedCornerShape(4.dp)
                         )
                         .clickable {
+
                             if (currentSessionId.isNotEmpty()) {
+
                                 navController.navigate(
                                     Screen.SessionSettings.createRoute(
                                         currentSessionId
@@ -172,13 +190,30 @@ fun ReasonTouchApp(repository: SessionRepository) {
                 ) {
 
                     Text(
-                        "\u2699 SESSION",
+                        text = "\u2699 SESSION",
                         color = TEXT_DIM,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
                 }
+
+                // SPACE BETWEEN SESSION + TRANSPORT
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // GLOBAL TRANSPORT
+
+                val playbackVm: PlaybackViewModel = hiltViewModel()
+                val transport = playbackVm.transport.collectAsState()
+
+                TransportControls(
+                    isPlaying = transport.value.isPlaying,
+                    onPlay = { playbackVm.play(currentSessionId) },
+                    onStop = playbackVm::stop,
+                    onRewind = playbackVm::rewind
+                )
+
             }
 
             Box(
@@ -254,9 +289,11 @@ fun ReasonTouchApp(repository: SessionRepository) {
         ExportDialog(
             sessionId = currentSessionId,
             sessionName = "Session",
+
             onDismiss = {
                 showExport = false
             },
+
             viewModel = exportVm
         )
     }

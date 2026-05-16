@@ -70,6 +70,7 @@ dependencies {
     implementation(project(":feature:feature-pianoroll"))
     implementation(project(":feature:feature-export"))
     implementation(project(":feature:feature-drums"))
+    implementation(project(":core:core-playback"))
 
     testImplementation(libs.junit)
 
