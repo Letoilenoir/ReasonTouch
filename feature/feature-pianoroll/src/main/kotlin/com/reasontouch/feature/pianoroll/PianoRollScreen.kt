@@ -62,6 +62,7 @@ fun PianoRollScreen(
     val playheadBeat by viewModel.playheadBeat.collectAsState()
     val isPlaying    by viewModel.isPlaying.collectAsState()
     val hasClipboard by viewModel.hasClipboard.collectAsState()
+    val drawDuration by viewModel.drawDuration.collectAsState()
 
     val bpm       = session?.bpm ?: 120
     val totalBars = session?.totalBars ?: 4
@@ -80,7 +81,8 @@ fun PianoRollScreen(
         playheadBeat = playheadBeat,
         isPlaying    = isPlaying,
         totalBars    = totalBars,
-        hasClipboard = hasClipboard
+        hasClipboard = hasClipboard,
+        drawDuration = drawDuration
     )
 
     LaunchedEffect(playheadBeat, isPlaying) {
@@ -283,3 +285,4 @@ fun ToolChip(
         )
     }
 }
+

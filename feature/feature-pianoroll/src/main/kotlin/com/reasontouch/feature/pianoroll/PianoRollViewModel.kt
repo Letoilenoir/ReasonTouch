@@ -337,8 +337,36 @@ class PianoRollViewModel @Inject constructor(
         }
     }
 
-        fun clearSelection() {
+            fun clearSelection() {
         _selectedNoteIds.value = emptySet()
+    }
+
+    // -- Draw duration stepper ------------------------------------
+    private val _drawDuration = MutableStateFlow(0.25f)
+    val drawDuration: StateFlow<Float> = _drawDuration.asStateFlow()
+
+    fun stepDuration(delta: Float) {
+        val snap = snapValues[_snapIndex.value]
+        val newDur = (_drawDuration.value + delta).coerceIn(snap, 16f)
+        _drawDuration.value = newDur
+        resizeSelectedNotes(newDur)
+    }
+
+    private fun resizeSelectedNotes(newDuration: Float) {
+        val ids = _selectedNoteIds.value
+        if (ids.isEmpty()) return
+        val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
+        val current = _allNotes.value.toMutableMap()
+        val notes = current[activeTrack.id] ?: return
+        val updated = notes.map { note ->
+            if (note.id in ids) note.copy(duration = newDuration) else note
+        }
+        current[activeTrack.id] = updated
+        _allNotes.value = current
+        updateActiveNotes()
+        viewModelScope.launch {
+            updated.filter { it.id in ids }.forEach { repository.saveNote(it) }
+        }
     }
 
     fun setLoopStart(beat: Float) = playbackController.setLoopStart(beat)
@@ -361,6 +389,7 @@ class PianoRollViewModel @Inject constructor(
         playbackController.seekTo(clamped)
     }
 }
+
 
 
 

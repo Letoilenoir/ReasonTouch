@@ -199,21 +199,57 @@ fun ReasonTouchApp(repository: SessionRepository) {
                 }
 
                 // SPACE BETWEEN SESSION + TRANSPORT
-
                 Spacer(modifier = Modifier.width(12.dp))
-
                 // GLOBAL TRANSPORT
-
                 val playbackVm: PlaybackViewModel = hiltViewModel()
                 val transport = playbackVm.transport.collectAsState()
-
                 TransportControls(
                     isPlaying = transport.value.isPlaying,
                     onPlay = { playbackVm.play(currentSessionId) },
                     onStop = playbackVm::stop,
                     onRewind = playbackVm::rewind
                 )
-
+                // DURATION STEPPER (Arrange only)
+                val isArrange = currentRoute.startsWith("piano_roll/")
+                if (isArrange) {
+                    val drawDuration by playbackVm.drawDuration.collectAsState()
+                    val snapValue = playbackVm.snapValues[0]
+                    val label = when (drawDuration) {
+                        0.0625f -> "1/64"
+                        0.125f  -> "1/32"
+                        0.25f   -> "1/16"
+                        0.5f    -> "1/8"
+                        1f      -> "1/4"
+                        2f      -> "1/2"
+                        4f      -> "1 BAR"
+                        8f      -> "2 BAR"
+                        else    -> "%.2f".format(drawDuration)
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.IconButton(
+                            onClick = { playbackVm.stepDuration(-snapValue, snapValue) },
+                            modifier = Modifier.width(28.dp)
+                        ) {
+                            Text("-", color = Color(0xFFC8C8D4), fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+                        Text(
+                            text = label,
+                            color = Color(0xFFE84040),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.width(36.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        androidx.compose.material3.IconButton(
+                            onClick = { playbackVm.stepDuration(snapValue, snapValue) },
+                            modifier = Modifier.width(28.dp)
+                        ) {
+                            Text("+", color = Color(0xFFC8C8D4), fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+                                    }
+                }
             }
 
             Box(
@@ -298,3 +334,7 @@ fun ReasonTouchApp(repository: SessionRepository) {
         )
     }
 }
+
+
+
+

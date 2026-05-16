@@ -17,7 +17,8 @@ data class PianoRollUiState(
     val playheadBeat: Float                        = 0f,
     val isPlaying:    Boolean                      = false,
     val totalBars:    Int                          = 4,
-    val hasClipboard: Boolean                      = false
+    val hasClipboard: Boolean = false,
+    val drawDuration: Float = 0.25f
 ) {
     val snapValues   = listOf(1f, 0.5f, 0.25f, 0.125f, 0.0625f)
     val snapLabels   = listOf("1/4","1/8","1/16","1/32","1/64")

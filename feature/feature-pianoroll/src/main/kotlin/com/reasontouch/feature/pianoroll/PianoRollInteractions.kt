@@ -26,7 +26,7 @@ fun handleGridTap(
     when (uiState.currentTool) {
         PianoRollViewModel.Tool.DRAW -> {
             if (hitNote == null) {
-                viewModel.addNote(pitch, beat, uiState.snapValue)
+                viewModel.addNote(pitch, beat, uiState.drawDuration)
                 viewModel.auditionNote(pitch)
             } else {
                 viewModel.selectNote(hitNote.id)
