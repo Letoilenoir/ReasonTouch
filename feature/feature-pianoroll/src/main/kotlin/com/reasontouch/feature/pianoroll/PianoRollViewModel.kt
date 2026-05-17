@@ -72,6 +72,11 @@ class PianoRollViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            playbackController.drawDuration.collect { newDuration ->
+                resizeSelectedNotes(newDuration)
+            }
+        }
+        viewModelScope.launch {
             tracks.collect { trackList ->
                 val notes = trackList.associate { track ->
                     track.id to repository.getNotesForTrackOnce(track.id)
@@ -389,6 +394,7 @@ class PianoRollViewModel @Inject constructor(
         playbackController.seekTo(clamped)
     }
 }
+
 
 
 

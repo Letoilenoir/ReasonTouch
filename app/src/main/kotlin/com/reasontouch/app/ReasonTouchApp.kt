@@ -207,13 +207,16 @@ fun ReasonTouchApp(repository: SessionRepository) {
                     isPlaying = transport.value.isPlaying,
                     onPlay = { playbackVm.play(currentSessionId) },
                     onStop = playbackVm::stop,
-                    onRewind = playbackVm::rewind
+                    onRewind = playbackVm::rewind,
+                    onFastForward = playbackVm::fastForward,
+                    onSkipToStart = playbackVm::skipToStart,
+                    onSkipToEnd = playbackVm::skipToEnd
                 )
                 // DURATION STEPPER (Arrange only)
                 val isArrange = currentRoute.startsWith("piano_roll/")
                 if (isArrange) {
                     val drawDuration by playbackVm.drawDuration.collectAsState()
-                    val snapValue = playbackVm.snapValues[0]
+                    val snapValue = 0.0625f // 1/64 minimum step
                     val label = when (drawDuration) {
                         0.0625f -> "1/64"
                         0.125f  -> "1/32"
@@ -334,6 +337,8 @@ fun ReasonTouchApp(repository: SessionRepository) {
         )
     }
 }
+
+
 
 
 

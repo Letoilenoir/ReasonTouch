@@ -11,6 +11,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
+        multiDexEnabled = true
         applicationId = "com.reasontouch.app"
         minSdk = 26
         targetSdk = 36
@@ -57,6 +58,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation("androidx.multidex:multidex:2.0.1")
 
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.window)
@@ -82,3 +84,4 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
+
