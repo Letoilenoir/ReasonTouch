@@ -44,7 +44,8 @@ private val PURPLE   = Color(0xFFA78BFA)
 @Composable
 fun PianoRollScreen(
     sessionId: String,
-    viewModel: PianoRollViewModel = hiltViewModel()
+    viewModel: PianoRollViewModel = hiltViewModel(),
+    
 ) {
     val state = remember { PianoRollState() }
 
@@ -106,7 +107,8 @@ fun PianoRollScreen(
             uiState      = uiState,
             onTool       = viewModel::setTool,
             onSnapCycle  = { viewModel.setSnapIndex((snapIndex + 1) % viewModel.snapValues.size) },
-            onLoopToggle = viewModel::toggleLoop
+            onLoopToggle = viewModel::toggleLoop,
+            
         )
 
         if (uiState.hasSelection) {
@@ -217,7 +219,7 @@ fun PianoRollToolbar(
     onTool:       (PianoRollViewModel.Tool) -> Unit,
     onSnapCycle:  () -> Unit,
     onLoopToggle: () -> Unit,
-
+    
 ) {
     Row(
         modifier = Modifier
@@ -247,9 +249,9 @@ fun PianoRollToolbar(
             selectedColor = Color(0xFF1A4A2E),
             selectedBorder = GREEN,
             selectedText  = GREEN,
-            onClick       = onLoopToggle
+                    onClick       = onLoopToggle
         )
-
+        
     }
     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(BORDER))
 }
@@ -285,4 +287,7 @@ fun ToolChip(
         )
     }
 }
+
+
+
 

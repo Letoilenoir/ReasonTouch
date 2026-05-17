@@ -161,6 +161,28 @@ fun ReasonTouchApp(repository: SessionRepository) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
+                // HOME BUTTON
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(PANEL)
+                        .border(1.dp, BORDER, RoundedCornerShape(4.dp))
+                        .clickable {
+                            navController.navigate(Screen.SessionList.route) {
+                                popUpTo(Screen.SessionList.route) { inclusive = true }
+                            }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "HOME",
+                        color = TEXT_DIM,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
                 // SESSION BUTTON
 
                 Box(
@@ -337,6 +359,9 @@ fun ReasonTouchApp(repository: SessionRepository) {
         )
     }
 }
+
+
+
 
 
 
