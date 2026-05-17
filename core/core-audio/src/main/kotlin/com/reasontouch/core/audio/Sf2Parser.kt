@@ -6,7 +6,7 @@ import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-class Sf2Parser(assetManager: AssetManager, fileName: String = "TimGM6mb.sf2") {
+class Sf2Parser(assetManager: AssetManager, fileName: String = "ReasonTouch.sf2") {
 
     data class SampleHeader(
         val name: String,
