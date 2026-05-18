@@ -67,8 +67,8 @@ val GM_GUITARS = listOf(
     GmInstrument("Acoustic Steel", 25),
     GmInstrument("Electric Jazz",  26),
     GmInstrument("Electric Clean", 27),
-    GmInstrument("Electric Muted", 28),
-    GmInstrument("Harmonics",      31)
+    GmInstrument("Overdriven",     29),
+    GmInstrument("Distortion",      30)
 )
 
 data class ProgressionBar(

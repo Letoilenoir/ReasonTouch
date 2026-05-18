@@ -938,7 +938,7 @@ fun SettingsPanel(viewModel: ChordViewModel) {
                                             fontSize = 12.sp,
                                             fontFamily = FontFamily.Monospace,
                                             fontWeight = FontWeight.Bold)
-                                        Text("GM ${gm.program + 1}",
+                                        Text("GM ${gm.program}",
                                             color = TEXT_DIM, fontSize = 10.sp,
                                             fontFamily = FontFamily.Monospace)
                                     }
