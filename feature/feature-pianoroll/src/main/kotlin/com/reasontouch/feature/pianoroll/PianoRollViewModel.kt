@@ -104,6 +104,13 @@ class PianoRollViewModel @Inject constructor(
         }
     }
 
+    fun setTrackGmProgram(index: Int, gmProgram: Int) {
+        viewModelScope.launch {
+            val track = tracks.value.getOrNull(index) ?: return@launch
+            repository.updateTrack(track.copy(gmProgram = gmProgram))
+        }
+    }
+
     fun muteTrack(index: Int) {
         viewModelScope.launch {
             val track = tracks.value.getOrNull(index) ?: return@launch
@@ -294,13 +301,7 @@ class PianoRollViewModel @Inject constructor(
         track.midiChannel == 9 ||
                 track.name.uppercase() in listOf("DRUMS", "DRUM")
 
-    private fun gmProgramForTrack(track: MidiTrack): Int = when (track.name.uppercase()) {
-        "BASS"  -> 32
-        "LEAD"  -> 80
-        "CHORD" -> 25
-        "PAD"   -> 88
-        else    -> 0
-    }
+    private fun gmProgramForTrack(track: MidiTrack): Int = track.gmProgram
 
     // If your original implementation did more here, you can keep it.
     // This stub keeps bounceDown() compiling even if tracks/notes are flow-driven.

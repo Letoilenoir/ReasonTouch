@@ -29,5 +29,7 @@ data class MidiTrack(
     val midiChannel: Int = 0,
     val muted: Boolean = false,
     val solo: Boolean = false,
-    val volume: Float = 1.0f
+    val volume: Float = 1.0f,
+    val gmProgram: Int = 33,
+    val drumPack: String = "default"
 )
