@@ -1,6 +1,7 @@
 package com.reasontouch.feature.pianoroll
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,7 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.foundation.layout.Spacer
-
+// GmInstrument defined locally to avoid cross-module dependency
+data class TrackInstrument(val label: String, val program: Int)
 
 private val BG       = Color(0xFF1A1A1E)
 private val RACK     = Color(0xFF222228)
@@ -40,12 +44,66 @@ private val GREEN    = Color(0xFF3DDC84)
 private val TEXT     = Color(0xFFC8C8D4)
 private val TEXT_DIM = Color(0xFF666675)
 private val PURPLE   = Color(0xFFA78BFA)
+private val BLUE     = Color(0xFF38BDF8)
+
+// -- Per-track instrument lists ------------------------------------------------
+
+private val BASS_INSTRUMENTS = listOf(
+    TrackInstrument("Acoustic Bass",    32),
+    TrackInstrument("Finger Bass",      33),
+    TrackInstrument("Pick Bass",        34),
+    TrackInstrument("Fretless Bass",    35),
+    TrackInstrument("Synth Bass 1",     38),
+    TrackInstrument("Synth Bass 2",     39)
+)
+
+private val LEAD_INSTRUMENTS = listOf(
+    TrackInstrument("Grand Piano",      0),
+    TrackInstrument("Electric Piano",   4),
+    TrackInstrument("Overdriven",       29),
+    TrackInstrument("Square Lead",      80),
+    TrackInstrument("Saw Lead",         81)
+)
+
+private val CHORD_INSTRUMENTS = listOf(
+    TrackInstrument("Nylon Guitar",     24),
+    TrackInstrument("Steel Guitar",     25),
+    TrackInstrument("Jazz Guitar",      26),
+    TrackInstrument("Clean Guitar",     27),
+    TrackInstrument("Overdriven",       29),
+    TrackInstrument("Distortion",       30)
+)
+
+private val PAD_INSTRUMENTS = listOf(
+    TrackInstrument("Electric Piano",   4),
+    TrackInstrument("Strings",          48),
+    TrackInstrument("Strings 2",        49),
+    TrackInstrument("Synth Strings",    51),
+    TrackInstrument("Fantasia",         88),
+    TrackInstrument("Warm Pad",         89)
+)
+
+private fun instrumentsForTrack(trackName: String): List<TrackInstrument>? = when (trackName.uppercase()) {
+    "BASS"  -> BASS_INSTRUMENTS
+    "LEAD"  -> LEAD_INSTRUMENTS
+    "CHORD" -> CHORD_INSTRUMENTS
+    "PAD"   -> PAD_INSTRUMENTS
+    else    -> null  // DRUMS � no picker
+}
+
+private fun emojiForTrack(trackName: String): String = when (trackName.uppercase()) {
+    "BASS"  -> "\uD83C\uDFB8"
+    "LEAD"  -> "\uD83C\uDFB9"
+    "CHORD" -> "\uD83C\uDFB8"
+    "PAD"   -> "\uD83C\uDFB9"
+    "DRUMS" -> "\uD83E\uDD41"
+    else    -> "\uD83C\uDFB5"
+}
 
 @Composable
 fun PianoRollScreen(
     sessionId: String,
     viewModel: PianoRollViewModel = hiltViewModel(),
-    
 ) {
     val state = remember { PianoRollState() }
 
@@ -64,6 +122,8 @@ fun PianoRollScreen(
     val isPlaying    by viewModel.isPlaying.collectAsState()
     val hasClipboard by viewModel.hasClipboard.collectAsState()
     val drawDuration by viewModel.drawDuration.collectAsState()
+
+    var showInstrumentPanel by remember { mutableStateOf(false) }
 
     val bpm       = session?.bpm ?: 120
     val totalBars = session?.totalBars ?: 4
@@ -104,11 +164,11 @@ fun PianoRollScreen(
     Column(modifier = Modifier.fillMaxSize().background(BG)) {
 
         PianoRollToolbar(
-            uiState      = uiState,
-            onTool       = viewModel::setTool,
-            onSnapCycle  = { viewModel.setSnapIndex((snapIndex + 1) % viewModel.snapValues.size) },
-            onLoopToggle = viewModel::toggleLoop,
-            
+            uiState           = uiState,
+            onTool            = viewModel::setTool,
+            onSnapCycle       = { viewModel.setSnapIndex((snapIndex + 1) % viewModel.snapValues.size) },
+            onLoopToggle      = viewModel::toggleLoop,
+            onInstrumentClick = { showInstrumentPanel = !showInstrumentPanel }
         )
 
         if (uiState.hasSelection) {
@@ -123,20 +183,35 @@ fun PianoRollScreen(
             )
         }
 
-        NeoTrackCardRow(
-            tracks          = tracks,
-            activeIndex     = activeIndex,
-            onSelect        = viewModel::setActiveTrack,
-            onMuteToggle    = viewModel::muteTrack,
-            onVolumeChange  = viewModel::setTrackVolume
-        )
+        // Floating instrument panel � appears above track row when open
+        if (showInstrumentPanel) {
+            val activeTrack = tracks.getOrNull(activeIndex)
+            if (activeTrack != null) {
+                InstrumentPanel(
+                    trackName      = activeTrack.name,
+                    currentProgram = activeTrack.gmProgram,
+                    onSelect       = { program ->
+                        viewModel.setTrackGmProgram(activeIndex, program)
+                        showInstrumentPanel = false
+                    },
+                    onDismiss = { showInstrumentPanel = false }
+                )
+            }
+        } else {
+            NeoTrackCardRow(
+                tracks         = tracks,
+                activeIndex    = activeIndex,
+                onSelect       = viewModel::setActiveTrack,
+                onMuteToggle   = viewModel::muteTrack,
+                onVolumeChange = viewModel::setTrackVolume
+            )
+        }
 
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-
             PianoRollCanvas(
                 state     = state,
                 uiState   = uiState,
@@ -151,11 +226,106 @@ fun PianoRollScreen(
                 modifier  = Modifier.align(Alignment.BottomCenter)
             )
         }
-
     }
 }
 
-// ── Selection action bar ──────────────────────────────────────────────────────
+// -- Instrument panel ----------------------------------------------------------
+
+@Composable
+fun InstrumentPanel(
+    trackName:      String,
+    currentProgram: Int,
+    onSelect:       (Int) -> Unit,
+    onDismiss:      () -> Unit
+) {
+    val instruments = instrumentsForTrack(trackName)
+    val emoji       = emojiForTrack(trackName)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF1E1E2A))
+            .border(1.dp, BLUE.copy(alpha = 0.4f), RoundedCornerShape(0.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "$emoji  ${trackName.uppercase()} SOUND",
+                color = BLUE, fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace, letterSpacing = 1.sp
+            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(3.dp))
+                    .clickable(onClick = onDismiss)
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Text("X", color = TEXT_DIM, fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (instruments == null) {
+            // DRUMS � WAV engine, no picker
+            Text(
+                text = "WAV Kit � sound managed by Drum Machine",
+                color = TEXT_DIM, fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace
+            )
+        } else {
+            // Instrument chips in a wrapping row
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement   = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                instruments.forEach { inst ->
+                    val isSelected = inst.program == currentProgram
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(
+                                if (isSelected) BLUE.copy(alpha = 0.2f)
+                                else Color(0xFF16161A)
+                            )
+                            .border(
+                                1.dp,
+                                if (isSelected) BLUE else BORDER,
+                                RoundedCornerShape(4.dp)
+                            )
+                            .clickable { onSelect(inst.program) }
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = inst.label,
+                                color = if (isSelected) BLUE else TEXT,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "GM ${inst.program}",
+                                color = TEXT_DIM, fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+    }
+}
+
+// -- Selection action bar ------------------------------------------------------
 
 @Composable
 fun SelectionActionBar(
@@ -211,16 +381,24 @@ fun SelectionChip(label: String, color: Color, onClick: () -> Unit) {
     }
 }
 
-// ── Toolbar ───────────────────────────────────────────────────────────────────
+// -- Toolbar -------------------------------------------------------------------
 
 @Composable
 fun PianoRollToolbar(
-    uiState:      PianoRollUiState,
-    onTool:       (PianoRollViewModel.Tool) -> Unit,
-    onSnapCycle:  () -> Unit,
-    onLoopToggle: () -> Unit,
-    
+    uiState:           PianoRollUiState,
+    onTool:            (PianoRollViewModel.Tool) -> Unit,
+    onSnapCycle:       () -> Unit,
+    onLoopToggle:      () -> Unit,
+    onInstrumentClick: () -> Unit
 ) {
+    val activeTrack = uiState.tracks.getOrNull(uiState.activeIndex)
+    val emoji       = if (activeTrack != null) emojiForTrack(activeTrack.name) else "\uD83C\uDFB5"
+    val instLabel   = if (activeTrack != null) {
+        val instruments = instrumentsForTrack(activeTrack.name)
+        instruments?.firstOrNull { it.program == activeTrack.gmProgram }?.label
+            ?: if (activeTrack.name.uppercase() == "DRUMS") "WAV Kit" else "GM ${activeTrack.gmProgram}"
+    } else ""
+
     Row(
         modifier = Modifier
             .fillMaxWidth().height(40.dp)
@@ -244,14 +422,33 @@ fun PianoRollToolbar(
         )
         Divider()
         ToolChip(
-            label         = "LOOP",
-            selected      = uiState.loopEnabled,
-            selectedColor = Color(0xFF1A4A2E),
+            label          = "LOOP",
+            selected       = uiState.loopEnabled,
+            selectedColor  = Color(0xFF1A4A2E),
             selectedBorder = GREEN,
-            selectedText  = GREEN,
-                    onClick       = onLoopToggle
+            selectedText   = GREEN,
+            onClick        = onLoopToggle
         )
-        
+        Divider()
+        // Instrument selector button � right side, weight fills remaining space
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Color(0xFF16161A))
+                .border(1.dp, BLUE.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
+                .clickable(onClick = onInstrumentClick)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "$emoji $instLabel \u25BE",
+                color = BLUE, fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1
+            )
+        }
     }
     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(BORDER))
 }
@@ -263,13 +460,13 @@ private fun Divider() {
 
 @Composable
 fun ToolChip(
-    label:         String,
-    selected:      Boolean,
-    onClick:       () -> Unit,
-    monospace:     Boolean = false,
-    selectedColor: Color   = ACCENT,
-    selectedBorder: Color  = ACCENT,
-    selectedText:  Color   = Color.White
+    label:          String,
+    selected:       Boolean,
+    onClick:        () -> Unit,
+    monospace:      Boolean = false,
+    selectedColor:  Color   = ACCENT,
+    selectedBorder: Color   = ACCENT,
+    selectedText:   Color   = Color.White
 ) {
     Box(
         modifier = Modifier
@@ -287,7 +484,3 @@ fun ToolChip(
         )
     }
 }
-
-
-
-
