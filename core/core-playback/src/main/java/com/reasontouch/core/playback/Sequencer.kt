@@ -43,13 +43,7 @@ class Sequencer @Inject constructor(
         fun isDrumTrack(track: MidiTrack) =
             track.midiChannel == 9 || track.name.uppercase() in listOf("DRUM", "DRUMS")
 
-        fun gmProgram(track: MidiTrack) = when (track.name.uppercase()) {
-            "BASS" -> 32
-            "LEAD" -> 80
-            "CHORD" -> 25
-            "PAD" -> 88
-            else -> 0
-        }
+        fun gmProgram(track: MidiTrack) = track.gmProgram
 
         fun buildClusters(notes: List<NoteEvent>): List<Float> {
             val sorted = notes.sortedBy { it.beat }

@@ -22,8 +22,8 @@ import java.util.UUID
 object BassGenerator {
 
     // Bass register target — keep notes in E1-E3 range (MIDI 28-52)
-    private const val BASS_MIN_MIDI = 28
-    private const val BASS_MAX_MIDI = 52
+    private const val BASS_MIN_MIDI = 40
+    private const val BASS_MAX_MIDI = 64
 
     /**
      * Generate bass notes for a complete progression.
@@ -190,7 +190,7 @@ object BassGenerator {
     /** Transpose a MIDI note into the bass register (MIDI 28-52) */
     private fun bassRegister(midiNote: Int): Int {
         var n = midiNote % 12  // reduce to pitch class
-        n += 36                // start in C2
+        n += 48                // start in C3
         while (n < BASS_MIN_MIDI) n += 12
         while (n > BASS_MAX_MIDI) n -= 12
         return n.coerceIn(BASS_MIN_MIDI, BASS_MAX_MIDI)
