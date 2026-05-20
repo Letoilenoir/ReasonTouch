@@ -51,8 +51,6 @@ private val BLUE     = Color(0xFF38BDF8)
 private val BASS_INSTRUMENTS = listOf(
     TrackInstrument("Acoustic Bass",    32),
     TrackInstrument("Finger Bass",      33),
-    TrackInstrument("Pick Bass",        34),
-    TrackInstrument("Fretless Bass",    35),
     TrackInstrument("Synth Bass 1",     38),
     TrackInstrument("Synth Bass 2",     39)
 )
