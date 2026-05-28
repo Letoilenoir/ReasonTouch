@@ -53,9 +53,7 @@ fun TransportControls(
             onClick = { if (isPlaying) onStop() else onPlay() }
         )
         Spacer(modifier = Modifier.width(2.dp))
-        TBtn(label = ">>", onClick = onFastForward)
-        Spacer(modifier = Modifier.width(2.dp))
-        TBtn(label = ">|", onClick = onSkipToEnd)
+        // Removed redundant transport step controls
     }
 }
 

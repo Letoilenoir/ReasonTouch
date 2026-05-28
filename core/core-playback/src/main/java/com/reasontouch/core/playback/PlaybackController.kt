@@ -34,11 +34,15 @@ class PlaybackController @Inject constructor(
     private val _drawDuration = MutableStateFlow(0.25f)
     val drawDuration: StateFlow<Float> = _drawDuration.asStateFlow()
     val snapValues = listOf(1f, 0.5f, 0.25f, 0.125f, 0.0625f)
+    fun setDrawDuration(duration: Float) {
+        _drawDuration.value = duration
+
 
     fun stepDuration(delta: Float, snapValue: Float) {
         _drawDuration.value = (_drawDuration.value + delta).coerceIn(0.0625f, 16f)
     }
 
+    }
     fun seekTo(beat: Float)       = _state.update { it.copy(playheadBeat = beat) }
     fun skipToStart()             = rewind()
     fun fastForward()             = _state.update { it.copy(playheadBeat = (it.playheadBeat + 4f)) }

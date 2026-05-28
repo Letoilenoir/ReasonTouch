@@ -86,7 +86,7 @@ private fun instrumentsForTrack(trackName: String): List<TrackInstrument>? = whe
     "LEAD"  -> LEAD_INSTRUMENTS
     "CHORD" -> CHORD_INSTRUMENTS
     "PAD"   -> PAD_INSTRUMENTS
-    else    -> null  // DRUMS — no picker
+    else    -> null  // DRUMS ï¿½ no picker
 }
 
 private fun emojiForTrack(trackName: String): String = when (trackName.uppercase()) {
@@ -181,7 +181,7 @@ fun PianoRollScreen(
             )
         }
 
-        // Floating instrument panel — appears above track row when open
+        // Floating instrument panel ï¿½ appears above track row when open
         if (showInstrumentPanel) {
             val activeTrack = tracks.getOrNull(activeIndex)
             if (activeTrack != null) {
@@ -271,9 +271,9 @@ fun InstrumentPanel(
         Spacer(modifier = Modifier.height(8.dp))
 
         if (instruments == null) {
-            // DRUMS — WAV engine, no picker
+            // DRUMS ï¿½ WAV engine, no picker
             Text(
-                text = "WAV Kit — sound managed by Drum Machine",
+                text = "WAV Kit ï¿½ sound managed by Drum Machine",
                 color = TEXT_DIM, fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace
             )
@@ -411,13 +411,7 @@ fun PianoRollToolbar(
                 onClick  = { onTool(tool) }
             )
         }
-        Divider()
-        ToolChip(
-            label    = uiState.snapLabels[uiState.snapIndex],
-            selected = false,
-            onClick  = onSnapCycle,
-            monospace = true
-        )
+
         Divider()
         ToolChip(
             label          = "LOOP",
@@ -428,7 +422,7 @@ fun PianoRollToolbar(
             onClick        = onLoopToggle
         )
         Divider()
-        // Instrument selector button — right side, weight fills remaining space
+        // Instrument selector button ï¿½ right side, weight fills remaining space
         Box(
             modifier = Modifier
                 .weight(1f)

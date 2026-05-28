@@ -252,12 +252,20 @@ fun ReasonTouchApp(repository: SessionRepository) {
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Row(verticalAlignment = Alignment.CenterVertically) {
+
                         androidx.compose.material3.IconButton(
-                            onClick = { playbackVm.stepDuration(-snapValue, snapValue) },
+                            onClick = { playbackVm.stepStepper(-1) },
                             modifier = Modifier.width(28.dp)
                         ) {
-                            Text("-", color = Color(0xFFC8C8D4), fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            Text(
+                                "-",
+                                color = Color(0xFFC8C8D4),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
                         }
+
                         Text(
                             text = label,
                             color = Color(0xFFE84040),
@@ -267,13 +275,20 @@ fun ReasonTouchApp(repository: SessionRepository) {
                             modifier = Modifier.width(36.dp),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
+
                         androidx.compose.material3.IconButton(
-                            onClick = { playbackVm.stepDuration(snapValue, snapValue) },
+                            onClick = { playbackVm.stepStepper(+1) },
                             modifier = Modifier.width(28.dp)
                         ) {
-                            Text("+", color = Color(0xFFC8C8D4), fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            Text(
+                                "+",
+                                color = Color(0xFFC8C8D4),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
                         }
-                                    }
+                    }
                 }
             }
 
