@@ -73,6 +73,7 @@ dependencies {
     implementation(project(":feature:feature-export"))
     implementation(project(":feature:feature-drums"))
     implementation(project(":core:core-playback"))
+    implementation(project(":core:core-ui"))
 
     testImplementation(libs.junit)
 

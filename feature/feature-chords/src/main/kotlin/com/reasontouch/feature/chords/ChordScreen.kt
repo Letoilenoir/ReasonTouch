@@ -745,6 +745,10 @@ fun ChordPanel(viewModel: ChordViewModel) {
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp)
     ) {
+        item { SectionLabel("PATTERN") }
+        item { PatternGrid(steps = stepStates, onCycleStep = viewModel::cycleStep) }
+        item { SectionLabel("PRESETS") }
+        item { PresetPatternsDropdown(onApply = viewModel::applyPreset) }
         item { SectionLabel("CATEGORY") }
         item {
             CategoryFilter(
@@ -771,10 +775,6 @@ fun ChordPanel(viewModel: ChordViewModel) {
                 )
             }
         }
-        item { SectionLabel("PATTERN") }
-        item { PatternGrid(steps = stepStates, onCycleStep = viewModel::cycleStep) }
-        item { SectionLabel("PRESETS") }
-        item { PresetPatternsDropdown(onApply = viewModel::applyPreset) }
         item { Spacer(modifier = Modifier.height(8.dp)) }
     }
 }
