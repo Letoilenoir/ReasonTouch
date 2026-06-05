@@ -32,6 +32,12 @@ enum class ChordQuality(val label: String) {
 
 enum class HarmonicFunction { TONIC, PREDOMINANT, DOMINANT }
 
+enum class CompositionMode {
+    MANUAL,
+    ASSISTED,
+    GUIDED
+}
+
 data class TheoryChord(
     val root: NoteClass,
     val quality: ChordQuality

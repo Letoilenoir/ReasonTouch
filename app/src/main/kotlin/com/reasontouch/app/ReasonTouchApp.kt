@@ -101,9 +101,7 @@ fun ReasonTouchApp(repository: SessionRepository) {
                         backStackEntry.arguments?.getString("sessionId")
                             ?: return@composable
 
-                    com.reasontouch.feature.chords.ChordScreenV2(
-                        sessionId = sessionId
-                    )
+                    com.reasontouch.feature.chords.ChordScreenV2()
                 }
 
                 composable(Screen.PianoRoll.route) { backStackEntry ->
@@ -377,6 +375,8 @@ fun ReasonTouchApp(repository: SessionRepository) {
         }
     }
 }
+
+
 
 
 

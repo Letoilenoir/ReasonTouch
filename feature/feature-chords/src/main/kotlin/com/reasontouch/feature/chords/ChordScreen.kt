@@ -86,11 +86,12 @@ fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) 
     var showBassSheet     by remember { mutableStateOf(false) }
     val progression       by viewModel.progression.collectAsState()
     val tracks            by viewModel.tracks.collectAsState()
-    val selectedChord     by viewModel.selectedChord.collectAsState()
-    val selectedPosition  by viewModel.selectedPosition.collectAsState()
-    val statusMessage     by viewModel.statusMessage.collectAsState()
-    val harmonyState      by viewModel.harmonyState.collectAsState()
-    val bassGenerating    by viewModel.bassGenerating.collectAsState()
+    val ui                by viewModel.ui.collectAsState()
+    val selectedChord     = ui.selectedChord
+    val selectedPosition  = ui.selectedPosition
+    val statusMessage     = ui.statusMessage
+    val harmonyState      = ui.harmony
+    val bassGenerating    = ui.bassGenerating
 
     Column(modifier = Modifier.fillMaxSize().background(BG)) {
 
@@ -607,7 +608,7 @@ fun BassStyleSheet(
                         fontFamily = FontFamily.Monospace)
                     Text(
                         text = if (appendMode) "Adds after existing bass notes"
-                               else "Replaces existing bass track",
+                        else "Replaces existing bass track",
                         color = TEXT_DIM, fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace)
                 }
@@ -734,9 +735,10 @@ fun ProgressionChip(bar: ChordEvent, onRemove: () -> Unit) {
 
 @Composable
 fun ChordPanel(viewModel: ChordViewModel) {
-    val selectedCategory   by viewModel.selectedCategory.collectAsState()
-    val selectedChord      by viewModel.selectedChord.collectAsState()
-    val selectedPosition   by viewModel.selectedPosition.collectAsState()
+    val ui                 by viewModel.ui.collectAsState()
+    val selectedCategory   = ui.selectedCategory
+    val selectedChord      = ui.selectedChord
+    val selectedPosition   = ui.selectedPosition
     val filteredChords     by viewModel.filteredChords.collectAsState()
     val availablePositions by viewModel.availablePositions.collectAsState()
     val stepStates         by viewModel.stepStates.collectAsState()
@@ -784,11 +786,12 @@ fun ChordPanel(viewModel: ChordViewModel) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsPanel(viewModel: ChordViewModel) {
-    val strumEnabled by viewModel.strumEnabled.collectAsState()
-    val strumSpeed   by viewModel.strumSpeed.collectAsState()
-    val instrument   by viewModel.instrument.collectAsState()
-    val barDuration  by viewModel.barDuration.collectAsState()
-    val tempo        by viewModel.tempo.collectAsState()
+    val ui               by viewModel.ui.collectAsState()
+    val strumEnabled     = ui.strumEnabled
+    val strumSpeed       = ui.strumSpeed
+    val instrument       = ui.instrument
+    val barDuration      = ui.barDuration
+    val tempo            by viewModel.bpm.collectAsState()
 
     var strumDropdownExpanded by remember { mutableStateOf(false) }
     var gmDropdownExpanded    by remember { mutableStateOf(false) }
@@ -1007,7 +1010,7 @@ fun ChordGrid(chords: List<String>, selected: String, onSelect: (String) -> Unit
             val bgColor = when {
                 isSelected -> ACCENT
                 chord.contains("m") && !chord.contains("maj") &&
-                    !chord.contains("dim") -> Color(0xFF1A2A4A)
+                        !chord.contains("dim") -> Color(0xFF1A2A4A)
                 chord.contains("7")   -> Color(0xFF2A1A2A)
                 chord.contains("sus") -> Color(0xFF1A2A1A)
                 chord.contains("dim") -> Color(0xFF2A1A1A)
@@ -1131,7 +1134,7 @@ fun PresetPatternsDropdown(onApply: (StepPattern) -> Unit) {
 
     val items = StrumPatterns.groups.flatMap { (groupName, patterns) ->
         listOf(PresetItem(groupName, "", null)) +
-        patterns.map { (name, pattern) -> PresetItem(groupName, name, pattern) }
+                patterns.map { (name, pattern) -> PresetItem(groupName, name, pattern) }
     }
 
     Row(
@@ -1258,32 +1261,32 @@ fun SendToPianoRollDialog(
                 Row(modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(false to "BLOCK" to "All notes together",
-                           true  to "STRUM" to "Apply pattern timing")
+                        true  to "STRUM" to "Apply pattern timing")
                         .forEach { (pair, desc) ->
-                        val (mode, modeLabel) = pair
-                        val active = useStrum == mode
-                        val col    = if (mode) GREEN else BLUE
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(if (active) Color(0xFF1A2A1A) else Color(0xFF222228))
-                                .border(1.dp, if (active) col else BORDER, RoundedCornerShape(4.dp))
-                                .clickable { useStrum = mode }
-                                .padding(horizontal = 10.dp, vertical = 10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(modeLabel,
-                                    color = if (active) col else TEXT_DIM,
-                                    fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace)
-                                Text(desc, color = TEXT_DIM, fontSize = 10.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    textAlign = TextAlign.Center)
+                            val (mode, modeLabel) = pair
+                            val active = useStrum == mode
+                            val col    = if (mode) GREEN else BLUE
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(if (active) Color(0xFF1A2A1A) else Color(0xFF222228))
+                                    .border(1.dp, if (active) col else BORDER, RoundedCornerShape(4.dp))
+                                    .clickable { useStrum = mode }
+                                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(modeLabel,
+                                        color = if (active) col else TEXT_DIM,
+                                        fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace)
+                                    Text(desc, color = TEXT_DIM, fontSize = 10.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        textAlign = TextAlign.Center)
+                                }
                             }
                         }
-                    }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("TARGET TRACK", color = TEXT_DIM, fontSize = 10.sp,
@@ -1336,7 +1339,7 @@ fun SendToPianoRollDialog(
                             fontFamily = FontFamily.Monospace)
                         Text(
                             text = if (appendMode) "Adds after last note on track"
-                                   else "Overwrites from bar 1",
+                            else "Overwrites from bar 1",
                             color = TEXT_DIM, fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace)
                     }

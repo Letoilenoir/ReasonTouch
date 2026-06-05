@@ -1,7 +1,13 @@
 package com.reasontouch.core.ui.theme
 
 import androidx.compose.ui.graphics.Color
+val ModeBarBackground = Color(0xFF202024)
 
+val ManualModeColor   = Color(0xFF7A7A88)
+val AssistedModeColor = Color(0xFFE84040)
+val GuidedModeColor   = Color(0xFF8B5CF6)
+
+val ModeChipBackground = Color(0xFF2A2A32)
 val NeoDarkSkin = ReasonTouchSkin(
 
     // Backgrounds
