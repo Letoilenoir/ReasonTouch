@@ -62,6 +62,7 @@ fun ChordScreenV2(
                 } else {
                     when (selectedStartingPoint.value?.name) {
                         "Mood" -> MoodWorkspace(
+                            viewModel = viewModel,
                             onMoodSelected = { mood -> },
                             onAudition = { moodName ->
                                 val chordForMood = when(moodName) {

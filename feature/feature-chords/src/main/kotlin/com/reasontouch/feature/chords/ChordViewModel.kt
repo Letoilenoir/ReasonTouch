@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.delay
 
 // ------------------------------------------------------------
 // UI STATE
@@ -220,6 +221,18 @@ class ChordViewModel @Inject constructor(
 
         android.util.Log.d("CHORD_AUDIO", "About to play chord")
         sf2Player.playChord(midiNotes, ringDur, 90, gmProgram, strumDelay)
+    }
+    /**
+     * Play a progression of chords sequentially
+     * Each chord plays for ~1 second with slight delay between them
+     */
+    fun playProgression(chords: List<String>, position: String = "Open") {
+        viewModelScope.launch {
+            chords.forEach { chord ->
+                auditionChord(chord, position)
+                delay(1200) // 1.2 seconds per chord (1s play + 0.2s gap)
+            }
+        }
     }
 
     fun auditionSuggestion(suggestion: ChordSuggestion) {
