@@ -2,10 +2,10 @@ package com.reasontouch.feature.chords.workspaces
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reasontouch.feature.chords.ChordViewModel
 
 private val BG = Color(0xFF1A1A1E)
 private val TEXT = Color(0xFFC8C8D4)
@@ -22,22 +23,17 @@ private val TEXT_DIM = Color(0xFF666675)
 private val GREEN = Color(0xFF3DDC84)
 
 /**
- * ManualWorkspace - Returns to the original ChordPanel behavior
- * User can freely select any chord and build their own progression
- * with no AI assistance or suggestions.
- * 
- * This delegates to ChordPanel which is already fully implemented
- * in the original ChordScreen.
+ * ManualWorkspace - Full chord grid composition with no AI assistance
+ * Integrates ChordPanel from original ChordScreen for complete freedom
  */
 @Composable
 fun ManualWorkspace(
-    onChordSelected: (String) -> Unit = {}
+    viewModel: ChordViewModel
 ) {
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
-            .background(BG),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 16.dp)
+            .background(BG)
     ) {
         item {
             ManualHeader()
@@ -55,7 +51,7 @@ fun ManualWorkspace(
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(BG)
+                    .padding(horizontal = 12.dp)
             )
         }
 
@@ -64,12 +60,13 @@ fun ManualWorkspace(
         }
 
         item {
+            // TODO: Wire ChordPanel from original ChordScreen here
             Text(
-                text = "NOTE: Manual workspace uses the full ChordPanel from below.",
+                text = "[ChordPanel to be integrated]",
                 color = TEXT_DIM,
-                fontSize = 9.sp,
+                fontSize = 10.sp,
                 fontFamily = FontFamily.Monospace,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.padding(12.dp)
             )
         }
 
@@ -81,9 +78,9 @@ fun ManualWorkspace(
 
 @Composable
 fun ManualHeader() {
-    Column {
+    Column(modifier = Modifier.padding(12.dp)) {
         Text(
-            text = "✏️  MANUAL COMPOSITION",
+            text = "??  MANUAL COMPOSITION",
             color = GREEN,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,

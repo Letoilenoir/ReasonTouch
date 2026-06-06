@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,6 +59,7 @@ val AVAILABLE_MOODS = listOf(
 @Composable
 fun MoodWorkspace(
     onMoodSelected: (Mood) -> Unit,
+    onAudition: (String) -> Unit = {},
     onContinue: () -> Unit = {}
 ) {
     var selectedMood by remember { mutableStateOf<Mood?>(null) }
@@ -105,6 +105,7 @@ fun MoodWorkspace(
                             moodBiasFine = mood.moodBias
                             onMoodSelected(mood)
                         },
+                        onAudition = onAudition,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -195,6 +196,7 @@ fun MoodCard(
     mood: Mood,
     isSelected: Boolean,
     onSelect: () -> Unit,
+    onAudition: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val bgColor = if (isSelected) Color(0xFF2A1A2A) else PANEL
@@ -205,7 +207,10 @@ fun MoodCard(
             .clip(RoundedCornerShape(8.dp))
             .background(bgColor)
             .border(2.dp, borderColor, RoundedCornerShape(8.dp))
-            .clickable(onClick = onSelect)
+            .clickable {
+                onAudition(mood.name)
+                onSelect()
+            }
             .padding(12.dp),
         contentAlignment = Alignment.Center
     ) {

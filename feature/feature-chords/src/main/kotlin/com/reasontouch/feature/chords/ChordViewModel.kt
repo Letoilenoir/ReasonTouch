@@ -208,7 +208,7 @@ class ChordViewModel @Inject constructor(
     // AUDITION
     // ------------------------------------------------------------
 
-    fun auditionChord(chordName: String, position: String) {
+    fun auditionChord(chordName: String, position: String) {android.util.Log.d("CHORD_AUDIO", "auditionChord called: $chordName, $position")
         val state = ui.value
         val notes = GuitarVoicings.voicings[chordName]?.get(position) ?: return
         val midiNotes = notes.filterNotNull()
@@ -218,6 +218,7 @@ class ChordViewModel @Inject constructor(
         val beatDurSec = 60f / bpm.value.coerceAtLeast(20).toFloat()
         val ringDur = (beatDurSec * 2f).coerceIn(0.3f, 1.2f)
 
+        android.util.Log.d("CHORD_AUDIO", "About to play chord")
         sf2Player.playChord(midiNotes, ringDur, 90, gmProgram, strumDelay)
     }
 

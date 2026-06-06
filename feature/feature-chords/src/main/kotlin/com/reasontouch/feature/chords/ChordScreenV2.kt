@@ -49,7 +49,7 @@ fun ChordScreenV2(
         // WORKSPACE - Use Column for simple layouts, LazyColumn only for scrollable content
         when (compositionMode.value) {
             CompositionMode.MANUAL -> {
-                ManualWorkspace()
+                ManualWorkspace(viewModel = viewModel)
             }
 
             CompositionMode.ASSISTED -> {
@@ -63,6 +63,18 @@ fun ChordScreenV2(
                     when (selectedStartingPoint.value?.name) {
                         "Mood" -> MoodWorkspace(
                             onMoodSelected = { mood -> },
+                            onAudition = { moodName ->
+                                val chordForMood = when(moodName) {
+                                    "Dark" -> "Am"
+                                    "Uplifting" -> "Cmaj7"
+                                    "Cinematic" -> "Gmaj7"
+                                    "Ambient" -> "Gmaj7"
+                                    "Energetic" -> "G7"
+                                    "Melancholic" -> "Em7"
+                                    else -> "C"
+                                }
+                                viewModel.auditionChord(chordForMood, "Open")
+                            },
                             onContinue = { }
                         )
                         "Inspire" -> InspireWorkspace(
@@ -71,7 +83,7 @@ fun ChordScreenV2(
                         "Progression" -> ProgressionWorkspace(
                             onProgressionSelected = { template -> }
                         )
-                        else -> ManualWorkspace()
+                        else -> ManualWorkspace(viewModel = viewModel)
                     }
                 }
             }
@@ -84,3 +96,6 @@ fun ChordScreenV2(
         }
     }
 }
+
+
+
