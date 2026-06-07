@@ -3,6 +3,7 @@ package com.reasontouch.feature.chords.workspaces
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -24,6 +26,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,9 +39,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.runtime.LaunchedEffect
 import com.reasontouch.feature.chords.ChordViewModel
 import kotlinx.coroutines.delay
 
@@ -68,16 +68,6 @@ val AVAILABLE_MOODS = listOf(
     Mood("Melancholic", "Contemplative, sad", "💔", -0.6f)
 )
 
-/**
- * MoodWorkspace - Phase 3b Refactor
- *
- * Features:
- * - Collapsible header overlay
- * - Collapsible "How It Works" info tray
- * - COMPACT mood cards (~80dp height)
- * - Visual hierarchy: Title dominant, subtitle secondary, icon beside
- * - 3-column grid layout
- */
 @Composable
 fun MoodWorkspace(
     viewModel: ChordViewModel,
@@ -97,9 +87,7 @@ fun MoodWorkspace(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // ================== CONDITIONAL: OVERLAYS OR PROGRESSION ==================
         if (selectedMood == null) {
-            // Show collapsible overlays when no mood selected
             item {
                 CollapsibleHeaderTray(
                     isExpanded = headerExpanded,
@@ -118,14 +106,15 @@ fun MoodWorkspace(
                 Spacer(modifier = Modifier.height(8.dp))
             }
         } else {
-            // Show progression display when mood IS selected
             item {
                 SuggestedProgressionDisplay(
                     mood = selectedMood!!,
+                    harmonyBias = moodBiasFine,
+                    viewModel = viewModel,
                     onPlayProgression = { chords ->
                         viewModel.playProgression(chords)
                     },
-                    onProgressionReady = { /* TODO: Navigate to progression builder */ }
+                    onProgressionReady = { }
                 )
             }
 
@@ -134,7 +123,6 @@ fun MoodWorkspace(
             }
         }
 
-        // ================== MOOD SELECTION SECTION ==================
         item {
             Text(
                 text = "SELECT A MOOD",
@@ -146,7 +134,6 @@ fun MoodWorkspace(
             )
         }
 
-        // 3-column grid layout
         items(AVAILABLE_MOODS.chunked(3)) { moodRow ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -165,7 +152,6 @@ fun MoodWorkspace(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                // Fill empty space if row has fewer than 3 cards
                 repeat(3 - moodRow.size) {
                     Spacer(modifier = Modifier.weight(1f))
                 }
@@ -176,7 +162,6 @@ fun MoodWorkspace(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // ================== MOOD FINE-TUNING SECTION ==================
         if (selectedMood != null) {
             item {
                 MoodBiasTuner(
@@ -200,9 +185,6 @@ fun MoodWorkspace(
     }
 }
 
-/**
- * Collapsible Header Tray (Phase 3a)
- */
 @Composable
 private fun CollapsibleHeaderTray(
     isExpanded: Boolean,
@@ -254,9 +236,6 @@ private fun CollapsibleHeaderTray(
     }
 }
 
-/**
- * Collapsible "How It Works" Info Tray (Phase 3a)
- */
 @Composable
 private fun CollapsibleHowItWorksTray(
     isExpanded: Boolean,
@@ -309,27 +288,16 @@ private fun CollapsibleHowItWorksTray(
         }
     }
 }
-/**
- * Suggested Chord Progression Display (Phase 3c - with Audition)
- * Shows default progression based on selected mood
- * User can audition the full progression before accepting
- */
+
 @Composable
 private fun SuggestedProgressionDisplay(
     mood: Mood,
+    harmonyBias: Float,
+    viewModel: ChordViewModel,
     onPlayProgression: (List<String>) -> Unit,
     onProgressionReady: () -> Unit
 ) {
-    val progressionMap = mapOf(
-        "Dark" to listOf("Am", "Em", "Dm", "Am"),
-        "Uplifting" to listOf("Cmaj7", "Am7", "G7", "Gmaj7"),
-        "Cinematic" to listOf("Gmaj7", "Em7", "Asus2", "D"),
-        "Ambient" to listOf("Gmaj7", "Asus2", "Emaj7", "Amaj7"),
-        "Energetic" to listOf("G7", "D7", "A7", "E7"),
-        "Melancholic" to listOf("Em", "Am", "Em", "B7")
-    )
-
-    val chords = progressionMap[mood.name] ?: listOf("C", "Am", "F", "G")
+    val chords = viewModel.generateProgressionForMood(mood.name, harmonyBias)
     var isPlaying by remember { mutableStateOf(false) }
 
     Column(
@@ -341,7 +309,6 @@ private fun SuggestedProgressionDisplay(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Header with play button
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -355,7 +322,6 @@ private fun SuggestedProgressionDisplay(
                 letterSpacing = 2.sp
             )
 
-            // Play/Stop button
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
@@ -377,7 +343,6 @@ private fun SuggestedProgressionDisplay(
             }
         }
 
-        // Chord row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -404,18 +369,19 @@ private fun SuggestedProgressionDisplay(
             }
         }
 
-        // Action buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Regenerate button
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(4.dp))
                     .background(BORDER.copy(alpha = 0.5f))
-                    .clickable(enabled = !isPlaying) { /* TODO: Regenerate progression */ }
+                    .clickable(enabled = !isPlaying) {
+                        isPlaying = true
+                        onPlayProgression(chords)
+                    }
                     .padding(vertical = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -428,7 +394,6 @@ private fun SuggestedProgressionDisplay(
                 )
             }
 
-            // Accept button
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -449,23 +414,14 @@ private fun SuggestedProgressionDisplay(
         }
     }
 
-    // Auto-play progression when first displayed
-    LaunchedEffect(chords) {
-        isPlaying = true
-        onPlayProgression(chords)
-        delay(chords.size * 1200L + 500)
-        isPlaying = false
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            delay(chords.size * 1200L + 500)
+            isPlaying = false
+        }
     }
 }
-/**
- * Mood Card Component - COMPACT LAYOUT (Phase 3b - Fine-tuned)
- *
- * Layout:
- * - Primary text (Title) spans full width at top
- * - Secondary text (Subtitle) + Icon occupy area below
- *
- * Height: ~80dp (compact)
- */
+
 @Composable
 fun MoodCard(
     mood: Mood,
@@ -493,7 +449,6 @@ fun MoodCard(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // PRIMARY TEXT (Full width, top)
             Text(
                 text = mood.name,
                 color = if (isSelected) PURPLE else TEXT,
@@ -503,13 +458,11 @@ fun MoodCard(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // SECONDARY ROW (Subtitle left, Icon right)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Subtitle + Description (left side)
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(1.dp)
@@ -526,7 +479,6 @@ fun MoodCard(
 
                 Spacer(modifier = Modifier.width(6.dp))
 
-                // Icon (right side)
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -543,9 +495,7 @@ fun MoodCard(
         }
     }
 }
-/**
- * Mood Bias Tuner Slider
- */
+
 @Composable
 fun MoodBiasTuner(
     mood: Mood,
@@ -606,9 +556,6 @@ fun MoodBiasTuner(
     }
 }
 
-/**
- * Mood Next Steps
- */
 @Composable
 fun MoodNextSteps(
     mood: Mood,

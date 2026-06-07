@@ -223,14 +223,88 @@ class ChordViewModel @Inject constructor(
         sf2Player.playChord(midiNotes, ringDur, 90, gmProgram, strumDelay)
     }
     /**
-     * Play a progression of chords sequentially
-     * Each chord plays for ~1 second with slight delay between them
+     * Generate progression based on mood + harmonic bias
+     *
+     * Bias range: -1.0 (dark/minor) to +1.0 (bright/major)
+     * Returns 4 chords filtered to only include "Open" position variants
      */
+    fun generateProgressionForMood(moodName: String, bias: Float): List<String> {
+        // Chord pool: Only chords with "Open" position available
+        val availableChords = GuitarVoicings.voicings
+            .filter { it.value.containsKey("Open") }
+            .keys
+            .toList()
+
+        // Major-leaning chords (for positive bias)
+        val majorChords = listOf("C", "D", "E", "G", "A", "Cmaj7", "Dmaj7", "Emaj7", "Gmaj7", "Amaj7")
+            .filter { it in availableChords }
+
+        // Minor-leaning chords (for negative bias)
+        val minorChords = listOf("Am", "Dm", "Em", "Gm", "Em7", "Am7", "Dm7")
+            .filter { it in availableChords }
+
+        // Dominant 7 chords (neutral/energetic)
+        val dominantChords = listOf("G7", "D7", "A7", "E7", "C7")
+            .filter { it in availableChords }
+
+        // Mood-specific base progressions
+        val baseProgression = when (moodName) {
+            "Dark" -> listOf("Am", "Em", "Dm", "Am")
+            "Uplifting" -> listOf("Cmaj7", "Am7", "G7", "Gmaj7")
+            "Cinematic" -> listOf("Gmaj7", "Em7", "Asus2", "D")
+            "Ambient" -> listOf("Gmaj7", "Asus2", "Emaj7", "Amaj7")
+            "Energetic" -> listOf("G7", "D7", "A7", "E7")
+            "Melancholic" -> listOf("Em", "Am", "Em", "B7")
+            else -> listOf("C", "Am", "F", "G")
+        }
+
+        // Filter base progression to available chords
+        val filteredBase = baseProgression.filter { it in availableChords }
+
+        // If bias is neutral, return base progression
+        if (Math.abs(bias) < 0.15f) {
+            return filteredBase.takeIf { it.size >= 3 } ?: baseProgression.take(4)
+        }
+
+        // Generate bias-influenced progression
+        return when {
+            // Bright/Major bias (positive)
+            bias > 0.15f -> {
+                val intensity = (bias * 100).toInt() // 15-100
+                val majorCount = (4 * bias).coerceIn(1f, 3f).toInt()
+                val major = majorChords.shuffled().take(majorCount)
+                val minor = minorChords.shuffled().take(4 - majorCount)
+                (major + minor).shuffled().take(4)
+            }
+
+            // Dark/Minor bias (negative)
+            else -> {
+                val intensity = (Math.abs(bias) * 100).toInt()
+                val minorCount = (4 * Math.abs(bias)).coerceIn(1f, 3f).toInt()
+                val minor = minorChords.shuffled().take(minorCount)
+                val major = majorChords.shuffled().take(4 - minorCount)
+                (minor + major).shuffled().take(4)
+            }
+        }
+    }
+    /**
+    * Play a progression of chords sequentially
+    * Automatically uses first available position if specified position not found
+    */
     fun playProgression(chords: List<String>, position: String = "Open") {
         viewModelScope.launch {
             chords.forEach { chord ->
-                auditionChord(chord, position)
-                delay(1200) // 1.2 seconds per chord (1s play + 0.2s gap)
+                // Try specified position, fallback to first available
+                val voicing = GuitarVoicings.voicings[chord]
+                val positionToUse = if (voicing?.containsKey(position) == true) {
+                    position
+                } else {
+                    voicing?.keys?.firstOrNull() ?: position
+                }
+
+                android.util.Log.d("PlayProgression", "$chord using position: $positionToUse")
+                auditionChord(chord, positionToUse)
+                delay(1200)
             }
         }
     }
