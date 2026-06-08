@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reasontouch.feature.chords.ChordViewModel
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.mutableFloatStateOf
 
 private val BG = Color(0xFF1A1A1E)
 private val PANEL = Color(0xFF2A2A32)
@@ -76,7 +77,7 @@ fun MoodWorkspace(
     onContinue: () -> Unit = {}
 ) {
     var selectedMood by remember { mutableStateOf<Mood?>(null) }
-    var moodBiasFine by remember { mutableStateOf(0f) }
+    var moodBiasFine by remember { mutableFloatStateOf(0f) }
     var headerExpanded by remember { mutableStateOf(true) }
     var howItWorksExpanded by remember { mutableStateOf(false) }
 
