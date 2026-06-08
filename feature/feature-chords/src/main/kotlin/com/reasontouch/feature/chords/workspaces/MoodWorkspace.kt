@@ -297,7 +297,9 @@ private fun SuggestedProgressionDisplay(
     onPlayProgression: (List<String>) -> Unit,
     onProgressionReady: () -> Unit
 ) {
-    val chords = viewModel.generateProgressionForMood(mood.name, harmonyBias)
+    val chords = remember(mood, harmonyBias) {
+        viewModel.generateProgressionForMood(mood.name, harmonyBias)
+    }
     var isPlaying by remember { mutableStateOf(false) }
 
     Column(
@@ -327,6 +329,7 @@ private fun SuggestedProgressionDisplay(
                     .clip(RoundedCornerShape(4.dp))
                     .background(if (isPlaying) ACCENT else ACCENT.copy(alpha = 0.6f))
                     .clickable(enabled = !isPlaying) {
+                        android.util.Log.d("ProgressionPlay", "Playing chords: $chords")
                         isPlaying = true
                         onPlayProgression(chords)
                     }
@@ -413,14 +416,20 @@ private fun SuggestedProgressionDisplay(
             }
         }
     }
+// Reset playing state when progression changes
+    LaunchedEffect(chords) {
+        isPlaying = false
+    }
 
-    LaunchedEffect(isPlaying) {
+// Auto-reset playing state after progression finishes
+    LaunchedEffect(isPlaying, chords) {
         if (isPlaying) {
             delay(chords.size * 1200L + 500)
             isPlaying = false
         }
     }
 }
+
 
 @Composable
 fun MoodCard(

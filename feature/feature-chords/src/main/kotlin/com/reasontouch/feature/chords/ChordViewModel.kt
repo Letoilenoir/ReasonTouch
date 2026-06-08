@@ -204,12 +204,12 @@ class ChordViewModel @Inject constructor(
             }
         }
     }
-
-    // ------------------------------------------------------------
+// ------------------------------------------------------------
     // AUDITION
     // ------------------------------------------------------------
 
-    fun auditionChord(chordName: String, position: String) {android.util.Log.d("CHORD_AUDIO", "auditionChord called: $chordName, $position")
+    fun auditionChord(chordName: String, position: String) {
+        android.util.Log.d("CHORD_AUDIO", "auditionChord called: $chordName, $position")
         val state = ui.value
         val notes = GuitarVoicings.voicings[chordName]?.get(position) ?: return
         val midiNotes = notes.filterNotNull()
@@ -222,6 +222,7 @@ class ChordViewModel @Inject constructor(
         android.util.Log.d("CHORD_AUDIO", "About to play chord")
         sf2Player.playChord(midiNotes, ringDur, 90, gmProgram, strumDelay)
     }
+
     /**
      * Generate progression based on mood + harmonic bias
      *
@@ -270,11 +271,11 @@ class ChordViewModel @Inject constructor(
         return when {
             // Bright/Major bias (positive)
             bias > 0.15f -> {
-                val intensity = (bias * 100).toInt() // 15-100
+                val intensity = (bias * 100).toInt()
                 val majorCount = (4 * bias).coerceIn(1f, 3f).toInt()
                 val major = majorChords.shuffled().take(majorCount)
                 val minor = minorChords.shuffled().take(4 - majorCount)
-                (major + minor).shuffled().take(4)
+                (major + minor)  // No Shuffle
             }
 
             // Dark/Minor bias (negative)
@@ -283,7 +284,7 @@ class ChordViewModel @Inject constructor(
                 val minorCount = (4 * Math.abs(bias)).coerceIn(1f, 3f).toInt()
                 val minor = minorChords.shuffled().take(minorCount)
                 val major = majorChords.shuffled().take(4 - minorCount)
-                (minor + major).shuffled().take(4)
+                (minor + major) // No Shuffle
             }
         }
     }
