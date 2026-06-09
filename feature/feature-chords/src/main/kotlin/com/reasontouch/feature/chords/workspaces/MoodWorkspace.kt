@@ -79,6 +79,9 @@ fun MoodWorkspace(
     var moodBiasFine by remember { mutableStateOf(0f) }
     var headerExpanded by remember { mutableStateOf(true) }
     var howItWorksExpanded by remember { mutableStateOf(false) }
+    var showSendDialog by remember { mutableStateOf(false) }
+    var selectedTrackIndex by remember { mutableStateOf(0) }
+    var useStrum by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
