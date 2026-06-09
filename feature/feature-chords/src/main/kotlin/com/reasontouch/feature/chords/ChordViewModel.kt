@@ -272,18 +272,18 @@ class ChordViewModel @Inject constructor(
             bias > 0.15f -> {
                 val intensity = (bias * 100).toInt() // 15-100
                 val majorCount = (4 * bias).coerceIn(1f, 3f).toInt()
-                val major = majorChords.shuffled().take(majorCount)
-                val minor = minorChords.shuffled().take(4 - majorCount)
-                (major + minor).shuffled().take(4)
+                val major = majorChords.take(majorCount)
+                val minor = minorChords.take(4 - majorCount)
+                (major + minor).take(4)
             }
 
             // Dark/Minor bias (negative)
             else -> {
                 val intensity = (Math.abs(bias) * 100).toInt()
                 val minorCount = (4 * Math.abs(bias)).coerceIn(1f, 3f).toInt()
-                val minor = minorChords.shuffled().take(minorCount)
-                val major = majorChords.shuffled().take(4 - minorCount)
-                (minor + major).shuffled().take(4)
+                val minor = minorChords.take(minorCount)
+                val major = majorChords.take(4 - minorCount)
+                (minor + major).take(4)
             }
         }
     }
