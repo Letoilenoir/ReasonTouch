@@ -117,7 +117,7 @@ fun MoodWorkspace(
                     onPlayProgression = { chords ->
                         viewModel.playProgression(chords)
                     },
-                    onProgressionReady = { }
+                    onProgressionReady = { showSendDialog = true }
                 )
             }
 
