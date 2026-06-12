@@ -156,7 +156,7 @@ fun ChordScreen(sessionId: String, viewModel: ChordViewModel = hiltViewModel()) 
         SendToPianoRollDialog(
             tracks    = tracks,
             onConfirm = { trackIndex, useStrum, appendMode ->
-                viewModel.sendToPianoRoll(trackIndex, useStrum, appendMode) {}
+                viewModel.sendToPianoRoll(trackIndex, useStrum, null, appendMode) {}
                 showSendDialog = false
             },
             onDismiss = { showSendDialog = false }

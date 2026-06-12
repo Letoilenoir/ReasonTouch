@@ -209,18 +209,21 @@ class ChordViewModel @Inject constructor(
     // AUDITION
     // ------------------------------------------------------------
 
-    fun auditionChord(chordName: String, position: String) {android.util.Log.d("CHORD_AUDIO", "auditionChord called: $chordName, $position")
+    fun auditionChord(
+        chordName: String,
+        position: String,
+        strumDelayMs: Long = 0L  // ← Change from StepPattern to Long
+    ) {
         val state = ui.value
         val notes = GuitarVoicings.voicings[chordName]?.get(position) ?: return
         val midiNotes = notes.filterNotNull()
         val gmProgram = state.instrument.program
-        val strumDelay = if (state.strumEnabled) (state.strumSpeed * 1000).toLong() else 0L
 
         val beatDurSec = 60f / bpm.value.coerceAtLeast(20).toFloat()
         val ringDur = (beatDurSec * 2f).coerceIn(0.3f, 1.2f)
 
-        android.util.Log.d("CHORD_AUDIO", "About to play chord")
-        sf2Player.playChord(midiNotes, ringDur, 90, gmProgram, strumDelay)
+        android.util.Log.d("CHORD_AUDIO", "auditionChord: $chordName, strumDelayMs=$strumDelayMs")
+        sf2Player.playChord(midiNotes, ringDur, 90, gmProgram, strumDelayMs)
     }
     /**
      * Generate progression based on mood + harmonic bias
@@ -291,19 +294,23 @@ class ChordViewModel @Inject constructor(
     * Play a progression of chords sequentially
     * Automatically uses first available position if specified position not found
     */
-    fun playProgression(chords: List<String>, position: String = "Open") {
+    fun playProgression(chords: List<String>, strumPattern: StepPattern? = null) {
         viewModelScope.launch {
             chords.forEach { chord ->
-                // Try specified position, fallback to first available
                 val voicing = GuitarVoicings.voicings[chord]
-                val positionToUse = if (voicing?.containsKey(position) == true) {
-                    position
+                val positionToUse = if (voicing?.containsKey("Open") == true) {
+                    "Open"
                 } else {
-                    voicing?.keys?.firstOrNull() ?: position
+                    voicing?.keys?.firstOrNull() ?: "Open"
                 }
 
-                android.util.Log.d("PlayProgression", "$chord using position: $positionToUse")
-                auditionChord(chord, positionToUse)
+                val strumDelay = if (strumPattern != null && strumPattern != StepPattern.EMPTY) {
+                    (ui.value.strumSpeed * 1000).toLong()
+                } else {
+                    0L
+                }
+
+                auditionChord(chord, positionToUse, strumDelay)
                 delay(1200)
             }
         }
@@ -509,6 +516,105 @@ class ChordViewModel @Inject constructor(
         val notes = repository.getNotesForTrackOnce(trackId)
         return notes.maxOfOrNull { it.beat + it.duration } ?: 0f
     }
+    // Convert mood-generated chord names to NoteEvents and send directly to piano roll
+    fun sendProgressionToPianoRoll(
+        chordNames: List<String>,
+        strumPattern: StepPattern,
+        trackIndex: Int,
+        appendMode: Boolean,
+        onComplete: () -> Unit
+    ) {
+        android.util.Log.d("SendProgression", "ENTRY: chords=$chordNames, trackIndex=$trackIndex, nonOffSteps=${strumPattern.steps.count { it != StepState.OFF }}")
+        viewModelScope.launch {
+            if (chordNames.isEmpty()) {
+                android.util.Log.d("SendProgression", "ERROR: No chords provided")
+                update { copy(statusMessage = "No chords to send") }
+                onComplete()
+                return@launch
+            }
+
+            val trackList = tracks.value
+            if (trackList.isEmpty()) {
+                android.util.Log.d("SendProgression", "ERROR: No tracks available")
+                update { copy(statusMessage = "No tracks available") }
+                onComplete()
+                return@launch
+            }
+
+            if (trackIndex !in trackList.indices) {
+                android.util.Log.d("SendProgression", "ERROR: Invalid track index $trackIndex, trackList.size=${trackList.size}")
+                update { copy(statusMessage = "Invalid track selected") }
+                onComplete()
+                return@launch
+            }
+
+            val targetTrack = trackList[trackIndex]
+            val beatsPerBar = ui.value.barDuration.toFloat()
+            val useStrum = strumPattern != StepPattern.EMPTY
+
+            // Delete existing notes if not appending
+            if (!appendMode) {
+                repository.deleteNotesForTrack(targetTrack.id)
+            }
+
+            // Calculate append offset
+            val appendOffset = if (appendMode) {
+                val lastBeat = getLastBeatOnTrack(targetTrack.id)
+                if (lastBeat <= 0f) 0f else {
+                    val barsUsed = kotlin.math.ceil(lastBeat / beatsPerBar).toInt()
+                    barsUsed * beatsPerBar
+                }
+            } else {
+                0f
+            }
+
+            // Convert chord names directly to NoteEvents
+            val notes = mutableListOf<NoteEvent>()
+            chordNames.forEachIndexed { barIndex, chordName ->
+                val beatStart = (barIndex * beatsPerBar) + appendOffset
+                val midiNotes = GuitarVoicings.voicings[chordName]?.get("Open")?.filterNotNull() ?: emptyList()
+
+                android.util.Log.d("SendProgression", "Bar $barIndex: $chordName -> ${midiNotes.size} notes")
+
+                if (useStrum) {
+                    // Apply strum pattern with per-chord delay
+                    val strumDelay = (ui.value.strumSpeed * beatsPerBar).toFloat()
+                    midiNotes.forEachIndexed { noteIndex, midiNote ->
+                        notes.add(
+                            NoteEvent(
+                                id = UUID.randomUUID().toString(),
+                                trackId = targetTrack.id,
+                                pitch = 108 - midiNote,
+                                beat = beatStart + (noteIndex * strumDelay),
+                                duration = beatsPerBar - (noteIndex * strumDelay),
+                                velocity = 80
+                            )
+                        )
+                    }
+                } else {
+                    // Block mode - all notes together
+                    midiNotes.forEach { midiNote ->
+                        notes.add(
+                            NoteEvent(
+                                id = UUID.randomUUID().toString(),
+                                trackId = targetTrack.id,
+                                pitch = 108 - midiNote,
+                                beat = beatStart,
+                                duration = beatsPerBar,
+                                velocity = 80
+                            )
+                        )
+                    }
+                }
+            }
+
+            android.util.Log.d("SendProgression", "Saving ${notes.size} total notes to track ${targetTrack.id} (${targetTrack.name})")
+            repository.saveNotes(notes)
+            update { copy(statusMessage = "Sent ${notes.size} notes to ${targetTrack.name}") }
+            android.util.Log.d("SendProgression", "COMPLETE")
+            onComplete()
+        }
+    }
 
     // ------------------------------------------------------------
     // SEND TO PIANO ROLL
@@ -517,11 +623,13 @@ class ChordViewModel @Inject constructor(
     fun sendToPianoRoll(
         trackIndex: Int,
         useStrum: Boolean,
+        strumPattern: StepPattern?,
         appendMode: Boolean,
         onComplete: () -> Unit
     ) {
         viewModelScope.launch {
             val bars = progression.value
+            android.util.Log.d("SendToPianoRoll", "ENTRY: trackIndex=$trackIndex, useStrum=$useStrum, bars.size=${bars.size}, tracks.size=${tracks.value.size}")
             if (bars.isEmpty()) {
                 update { copy(statusMessage = "Add bars to the progression first") }
                 onComplete()
@@ -533,6 +641,7 @@ class ChordViewModel @Inject constructor(
                 update { copy(statusMessage = "Invalid track selected") }
                 onComplete()
                 return@launch
+
             }
 
             val targetTrack = trackList[trackIndex]
@@ -591,8 +700,10 @@ class ChordViewModel @Inject constructor(
                 }
             }
 
+            android.util.Log.d("SendToPianoRoll", "Saving ${notes.size} notes to track ${targetTrack.id} (${targetTrack.name})")
             repository.saveNotes(notes)
             update { copy(statusMessage = "Sent ${notes.size} notes to ${targetTrack.name}") }
+            android.util.Log.d("SendToPianoRoll", "DONE - statusMessage updated")
             onComplete()
         }
     }
