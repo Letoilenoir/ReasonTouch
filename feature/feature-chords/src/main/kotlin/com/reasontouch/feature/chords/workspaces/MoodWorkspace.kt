@@ -87,7 +87,6 @@ fun MoodWorkspace(
     var howItWorksExpanded by remember { mutableStateOf(false) }
     var showSendDialog by remember { mutableStateOf(false) }
     var selectedTrackIndex by remember { mutableStateOf(0) }
-    var useStrum by remember { mutableStateOf(false) }
     var pendingProgressionChords by remember { mutableStateOf<List<String>>(emptyList()) }
     var pendingStrumPattern by remember { mutableStateOf<StepPattern?>(null) }
     val trackList by viewModel.tracks.collectAsState()
@@ -211,7 +210,7 @@ fun MoodWorkspace(
         SendProgressionToPianoRollDialog(
             progression = pendingProgressionChords,
             tracks = trackList,  // ← USE ACTUAL TRACKS
-            onConfirm = { trackIndex, useStrum, appendMode ->
+            onConfirm = { trackIndex, appendMode ->
 
                 viewModel.sendProgressionToPianoRoll(
                     chordNames = pendingProgressionChords,
@@ -233,7 +232,7 @@ fun MoodWorkspace(
 private fun SendProgressionToPianoRollDialog(
     progression: List<String>,
     tracks: List<Any>,
-    onConfirm: (trackIndex: Int, useStrum: Boolean, appendMode: Boolean) -> Unit,
+    onConfirm: (trackIndex: Int, appendMode: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     var selectedTrackIndex by remember { mutableStateOf(0) }
@@ -301,46 +300,7 @@ private fun SendProgressionToPianoRollDialog(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                Text(
-                    "Mode",
-                    color = TEXT_DIM,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.sp
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf(false to "Block", true to "Strum")
-                        .forEach { (mode, label) ->
-                            val active = useStrum == mode
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(if (active) ACCENT.copy(alpha = 0.2f) else PANEL)
-                                    .border(
-                                        1.dp,
-                                        if (active) ACCENT else BORDER,
-                                        RoundedCornerShape(4.dp)
-                                    )
-                                    .clickable { useStrum = mode }
-                                    .padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    label,
-                                    color = if (active) ACCENT else TEXT_DIM,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                        }
-                }
 
-                Spacer(modifier = Modifier.height(4.dp))
 
                 Row(
                     modifier = Modifier
@@ -372,7 +332,7 @@ private fun SendProgressionToPianoRollDialog(
         },
         confirmButton = {
             androidx.compose.material3.Button(
-                onClick = { onConfirm(selectedTrackIndex, useStrum, appendMode) },
+                onClick = { onConfirm(selectedTrackIndex,appendMode) },
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                     containerColor = ACCENT
                 )
