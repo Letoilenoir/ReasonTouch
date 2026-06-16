@@ -47,6 +47,7 @@ import kotlinx.coroutines.delay
 import com.reasontouch.core.ui.components.StrumPatternTray
 import com.reasontouch.feature.chords.StepPattern
 import com.reasontouch.feature.chords.StrumPatterns
+import com.reasontouch.feature.chords.components.SendProgressionToPianoRollDialog
 
 private val BG = Color(0xFF1A1A1E)
 private val PANEL = Color(0xFF2A2A32)
@@ -208,9 +209,9 @@ fun MoodWorkspace(
 // Send to Piano Roll Dialog
     if (showSendDialog) {
         SendProgressionToPianoRollDialog(
-            progression = pendingProgressionChords,
-            tracks = trackList,  // ← USE ACTUAL TRACKS
-            onConfirm = { trackIndex, appendMode ->
+        trackList = trackList,
+        onDismiss = { showSendDialog = false },
+        onConfirm = { trackIndex, appendMode ->
 
                 viewModel.sendProgressionToPianoRoll(
                     chordNames = pendingProgressionChords,
@@ -222,140 +223,11 @@ fun MoodWorkspace(
                         selectedMood = null
                     }
                 )
-            },
-            onDismiss = { showSendDialog = false }
+            }
         )
     }
 }
 
-@Composable
-private fun SendProgressionToPianoRollDialog(
-    progression: List<String>,
-    tracks: List<Any>,
-    onConfirm: (trackIndex: Int, appendMode: Boolean) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var selectedTrackIndex by remember { mutableStateOf(0) }
-    var useStrum by remember { mutableStateOf(false) }
-    var appendMode by remember { mutableStateOf(false) }
-
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = PANEL,
-        titleContentColor = ACCENT,
-        textContentColor = TEXT,
-        title = {
-            Text(
-                "SEND TO PIANO ROLL",
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp,
-                fontSize = 14.sp
-            )
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // TRACK SELECTOR
-                if (tracks.isNotEmpty()) {
-                    Text(
-                        "Track",
-                        color = TEXT_DIM,
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 1.sp
-                    )
-                    androidx.compose.foundation.lazy.LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(tracks.size) { index ->
-                            val track = tracks[index] as? MidiTrack
-                            val isSelected = selectedTrackIndex == index
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(if (isSelected) ACCENT.copy(alpha = 0.2f) else PANEL)
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) ACCENT else BORDER,
-                                        RoundedCornerShape(4.dp)
-                                    )
-                                    .clickable { selectedTrackIndex = index }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    track?.name ?: "Track $index",
-                                    color = if (isSelected) ACCENT else TEXT_DIM,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(if (appendMode) BORDER.copy(alpha = 0.3f) else PANEL)
-                        .border(1.dp, if (appendMode) ACCENT else BORDER, RoundedCornerShape(4.dp))
-                        .clickable { appendMode = !appendMode }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        "Append to existing",
-                        color = if (appendMode) ACCENT else TEXT_DIM,
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    androidx.compose.material3.Switch(
-                        checked = appendMode,
-                        onCheckedChange = { appendMode = it },
-                        colors = androidx.compose.material3.SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = ACCENT
-                        )
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            androidx.compose.material3.Button(
-                onClick = { onConfirm(selectedTrackIndex,appendMode) },
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = ACCENT
-                )
-            ) {
-                Text(
-                    "SEND",
-                    color = Color.White,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        },
-        dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text(
-                    "CANCEL",
-                    color = TEXT_DIM,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
-        }
-    )
-}  // ← MoodWorkspace closing brace
 
 @Composable
 private fun CollapsibleHeaderTray(

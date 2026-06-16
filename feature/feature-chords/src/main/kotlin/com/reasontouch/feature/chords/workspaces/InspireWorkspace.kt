@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +30,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reasontouch.core.ui.components.StrumPatternTray
+import com.reasontouch.feature.chords.ChordViewModel
+import com.reasontouch.feature.chords.StrumPatterns
+import com.reasontouch.feature.chords.components.SendProgressionToPianoRollDialog
 
 private val BG = Color(0xFF1A1A1E)
 private val PANEL = Color(0xFF2A2A32)
@@ -37,14 +42,20 @@ private val ACCENT = Color(0xFFE84040)
 private val TEXT = Color(0xFFC8C8D4)
 private val TEXT_DIM = Color(0xFF666675)
 private val BLUE = Color(0xFF38BDF8)
+private val GREEN = Color(0xFF3DDC84)
 
 @Composable
 fun InspireWorkspace(
+    viewModel: ChordViewModel,
     onGenerateProgression: () -> Unit,
     onContinue: () -> Unit = {}
 ) {
+    val trackList by viewModel.tracks.collectAsState()
+
     var isGenerating by remember { mutableStateOf(false) }
     var suggestedProgression by remember { mutableStateOf<List<String>?>(null) }
+    var selectedStrumPattern by remember { mutableStateOf(StrumPatterns.groups["Core"]?.get("Clear")) }
+    var showSendDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
@@ -67,7 +78,6 @@ fun InspireWorkspace(
                 onClick = {
                     isGenerating = true
                     onGenerateProgression()
-                    // Simulate generation delay
                     suggestedProgression = listOf("Cmaj7", "Am7", "Dmaj7", "G7")
                     isGenerating = false
                 }
@@ -104,20 +114,54 @@ fun InspireWorkspace(
 
         if (suggestedProgression != null && !isGenerating) {
             item {
-                ProgressionPreview(
+                ProgressionPreviewWithPlay(
                     progression = suggestedProgression!!,
-                    onAccept = onContinue,
+                    viewModel = viewModel,
                     onRegenerate = {
                         isGenerating = true
                         suggestedProgression = null
-                    }
+                    },
+                    onAccept = { showSendDialog = true }
                 )
+            }
+
+            item {
+                StrumPatternTray(
+                    selectedPattern = selectedStrumPattern,
+                    onPatternSelected = { selectedStrumPattern = it },
+                    patterns = StrumPatterns.groups,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
 
         item {
             Spacer(modifier = Modifier.height(20.dp))
         }
+    }
+
+    // SEND DIALOG
+    if (showSendDialog && suggestedProgression != null && selectedStrumPattern != null) {
+        SendProgressionToPianoRollDialog(
+            trackList = trackList,
+            onDismiss = { showSendDialog = false },
+            onConfirm = { trackIndex, appendMode ->
+                viewModel.sendProgressionToPianoRoll(
+                    chordNames = suggestedProgression!!,
+                    strumPattern = selectedStrumPattern!!,
+                    trackIndex = trackIndex,
+                    appendMode = appendMode,
+                    onComplete = {
+                        showSendDialog = false
+                        onContinue()
+                    }
+                )
+            }
+        )
     }
 }
 
@@ -161,7 +205,7 @@ fun InspireDescription() {
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = "1. Generate a random progression\n2. Review the suggested chords\n3. Accept and start composing\n4. Modify or regenerate anytime",
+            text = "1. Generate a random progression\n2. Preview the chords\n3. Select a strum pattern\n4. Send to piano roll",
             color = TEXT_DIM,
             fontSize = 9.sp,
             fontFamily = FontFamily.Monospace,
@@ -195,10 +239,11 @@ fun GenerateButton(
 }
 
 @Composable
-fun ProgressionPreview(
+fun ProgressionPreviewWithPlay(
     progression: List<String>,
-    onAccept: () -> Unit,
-    onRegenerate: () -> Unit
+    viewModel: ChordViewModel,
+    onRegenerate: () -> Unit,
+    onAccept: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -282,14 +327,34 @@ fun ProgressionPreview(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFF3DDC84))
+                    .background(GREEN)
+                    .clickable(onClick = {
+                        viewModel.playProgression(progression, null)
+                    })
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "▶ PLAY",
+                    color = Color.Black,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(ACCENT)
                     .clickable(onClick = onAccept)
                     .padding(vertical = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     "ACCEPT",
-                    color = Color.Black,
+                    color = Color.White,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace

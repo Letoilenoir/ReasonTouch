@@ -26,7 +26,7 @@ fun ChordScreenV2(
     viewModel: ChordViewModel = hiltViewModel()
 ) {
     val ui by viewModel.ui.collectAsState()
-    
+
     val compositionMode = remember { mutableStateOf(CompositionMode.ASSISTED) }
     val selectedStartingPoint = remember { mutableStateOf<StartingPoint?>(null) }
 
@@ -79,10 +79,14 @@ fun ChordScreenV2(
                             onContinue = { }
                         )
                         "Inspire" -> InspireWorkspace(
-                            onGenerateProgression = { }
+                            viewModel = viewModel,
+                            onGenerateProgression = { },
+                            onContinue = { }
                         )
                         "Progression" -> ProgressionWorkspace(
-                            onProgressionSelected = { template -> }
+                            viewModel = viewModel,
+                            onProgressionSelected = { template -> },
+                            onContinue = { }
                         )
                         else -> ManualWorkspace(viewModel = viewModel)
                     }
@@ -97,6 +101,3 @@ fun ChordScreenV2(
         }
     }
 }
-
-
-

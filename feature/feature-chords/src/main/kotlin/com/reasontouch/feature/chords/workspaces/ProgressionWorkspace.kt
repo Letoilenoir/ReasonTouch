@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +29,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reasontouch.core.ui.components.StrumPatternTray
+import com.reasontouch.feature.chords.ChordViewModel
+import com.reasontouch.feature.chords.StrumPatterns
+import com.reasontouch.feature.chords.components.SendProgressionToPianoRollDialog
 
 private val BG = Color(0xFF1A1A1E)
 private val PANEL = Color(0xFF2A2A32)
@@ -36,6 +41,7 @@ private val ACCENT = Color(0xFFE84040)
 private val TEXT = Color(0xFFC8C8D4)
 private val TEXT_DIM = Color(0xFF666675)
 private val GOLD = Color(0xFFF5C518)
+private val GREEN = Color(0xFF3DDC84)
 
 data class ProgressionTemplate(
     val name: String,
@@ -55,7 +61,7 @@ val PROGRESSION_TEMPLATES = listOf(
     ),
     ProgressionTemplate(
         "Jazz Turnaround",
-        listOf("Cmaj7", "Bm7b5", "E7", "Am7"),
+        listOf("Cmaj7", "Bm7", "E7", "Am7"),
         "Jazz",
         "Sophisticated",
         "Advanced"
@@ -76,14 +82,14 @@ val PROGRESSION_TEMPLATES = listOf(
     ),
     ProgressionTemplate(
         "Modal Vamp",
-        listOf("Dm7", "G", "Dm7", "G"),
+        listOf("Dm", "G", "Dm", "G"),
         "Contemporary",
         "Contemplative",
         "Intermediate"
     ),
     ProgressionTemplate(
         "Diminished Tension",
-        listOf("Cmaj7", "Bdim7", "Cmaj7", "Bdim7"),
+        listOf("Cmaj7", "Bdim", "Cmaj7", "Bdim"),
         "Modern",
         "Dramatic",
         "Advanced"
@@ -92,10 +98,15 @@ val PROGRESSION_TEMPLATES = listOf(
 
 @Composable
 fun ProgressionWorkspace(
+    viewModel: ChordViewModel,
     onProgressionSelected: (ProgressionTemplate) -> Unit,
     onContinue: () -> Unit = {}
 ) {
+    val trackList by viewModel.tracks.collectAsState()
+
     var selectedProgression by remember { mutableStateOf<ProgressionTemplate?>(null) }
+    var selectedStrumPattern by remember { mutableStateOf(StrumPatterns.groups["Core"]?.get("Clear")) }
+    var showSendDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
@@ -122,23 +133,47 @@ fun ProgressionWorkspace(
                 modifier = Modifier.padding(bottom = 4.dp)
             )
         }
-
-        items(PROGRESSION_TEMPLATES) { template ->
-            ProgressionTemplateCard(
-                template = template,
-                isSelected = selectedProgression == template,
-                onSelect = {
-                    selectedProgression = template
-                    onProgressionSelected(template)
-                }
-            )
+        if (selectedProgression == null) {
+            items(PROGRESSION_TEMPLATES) { template ->
+                ProgressionTemplateCard(
+                    template = template,
+                    isSelected = selectedProgression == template,
+                    onSelect = {
+                        selectedProgression = template
+                        onProgressionSelected(template)
+                    },
+                    onPlay = {
+                        viewModel.playProgression(template.chords, null)
+                    }
+                )
+            }
+        } else {
+            item {
+                ProgressionTemplateCard(
+                    template = selectedProgression!!,
+                    isSelected = true,
+                    onSelect = { },
+                    onPlay = {
+                        viewModel.playProgression(selectedProgression!!.chords, null)
+                    }
+                )
+            }
         }
 
         if (selectedProgression != null) {
             item {
+                StrumPatternTray(
+                    selectedPattern = selectedStrumPattern,
+                    onPatternSelected = { selectedStrumPattern = it },
+                    patterns = StrumPatterns.groups,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
                 ProgressionAcceptBar(
                     template = selectedProgression!!,
-                    onContinue = onContinue
+                    onContinue = { showSendDialog = true }
                 )
             }
         }
@@ -146,6 +181,26 @@ fun ProgressionWorkspace(
         item {
             Spacer(modifier = Modifier.height(20.dp))
         }
+    }
+
+    // SEND DIALOG
+    if (showSendDialog && selectedProgression != null && selectedStrumPattern != null) {
+        SendProgressionToPianoRollDialog(
+            trackList = trackList,
+            onDismiss = { showSendDialog = false },
+            onConfirm = { trackIndex, appendMode ->
+                viewModel.sendProgressionToPianoRoll(
+                    chordNames = selectedProgression!!.chords,
+                    strumPattern = selectedStrumPattern!!,
+                    trackIndex = trackIndex,
+                    appendMode = appendMode,
+                    onComplete = {
+                        showSendDialog = false
+                        onContinue()
+                    }
+                )
+            }
+        )
     }
 }
 
@@ -189,7 +244,7 @@ fun ProgressionDescription() {
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = "1. Select a progression template\n2. Customize voicings and patterns\n3. Extend or simplify as needed\n4. Learn the harmonic principles",
+            text = "1. Select a progression template\n2. Audition with Play button\n3. Choose strum pattern\n4. Send to piano roll",
             color = TEXT_DIM,
             fontSize = 9.sp,
             fontFamily = FontFamily.Monospace,
@@ -202,7 +257,8 @@ fun ProgressionDescription() {
 fun ProgressionTemplateCard(
     template: ProgressionTemplate,
     isSelected: Boolean,
-    onSelect: () -> Unit
+    onSelect: () -> Unit,
+    onPlay: () -> Unit
 ) {
     val bgColor = if (isSelected) Color(0xFF2A2A1A) else PANEL
     val borderColor = if (isSelected) GOLD else BORDER
@@ -281,12 +337,36 @@ fun ProgressionTemplateCard(
                 }
             }
 
-            Text(
-                text = "Mood: ${template.mood}",
-                color = TEXT_DIM,
-                fontSize = 8.sp,
-                fontFamily = FontFamily.Monospace
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Mood: ${template.mood}",
+                    color = TEXT_DIM,
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Color(0xFF1A2A2A))
+                        .border(1.dp, GREEN.copy(alpha = 0.4f), RoundedCornerShape(3.dp))
+                        .clickable(onClick = onPlay)
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "▶ PLAY",
+                        color = GREEN,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
         }
     }
 }
@@ -301,14 +381,14 @@ fun ProgressionAcceptBar(
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
             .background(Color(0xFF1A2A1A))
-            .border(1.dp, Color(0xFF3DDC84).copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+            .border(1.dp, GREEN.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
             .clickable(onClick = onContinue)
             .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = "✓ START WITH THIS PROGRESSION",
-            color = Color(0xFF3DDC84),
+            color = GREEN,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace
