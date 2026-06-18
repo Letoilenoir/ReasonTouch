@@ -57,6 +57,8 @@ fun InspireWorkspace(
     var selectedStrumPattern by remember { mutableStateOf(StrumPatterns.groups["Core"]?.get("Clear")) }
     var showSendDialog by remember { mutableStateOf(false) }
 
+
+
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
@@ -77,8 +79,8 @@ fun InspireWorkspace(
                 isGenerating = isGenerating,
                 onClick = {
                     isGenerating = true
-                    onGenerateProgression()
-                    suggestedProgression = listOf("Cmaj7", "Am7", "Dmaj7", "G7")
+                    onGenerateProgression()  // ← Slow async call
+                    suggestedProgression = listOf("C", "Am", "F", "G")
                     isGenerating = false
                 }
             )
@@ -118,8 +120,26 @@ fun InspireWorkspace(
                     progression = suggestedProgression!!,
                     viewModel = viewModel,
                     onRegenerate = {
-                        isGenerating = true
-                        suggestedProgression = null
+                        // Instant random selection, no async
+                        val templates = listOf(
+                            listOf("C", "Am", "F", "G"),           // Pop classic
+                            listOf("Am", "F", "C", "G"),           // Minor start
+                            listOf("C7", "F7", "C7", "G7"),        // Blues
+                            listOf("Dm", "G", "Dm", "G"),          // Modal vamp
+                            listOf("C", "Bdim", "C", "Bdim"),      // Diminished
+                            listOf("Cmaj7", "Bm7", "Em7", "Am7"),  // Jazz
+                            listOf("C", "F", "G"),                 // I-IV-V
+                            listOf("C", "G", "Am", "F"),           // I-V-vi-IV
+                            listOf("C", "Am", "Dm", "G"),          // I-vi-ii-V
+                            listOf("Am", "Dm", "G", "C"),          // vi-ii-V-I
+                            listOf("C", "Em", "Am", "F"),          // I-iii-vi-IV
+                            listOf("Dm", "G", "C", "F"),           // ii-V-I-IV
+                            listOf("Am", "F", "G"),                // vi-IV-V
+                            listOf("C", "F", "C", "G"),            // I-IV-I-V
+                            listOf("Em", "Am", "Dm", "G"),         // iii-vi-ii-V
+                            listOf("G", "F", "C"),                 // V-IV-I
+                        )
+                        suggestedProgression = templates.random()
                     },
                     onAccept = { showSendDialog = true }
                 )

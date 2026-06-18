@@ -54,14 +54,14 @@ data class ProgressionTemplate(
 val PROGRESSION_TEMPLATES = listOf(
     ProgressionTemplate(
         "I-vi-IV-V",
-        listOf("Cmaj", "Am", "F", "G"),
+        listOf("C", "Am", "F", "G"),
         "Pop",
         "Balanced",
         "Beginner"
     ),
     ProgressionTemplate(
         "Jazz Turnaround",
-        listOf("Cmaj7", "Bm7", "E7", "Am7"),
+        listOf("C7", "Bm7", "Em7", "Am7"),
         "Jazz",
         "Sophisticated",
         "Advanced"
@@ -89,7 +89,7 @@ val PROGRESSION_TEMPLATES = listOf(
     ),
     ProgressionTemplate(
         "Diminished Tension",
-        listOf("Cmaj7", "Bdim", "Cmaj7", "Bdim"),
+        listOf("C7", "Bdim", "C7", "Bdim"),
         "Modern",
         "Dramatic",
         "Advanced"

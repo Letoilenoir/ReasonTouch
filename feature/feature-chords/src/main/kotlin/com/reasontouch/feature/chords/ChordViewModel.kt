@@ -560,7 +560,12 @@ class ChordViewModel @Inject constructor(
 
             chordNames.forEachIndexed { barIndex, chordName ->
                 val beatStart = (barIndex * beatsPerBar) + appendOffset
-                val midiNotes = GuitarVoicings.voicings[chordName]?.get("Open")?.filterNotNull() ?: emptyList()
+
+                // Try "Open" first, fallback to first available voicing
+                val voicing = GuitarVoicings.voicings[chordName]?.get("Open")
+                    ?: GuitarVoicings.voicings[chordName]?.values?.firstOrNull()
+
+                val midiNotes = voicing?.filterNotNull() ?: emptyList()
 
                 android.util.Log.d("SendProgression", "Bar $barIndex: $chordName -> ${midiNotes.size} notes")
 

@@ -61,13 +61,6 @@ val STARTING_POINTS = listOf(
         "🎸",
         "Start with a classic progression. Understand harmonic structure.",
         Color(0xFFF5C518)
-    ),
-    StartingPoint(
-        "Manual",
-        "Total freedom",
-        "✏️",
-        "No suggestions. Build exactly what you hear, no theory limits.",
-        Color(0xFF3DDC84)
     )
 )
 
@@ -82,24 +75,11 @@ fun StartingPointSelector(
             .padding(horizontal = 12.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
-            SelectorHeader()
-        }
 
-        item {
-            SelectorDescription()
-        }
 
-        item {
-            Text(
-                text = "CHOOSE YOUR STARTING POINT",
-                color = TEXT_DIM,
-                fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 2.sp,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-        }
+
+
+
 
         items(STARTING_POINTS) { point ->
             StartingPointCard(
@@ -114,54 +94,8 @@ fun StartingPointSelector(
     }
 }
 
-@Composable
-fun SelectorHeader() {
-    Column {
-        Text(
-            text = "🤖  ASSISTED MODE",
-            color = ACCENT,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 1.sp
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Music theory available as suggestions. You're in control.",
-            color = TEXT_DIM,
-            fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace
-        )
-    }
-}
 
-@Composable
-fun SelectorDescription() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF1A1A28))
-            .border(1.dp, ACCENT.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-            .padding(12.dp)
-    ) {
-        Text(
-            text = "Assisted mode offers intelligent suggestions without forcing theory.",
-            color = TEXT_DIM,
-            fontSize = 10.sp,
-            fontFamily = FontFamily.Monospace,
-            lineHeight = 13.sp
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "• Accept suggestions to learn harmonic progression\n• Reject suggestions to explore unconventional ideas\n• Switch to Manual anytime for complete freedom",
-            color = TEXT_DIM,
-            fontSize = 9.sp,
-            fontFamily = FontFamily.Monospace,
-            lineHeight = 12.sp
-        )
-    }
-}
+
 
 @Composable
 fun StartingPointCard(
