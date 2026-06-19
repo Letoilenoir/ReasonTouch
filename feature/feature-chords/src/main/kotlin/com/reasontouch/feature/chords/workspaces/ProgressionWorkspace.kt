@@ -107,6 +107,7 @@ fun ProgressionWorkspace(
     var selectedProgression by remember { mutableStateOf<ProgressionTemplate?>(null) }
     var selectedStrumPattern by remember { mutableStateOf(StrumPatterns.groups["Core"]?.get("Clear")) }
     var showSendDialog by remember { mutableStateOf(false) }
+    var showProgressionDescriptor by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
@@ -116,11 +117,83 @@ fun ProgressionWorkspace(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            ProgressionHeader()
-        }
+            if (showProgressionDescriptor) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(PANEL)
+                        .border(1.dp, BORDER, RoundedCornerShape(8.dp))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "🎸  PROGRESSION TEMPLATES",
+                            color = GOLD,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(Color(0xFF3A3A45))
+                                .clickable { showProgressionDescriptor = false }
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                "✕",
+                                color = TEXT_DIM,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
 
-        item {
-            ProgressionDescription()
+                    Text(
+                        text = "Start with a classic progression. Great for learning harmonic structure.",
+                        color = TEXT_DIM,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "How it works:\n1. Select a progression template\n2. Audition with Play button\n3. Choose strum pattern\n4. Send to piano roll",
+                        color = TEXT_DIM,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        lineHeight = 14.sp
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(PANEL)
+                        .border(1.dp, BORDER, RoundedCornerShape(4.dp))
+                        .clickable { showProgressionDescriptor = true }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "ℹ SHOW PROGRESSION INFO",
+                        color = TEXT_DIM,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
         }
 
         item {
@@ -204,54 +277,8 @@ fun ProgressionWorkspace(
     }
 }
 
-@Composable
-fun ProgressionHeader() {
-    Column {
-        Text(
-            text = "🎵  PROGRESSION TEMPLATES",
-            color = GOLD,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 1.sp
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Start with a classic progression. Great for learning harmonic structure.",
-            color = TEXT_DIM,
-            fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace
-        )
-    }
-}
 
-@Composable
-fun ProgressionDescription() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF1A1A28))
-            .border(1.dp, GOLD.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-            .padding(12.dp)
-    ) {
-        Text(
-            text = "How it works:",
-            color = GOLD,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "1. Select a progression template\n2. Audition with Play button\n3. Choose strum pattern\n4. Send to piano roll",
-            color = TEXT_DIM,
-            fontSize = 9.sp,
-            fontFamily = FontFamily.Monospace,
-            lineHeight = 14.sp
-        )
-    }
-}
+
 
 @Composable
 fun ProgressionTemplateCard(

@@ -84,9 +84,7 @@ fun MoodWorkspace(
 ) {
     var selectedMood by remember { mutableStateOf<Mood?>(null) }
     var moodBiasFine by remember { mutableStateOf(0f) }
-    var headerExpanded by remember { mutableStateOf(true) }
-    var showMoodDescriptor by remember { mutableStateOf(true) }
-    var howItWorksExpanded by remember { mutableStateOf(false) }
+    var showMoodDescriptor by remember { mutableStateOf(false) }
     var showSendDialog by remember { mutableStateOf(false) }
     var selectedTrackIndex by remember { mutableStateOf(0) }
     var pendingProgressionChords by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -105,13 +103,74 @@ fun MoodWorkspace(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (selectedMood == null) {
-                item {
+            item {
+                if (selectedMood == null) {
                     if (showMoodDescriptor) {
-                        CollapsibleHeaderTray(
-                            isExpanded = headerExpanded,
-                            onToggle = { headerExpanded = !headerExpanded }
-                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(PANEL)
+                                .border(1.dp, BORDER, RoundedCornerShape(8.dp))
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "🎵 MOOD-DRIVEN COMPOSITION",
+                                    color = ACCENT,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    letterSpacing = 1.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(Color(0xFF3A3A45))
+                                        .clickable { showMoodDescriptor = false }
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        "✕",
+                                        color = TEXT_DIM,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            Text(
+                                text = "Start with a feeling. The harmony engine will suggest compatible chords.",
+                                color = TEXT_DIM,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                lineHeight = 12.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = "How it works:",
+                                color = TEXT_DIM,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+
+                            Text(
+                                text = "1. Choose a mood\n2. Refine the exact harmonic character\n3. Build your progression with AI-suggested chords\n4. Switch modes anytime",
+                                color = TEXT_DIM,
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                lineHeight = 13.sp
+                            )
+                        }
                     } else {
                         Box(
                             modifier = Modifier
@@ -132,20 +191,7 @@ fun MoodWorkspace(
                             )
                         }
                     }
-                }
-
-                item {
-                    CollapsibleHowItWorksTray(
-                        isExpanded = howItWorksExpanded,
-                        onToggle = { howItWorksExpanded = !howItWorksExpanded }
-                    )
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-            } else {
-                item {
+                } else {
                     SuggestedProgressionDisplay(
                         mood = selectedMood!!,
                         harmonyBias = moodBiasFine,
@@ -160,10 +206,10 @@ fun MoodWorkspace(
                         }
                     )
                 }
+            }
 
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
             item {
@@ -226,8 +272,7 @@ fun MoodWorkspace(
                 Spacer(modifier = Modifier.height(20.dp))
             }
         }
-    }  // ← LazyColumn closing brace
-
+    }
 // Send to Piano Roll Dialog
     if (showSendDialog) {
         SendProgressionToPianoRollDialog(
@@ -303,58 +348,7 @@ private fun CollapsibleHeaderTray(
     }
 }
 
-@Composable
-private fun CollapsibleHowItWorksTray(
-    isExpanded: Boolean,
-    onToggle: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(INFO_BG)
-            .border(1.dp, INFO_BORDER.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-            .clickable(onClick = onToggle)
-            .padding(12.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(40.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "ℹ  How it works",
-                color = TEXT_DIM,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                imageVector = if (isExpanded) Icons.Default.Clear else Icons.Default.Add,
-                contentDescription = if (isExpanded) "Collapse" else "Expand",
-                tint = TEXT_DIM,
-                modifier = Modifier.size(20.dp)
-            )
-        }
 
-        if (isExpanded) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "1. Choose a mood\n" +
-                        "2. Refine the exact harmonic character\n" +
-                        "3. Build your progression with AI-suggested chords\n" +
-                        "4. Switch modes anytime",
-                color = TEXT_DIM,
-                fontSize = 9.sp,
-                fontFamily = FontFamily.Monospace,
-                lineHeight = 13.sp
-            )
-        }
-    }
-}
 
 @Composable
 private fun SuggestedProgressionDisplay(

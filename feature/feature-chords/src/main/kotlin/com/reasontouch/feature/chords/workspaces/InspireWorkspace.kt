@@ -56,7 +56,7 @@ fun InspireWorkspace(
     var suggestedProgression by remember { mutableStateOf<List<String>?>(null) }
     var selectedStrumPattern by remember { mutableStateOf(StrumPatterns.groups["Core"]?.get("Clear")) }
     var showSendDialog by remember { mutableStateOf(false) }
-
+    var showInspireDescriptor by remember { mutableStateOf(false) }
 
 
     LazyColumn(
@@ -67,11 +67,83 @@ fun InspireWorkspace(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            InspireHeader()
-        }
+            if (showInspireDescriptor) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(PANEL)
+                        .border(1.dp, BORDER, RoundedCornerShape(8.dp))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "✨  INSPIRATION MODE",
+                            color = BLUE,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(Color(0xFF3A3A45))
+                                .clickable { showInspireDescriptor = false }
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                "✕",
+                                color = TEXT_DIM,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
 
-        item {
-            InspireDescription()
+                    Text(
+                        text = "Let the system suggest a complete progression. Perfect for creative block.",
+                        color = TEXT_DIM,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "How it works:\n1. Generate a random progression\n2. Preview the chords\n3. Select a strum pattern\n4. Send to piano roll",
+                        color = TEXT_DIM,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        lineHeight = 14.sp
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(PANEL)
+                        .border(1.dp, BORDER, RoundedCornerShape(4.dp))
+                        .clickable { showInspireDescriptor = true }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "ℹ SHOW INSPIRE INFO",
+                        color = TEXT_DIM,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
         }
 
         item {
@@ -185,54 +257,7 @@ fun InspireWorkspace(
     }
 }
 
-@Composable
-fun InspireHeader() {
-    Column {
-        Text(
-            text = "✨  INSPIRATION MODE",
-            color = BLUE,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 1.sp
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Let the system suggest a complete progression. Perfect for creative block.",
-            color = TEXT_DIM,
-            fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace
-        )
-    }
-}
 
-@Composable
-fun InspireDescription() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF1A1A28))
-            .border(1.dp, BLUE.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-            .padding(12.dp)
-    ) {
-        Text(
-            text = "How it works:",
-            color = BLUE,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "1. Generate a random progression\n2. Preview the chords\n3. Select a strum pattern\n4. Send to piano roll",
-            color = TEXT_DIM,
-            fontSize = 9.sp,
-            fontFamily = FontFamily.Monospace,
-            lineHeight = 14.sp
-        )
-    }
-}
 
 @Composable
 fun GenerateButton(
