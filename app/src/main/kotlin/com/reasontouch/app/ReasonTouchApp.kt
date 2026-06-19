@@ -45,6 +45,7 @@ import com.reasontouch.feature.export.ExportViewModel
 import com.reasontouch.feature.pianoroll.TransportControls
 import com.reasontouch.core.playback.PlaybackViewModel
 import com.reasontouch.core.ui.theme.ReasonTouchTheme
+import com.reasontouch.feature.chords.ChordViewModel
 
 
 private val RACK   = Color(0xFF222228)
@@ -70,6 +71,8 @@ fun ReasonTouchApp(repository: SessionRepository) {
 
         val currentSessionId =
             navBackStackEntry?.arguments?.getString("sessionId") ?: ""
+
+        var onBackAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
         Column(
             modifier = Modifier
@@ -101,7 +104,12 @@ fun ReasonTouchApp(repository: SessionRepository) {
                         backStackEntry.arguments?.getString("sessionId")
                             ?: return@composable
 
-                    com.reasontouch.feature.chords.ChordScreenV2()
+                    val chordVm: ChordViewModel = hiltViewModel()
+
+                    com.reasontouch.feature.chords.ChordScreenV2(
+                        viewModel = chordVm,
+                        onSetBackAction = { action -> onBackAction = action }
+                    )
                 }
 
                 composable(Screen.PianoRoll.route) { backStackEntry ->
@@ -218,6 +226,26 @@ fun ReasonTouchApp(repository: SessionRepository) {
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
                         )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // BACK BUTTON
+                    if (onBackAction != null) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFFE84040).copy(alpha = 0.8f))
+                                .clickable { onBackAction?.invoke() }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "← BACK",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
                     }
 
                     // SPACE BETWEEN SESSION + TRANSPORT

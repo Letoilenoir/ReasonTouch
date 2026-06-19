@@ -32,16 +32,28 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.reasontouch.feature.chords.components.CompositionModeBar
 import com.reasontouch.feature.chords.workspaces.*
 import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun ChordScreenV2(
-    viewModel: ChordViewModel = hiltViewModel()
+    viewModel: ChordViewModel = hiltViewModel(),
+    onSetBackAction: (((() -> Unit)?) -> Unit)? = null
 ) {
     val ui by viewModel.ui.collectAsState()
 
     val compositionMode = remember { mutableStateOf(CompositionMode.ASSISTED) }
     val selectedStartingPoint = remember { mutableStateOf<StartingPoint?>(null) }
     var showAssistedDescriptor by remember { mutableStateOf(true) }  // ← ADD
+    LaunchedEffect(selectedStartingPoint.value) {
+        onSetBackAction?.invoke(
+            if (selectedStartingPoint.value != null) {
+                { selectedStartingPoint.value = null }
+            } else {
+                null
+            }
+        )
+    }
+
 
     Column(
         modifier = Modifier

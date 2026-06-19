@@ -85,6 +85,7 @@ fun MoodWorkspace(
     var selectedMood by remember { mutableStateOf<Mood?>(null) }
     var moodBiasFine by remember { mutableStateOf(0f) }
     var headerExpanded by remember { mutableStateOf(true) }
+    var showMoodDescriptor by remember { mutableStateOf(true) }
     var howItWorksExpanded by remember { mutableStateOf(false) }
     var showSendDialog by remember { mutableStateOf(false) }
     var selectedTrackIndex by remember { mutableStateOf(0) }
@@ -106,10 +107,31 @@ fun MoodWorkspace(
         ) {
             if (selectedMood == null) {
                 item {
-                    CollapsibleHeaderTray(
-                        isExpanded = headerExpanded,
-                        onToggle = { headerExpanded = !headerExpanded }
-                    )
+                    if (showMoodDescriptor) {
+                        CollapsibleHeaderTray(
+                            isExpanded = headerExpanded,
+                            onToggle = { headerExpanded = !headerExpanded }
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(PANEL)
+                                .border(1.dp, BORDER, RoundedCornerShape(4.dp))
+                                .clickable { showMoodDescriptor = true }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "ℹ SHOW MOOD INFO",
+                                color = TEXT_DIM,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
                 }
 
                 item {
@@ -232,7 +254,8 @@ fun MoodWorkspace(
 @Composable
 private fun CollapsibleHeaderTray(
     isExpanded: Boolean,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+
 ) {
     Column(
         modifier = Modifier
@@ -240,7 +263,6 @@ private fun CollapsibleHeaderTray(
             .clip(RoundedCornerShape(8.dp))
             .background(PANEL)
             .border(1.dp, BORDER, RoundedCornerShape(8.dp))
-            .clickable(onClick = onToggle)
             .padding(12.dp)
     ) {
         Row(
@@ -259,6 +281,7 @@ private fun CollapsibleHeaderTray(
                 letterSpacing = 1.sp,
                 modifier = Modifier.weight(1f)
             )
+
             Icon(
                 imageVector = if (isExpanded) Icons.Default.Clear else Icons.Default.Add,
                 contentDescription = if (isExpanded) "Collapse" else "Expand",
