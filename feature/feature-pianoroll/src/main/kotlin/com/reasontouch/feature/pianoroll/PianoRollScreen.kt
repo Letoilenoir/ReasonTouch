@@ -102,8 +102,17 @@ private fun emojiForTrack(trackName: String): String = when (trackName.uppercase
 fun PianoRollScreen(
     sessionId: String,
     viewModel: PianoRollViewModel = hiltViewModel(),
+    onSetBackAction: (((() -> Unit)?) -> Unit)? = null,
+    onNavigateToChords: () -> Unit = {}
 ) {
     val state = remember { PianoRollState() }
+
+    // Register back action immediately
+    LaunchedEffect(Unit) {
+        onSetBackAction?.invoke {
+            onNavigateToChords()
+        }
+    }
 
     val session      by viewModel.session.collectAsState()
     val tracks       by viewModel.tracks.collectAsState()

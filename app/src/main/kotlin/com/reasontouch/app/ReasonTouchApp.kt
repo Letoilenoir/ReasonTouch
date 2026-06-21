@@ -119,7 +119,11 @@ fun ReasonTouchApp(repository: SessionRepository) {
                             ?: return@composable
 
                     com.reasontouch.feature.pianoroll.PianoRollScreen(
-                        sessionId = sessionId
+                        sessionId = sessionId,
+                        onSetBackAction = { action -> onBackAction = action },
+                        onNavigateToChords = {
+                            navController.navigate(Screen.Chords.createRoute(sessionId))
+                        }
                     )
                 }
 
