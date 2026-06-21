@@ -29,10 +29,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.reasontouch.core.ui.components.StrumPatternTray
 import com.reasontouch.feature.chords.ChordViewModel
 import com.reasontouch.feature.chords.StrumPatterns
 import com.reasontouch.feature.chords.components.SendProgressionToPianoRollDialog
+import com.reasontouch.feature.chords.components.StrumPatternTray
 
 private val BG = Color(0xFF1A1A1E)
 private val PANEL = Color(0xFF2A2A32)
