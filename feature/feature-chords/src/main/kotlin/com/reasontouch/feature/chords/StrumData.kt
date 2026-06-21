@@ -1,12 +1,22 @@
 package com.reasontouch.feature.chords
 
 import com.reasontouch.core.midi.StepState
+import java.util.UUID
 
-data class StepPattern(val steps: List<StepState>) {
+data class StepPattern(
+    val steps: List<StepState>,
+    val id: String = UUID.randomUUID().toString()
+) {
     init { require(steps.size == 16) { "Pattern must have exactly 16 steps" } }
+    
     companion object {
-        val EMPTY = StepPattern(List(16) { StepState.OFF })
+        val EMPTY = StepPattern(List(16) { StepState.OFF }, id = "EMPTY")
     }
+    
+    override fun equals(other: Any?): Boolean = 
+        this === other || (other is StepPattern && this.id == other.id)
+    
+    override fun hashCode(): Int = id.hashCode()
 }
 
 object StrumPatterns {
