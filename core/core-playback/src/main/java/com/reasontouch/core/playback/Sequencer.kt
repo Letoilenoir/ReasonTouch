@@ -140,9 +140,13 @@ class Sequencer @Inject constructor(
     }
 
     private fun computeEndBeat(allNotes: Map<String, List<NoteEvent>>): Float {
-        val last = allNotes.values.flatten().maxOfOrNull { it.beat + it.duration } ?: 0f
-        val bars = ceil(last / 4f).toInt().coerceAtLeast(1)
-        return bars * 4f
+        // For COMPOSITION: Find last bar where notes START, round up to next bar
+        val lastNoteBeat = allNotes.values.flatten().maxOfOrNull { it.beat } ?: 0f
+        if (lastNoteBeat <= 0f) return 4f
+
+        // Which bar does the last note occur in? Round up to end of that bar
+        val barContainingNote = ceil(lastNoteBeat / 4f).toInt().coerceAtLeast(1)
+        return (barContainingNote * 4f).toFloat()
     }
 }
 
