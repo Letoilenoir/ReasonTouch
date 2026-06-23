@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reasontouch.core.midi.StepState
 import androidx.compose.foundation.layout.width
+import com.reasontouch.core.ui.components.StepSequencerEditor
+import com.reasontouch.core.ui.components.SequencerMode
 
 
 enum class SequencerMode {
