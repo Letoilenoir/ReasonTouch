@@ -74,7 +74,12 @@ fun ChordScreenV2(
         // WORKSPACE - Use Column for simple layouts, LazyColumn only for scrollable content
         when (compositionMode.value) {
             CompositionMode.MANUAL -> {
-                ManualWorkspace(viewModel = viewModel)
+                ManualWorkspace(
+                    viewModel = viewModel,
+                    onMoodSelected = { },
+                    onAudition = { },
+                    onContinue = { }
+                )
             }
 
             CompositionMode.ASSISTED -> {
