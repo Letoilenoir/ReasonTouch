@@ -167,7 +167,7 @@ class ChordViewModel @Inject constructor(
         val notes = GuitarVoicings.voicings[chord]?.get(pos) ?: return
 
         if (_stepStates.value.all { it == StepState.OFF }) {
-            update { copy(statusMessage = "Set at least one step before adding a bar")Minor adjustments  }
+            update { copy(statusMessage = "Set at least one step before adding a bar") }
             return
         }
 
@@ -676,23 +676,63 @@ class ChordViewModel @Inject constructor(
                 val beatStart = (barIndex * beatsPerBar) + appendOffset
                 val midiNotes = chordEvent.midiNotes.split(",").mapNotNull { it.toIntOrNull() }
 
-                if (useStrum) {
-                    // Apply strum pattern
-                    val strumDelay = (ui.value.strumSpeed * beatsPerBar).toFloat()
-                    midiNotes.forEachIndexed { noteIndex, midiNote ->
-                        notes.add(
-                            NoteEvent(
-                                id = UUID.randomUUID().toString(),
-                                trackId = targetTrack.id,
-                                pitch = 108 - midiNote,
-                                beat = beatStart + (noteIndex * strumDelay),
-                                duration = beatsPerBar - (noteIndex * strumDelay),
-                                velocity = 80
-                            )
-                        )
+                if (useStrum && strumPattern != null) {
+
+                    val activeSteps = strumPattern.steps.mapIndexedNotNull { index, state ->
+                        if (state != StepState.OFF) Pair(index, state) else null
                     }
+
+                    if (activeSteps.isEmpty()) {
+
+                        midiNotes.forEach { midiNote ->
+                            notes.add(
+                                NoteEvent(
+                                    id = UUID.randomUUID().toString(),
+                                    trackId = targetTrack.id,
+                                    pitch = 108 - midiNote,
+                                    beat = beatStart,
+                                    duration = beatsPerBar,
+                                    velocity = 80
+                                )
+                            )
+                        }
+
+                    } else {
+
+                        val beatsPerStep = beatsPerBar / 16f
+
+                        activeSteps.forEach { (stepIndex, stepState) ->
+
+                            val stepBeat = beatStart + (stepIndex * beatsPerStep)
+
+                            val orderedNotes =
+                                if (stepState == StepState.DOWN)
+                                    midiNotes
+                                else
+                                    midiNotes.reversed()
+
+                            orderedNotes.forEachIndexed { noteIndex, midiNote ->
+
+                                val offset =
+                                    (noteIndex * ui.value.strumSpeed).toFloat()
+
+                                notes.add(
+                                    NoteEvent(
+                                        id = UUID.randomUUID().toString(),
+                                        trackId = targetTrack.id,
+                                        pitch = 108 - midiNote,
+                                        beat = stepBeat + offset,
+                                        duration = (beatsPerStep * 0.95f)
+                                            .coerceAtLeast(0.0625f),
+                                        velocity = 80
+                                    )
+                                )
+                            }
+                        }
+                    }
+
                 } else {
-                    // Block mode - all notes together
+
                     midiNotes.forEach { midiNote ->
                         notes.add(
                             NoteEvent(
@@ -705,6 +745,7 @@ class ChordViewModel @Inject constructor(
                             )
                         )
                     }
+
                 }
             }
 
