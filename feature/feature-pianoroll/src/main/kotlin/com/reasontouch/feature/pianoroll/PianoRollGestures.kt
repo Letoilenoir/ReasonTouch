@@ -214,7 +214,24 @@ fun Modifier.verticalScrollBarGestures(
         state.clampScroll(state.gridWidth, state.gridHeight)
     }
 }
+fun Modifier.gridScrollGestures(state: PianoRollState): Modifier =
+    this.pointerInput(Unit) {
+        detectDragGestures { change, dragAmount ->
+            change.consume()
 
+            // Horizontal scroll
+            val totalW = state.totalBeats * state.pixelsPerBeat
+            val ratioX = if (totalW > 0f) totalW / state.gridWidth else 1f
+            state.scrollX = (state.scrollX + dragAmount.x * ratioX).coerceAtLeast(0f)
+
+            // Vertical scroll
+            val totalH = state.totalNotes * state.noteHeight
+            val ratioY = if (totalH > 0f) totalH / state.gridHeight else 1f
+            state.scrollY = (state.scrollY + dragAmount.y * ratioY).coerceAtLeast(0f)
+
+            state.clampScroll(state.gridWidth, state.gridHeight)
+        }
+    }
 fun Modifier.velocityStripGestures(
     state: PianoRollState,
     uiState: PianoRollUiState,

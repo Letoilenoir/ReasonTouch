@@ -49,6 +49,7 @@ fun PianoRollCanvas(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
+                    .gridScrollGestures(state)  // ← Use combined gesture instead
                     .pianoRollGestures(state, uiState, viewModel)
             ) {
                 state.gridWidth  = size.width

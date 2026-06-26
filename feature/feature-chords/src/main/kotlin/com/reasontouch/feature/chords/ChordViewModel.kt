@@ -167,7 +167,7 @@ class ChordViewModel @Inject constructor(
         val notes = GuitarVoicings.voicings[chord]?.get(pos) ?: return
 
         if (_stepStates.value.all { it == StepState.OFF }) {
-            update { copy(statusMessage = "Set at least one step before adding a bar") }
+            update { copy(statusMessage = "Set at least one step before adding a bar")Minor adjustments  }
             return
         }
 
@@ -184,6 +184,11 @@ class ChordViewModel @Inject constructor(
                 strumPatternId = null
             )
             repository.saveChord(chordEvent)
+            val updatedSession = session.value?.copy(totalBars = progression.value.size + 1)
+            if (updatedSession != null) {
+                repository.updateSession(updatedSession)
+            }
+
             update { copy(statusMessage = null) }
         }
     }
@@ -547,11 +552,10 @@ class ChordViewModel @Inject constructor(
             }
 
             val appendOffset = if (appendMode) {
-                val lastBeat = getLastBeatOnTrack(targetTrack.id)
-                if (lastBeat <= 0f) 0f else {
-                    val barsUsed = kotlin.math.ceil(lastBeat / beatsPerBar).toInt()
-                    barsUsed * beatsPerBar
-                }
+                // Append starts at the beginning of the next bar after the current progression
+                // Use progression bar count, not note positions (which may bleed into next bar)
+                val currentProgressionBars = progression.value.size
+                (currentProgressionBars * beatsPerBar).toFloat()
             } else {
                 0f
             }

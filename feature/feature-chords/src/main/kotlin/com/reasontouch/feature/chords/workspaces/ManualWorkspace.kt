@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +36,7 @@ import com.reasontouch.feature.chords.ChordViewModel
 import com.reasontouch.feature.chords.components.StrumPatternTray
 import com.reasontouch.feature.chords.components.SendProgressionToPianoRollDialog
 import com.reasontouch.feature.chords.StrumPatterns
+import com.reasontouch.core.midi.StepState
 
 // Theme colors
 private val PANEL = Color(0xFF2A2A32)
@@ -65,6 +67,8 @@ fun ManualWorkspace(
     var showHarmonyPanel by remember { mutableStateOf(false) }
     var showSendDialog by remember { mutableStateOf(false) }
     var selectedPattern by remember { mutableStateOf<com.reasontouch.feature.chords.StepPattern?>(null) }
+
+    // Auto-apply preset on first non-null pattern selection (handled in StrumPatternTray callback)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         LazyColumn(
@@ -204,6 +208,7 @@ fun ManualWorkspace(
                     selectedPattern = selectedPattern,
                     onPatternSelected = { pattern ->
                         selectedPattern = pattern
+                        viewModel.applyPreset(pattern)  // ← Update viewModel stepStates
                     },
                     patterns = StrumPatterns.groups,
                     modifier = Modifier.padding(horizontal = 12.dp)
@@ -297,12 +302,27 @@ fun ManualWorkspace(
             trackList = tracks,
             onDismiss = { showSendDialog = false },
             onConfirm = { trackIndex, appendMode ->
-                viewModel.sendToPianoRoll(
-                    trackIndex,
-                    false,
-                    null,
-                    appendMode
-                ) {}
+                // Send with the selected pattern
+                val chordNames = progression.map {
+                    it.chordName.substringBefore(" ")
+                }
+
+                if (selectedPattern != null) {
+                    viewModel.sendProgressionToPianoRoll(
+                        chordNames = chordNames,
+                        strumPattern = selectedPattern!!,
+                        trackIndex = trackIndex,
+                        appendMode = appendMode,
+                        onComplete = {}
+                    )
+                } else {
+                    viewModel.sendToPianoRoll(
+                        trackIndex,
+                        false,
+                        null,
+                        appendMode
+                    ) {}
+                }
                 showSendDialog = false
             }
         )
@@ -494,8 +514,7 @@ fun FixedBottomBar(
                 fontFamily = FontFamily.Monospace, letterSpacing = 1.sp
             )
         }
-    }
-}
+    }}
 
 @Composable
 fun ProgressionChip(bar: com.reasontouch.core.data.ChordEvent, onRemove: () -> Unit) {

@@ -57,7 +57,7 @@ fun DrawScope.drawRuler(state: PianoRollState, textMeasurer: TextMeasurer) {
                 fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold))
         drawText(measured, topLeft = Offset(x + 4f, state.headerHeight - 16f))
         for (beat in 1 until state.beatsPerBar) {
-            val bx = state.beatToX(((bar - 1) * state.beatsPerBar + beat).toFloat())
+            val bx = state.beatToX(((bar - 1) * state.beatsPerBar + beat).toFloat()) - state.scrollX
             if (bx in 0f..size.width)
                 drawRect(color = Color(0xFF444455), topLeft = Offset(bx, state.headerHeight - 7f), size = Size(1f, 7f))
         }
