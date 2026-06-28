@@ -37,6 +37,8 @@ import com.reasontouch.feature.chords.components.StrumPatternTray
 import com.reasontouch.feature.chords.components.SendProgressionToPianoRollDialog
 import com.reasontouch.feature.chords.StrumPatterns
 import com.reasontouch.core.midi.StepState
+import com.reasontouch.feature.chords.PairingDecision
+import com.reasontouch.feature.chords.components.SuggestNextDialog
 
 // Theme colors
 private val PANEL = Color(0xFF2A2A32)
@@ -67,6 +69,8 @@ fun ManualWorkspace(
     var showHarmonyPanel by remember { mutableStateOf(false) }
     var showSendDialog by remember { mutableStateOf(false) }
     var selectedPattern by remember { mutableStateOf<com.reasontouch.feature.chords.StepPattern?>(null) }
+    var showSuggestDialog by remember { mutableStateOf(false) }
+    var currentSuggestion by remember { mutableStateOf<PairingDecision?>(null) }
 
     // Auto-apply preset on first non-null pattern selection (handled in StrumPatternTray callback)
 
@@ -259,38 +263,20 @@ fun ManualWorkspace(
         }
 
         // PROGRESSION DISPLAY (fixed bottom bar)
-        if (progression.isNotEmpty()) {
-            FixedBottomBar(
-                progression = progression,
-                chordName = "$selectedChord $selectedPosition",
-                statusMessage = ui.statusMessage,
-                onAddBar = viewModel::addBar,
-                onRemoveBar = viewModel::removeBar,
-                onClear = viewModel::clearProgression
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF16161A))
-                    .border(1.dp, BORDER, RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(ACCENT)
-                    .clickable { viewModel.addBar() }
-                    .padding(vertical = 14.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "+ ADD BAR  ${selectedChord.uppercase()} $selectedPosition",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.sp
-                )
+        FixedBottomBar(
+            progression = progression,
+            chordName = "$selectedChord $selectedPosition",
+            statusMessage = ui.statusMessage,
+            onAddBar = viewModel::addBar,
+            onRemoveBar = viewModel::removeBar,
+            onClear = viewModel::clearProgression,
+            onSuggestNext = {
+                val suggestion = viewModel.suggestNextSection()
+                currentSuggestion = suggestion
+                showSuggestDialog = true
             }
-        }
+        )
+
     }
 
     // MODALS
@@ -326,6 +312,22 @@ fun ManualWorkspace(
                 showSendDialog = false
             }
         )
+        if (showSuggestDialog && currentSuggestion != null) {
+            SuggestNextDialog(
+                decision = currentSuggestion!!,
+                onAccept = { barCount ->
+                    repeat(barCount / 4) {
+                        viewModel.addBar()
+                    }
+                    showSuggestDialog = false
+                    currentSuggestion = null
+                },
+                onDismiss = {
+                    showSuggestDialog = false
+                    currentSuggestion = null
+                }
+            )
+        }
     }
 }
 
@@ -451,7 +453,8 @@ fun FixedBottomBar(
     statusMessage: String?,
     onAddBar: () -> Unit,
     onRemoveBar: (com.reasontouch.core.data.ChordEvent) -> Unit,
-    onClear: () -> Unit
+    onClear: () -> Unit,
+    onSuggestNext: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -496,6 +499,23 @@ fun FixedBottomBar(
             Text(text = msg, color = Color(0xFFFF6B35), fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp))
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color(0xFF1A3A5A))
+                .clickable(onClick = onSuggestNext)
+                .padding(vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "🧠 SUGGEST NEXT",
+                color = Color(0xFF38BDF8), fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace, letterSpacing = 0.5.sp
+            )
         }
         Box(
             modifier = Modifier

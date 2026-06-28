@@ -11,7 +11,6 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
@@ -19,22 +18,18 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-
 rootProject.name = "ReasonTouch"
-
 include(":app")
-
 // Core
 include(":core:core-data")
 include(":core:core-midi")
 include(":core:core-audio")
 include(":core:core-ui")
-include(":core:core-music") // ✅ only this one
-
+include(":core:core-composition")
+include(":core:core-music")
 // Features
 include(":feature:feature-chords")
 include(":feature:feature-pianoroll")
 include(":feature:feature-export")
-include(":feature:feature-drums") // ✅ only once
-
+include(":feature:feature-drums")
 include(":core:core-playback")

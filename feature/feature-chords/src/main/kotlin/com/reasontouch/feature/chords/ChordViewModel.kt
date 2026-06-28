@@ -756,4 +756,29 @@ class ChordViewModel @Inject constructor(
             onComplete()
         }
     }
+
+    // STAGE 4: Pairing Engine Integration
+    fun suggestNextSection(): PairingDecision {
+        val currentProgression = progression.value
+        if (currentProgression.isEmpty()) {
+            return PairingDecision(
+                type = PairingType.CONTINUE,
+                suggestedBars = 4,
+                confidence = 0.5f,
+                rationale = "No progression yet - start with any 4-bar section"
+            )
+        }
+
+        val chordNames = currentProgression.map { it.chordName.substringBefore(" ") }
+        val detectedKeys = KeyDetector.detect(chordNames)
+        val detectedKey = detectedKeys.firstOrNull() ?: return PairingDecision(
+            type = PairingType.CONTINUE,
+            suggestedBars = 4,
+            confidence = 0.3f,
+            rationale = "Could not detect key"
+        )
+        
+        val analysis = ProgressionAnalyzer.analyze(currentProgression, detectedKey)
+        return PairingEngine.suggestNext(analysis)
+    }
 }

@@ -37,6 +37,33 @@ enum class CompositionMode {
     ASSISTED,
     GUIDED
 }
+enum class CompositionIntent(val label: String) {
+    CONTINUE("Continue"),
+    LIFT("Lift"),
+    RESOLVE("Resolve"),
+    CONTRAST("Contrast"),
+    DEVELOP("Develop"),
+    EXPAND("Expand"),
+    SURPRISE("Surprise"),
+    SIMPLIFY("Simplify")
+}
+enum class EnergyLevel(val label: String) {
+    VERY_LOW("Very Low"),
+    LOW("Low"),
+    MEDIUM("Medium"),
+    HIGH("High"),
+    VERY_HIGH("Very High")
+}
+enum class SectionType(val label: String) {
+    INTRO("Intro"),
+    VERSE("Verse"),
+    PRE_CHORUS("Pre-Chorus"),
+    CHORUS("Chorus"),
+    BRIDGE("Bridge"),
+    SOLO("Solo"),
+    OUTRO("Outro"),
+    CUSTOM("Custom")
+}
 
 data class TheoryChord(
     val root: NoteClass,
@@ -100,6 +127,7 @@ fun TheoryChord.guitarLabel(): String {
 }
 
 object MusicTheory {
+
 
     // Semitone intervals from root for major and natural minor scales
     private val MAJOR_INTERVALS = listOf(0, 2, 4, 5, 7, 9, 11)

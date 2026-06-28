@@ -2,6 +2,8 @@ package com.reasontouch.core.data
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import com.reasontouch.core.composition.SectionMarker
+import com.reasontouch.core.composition.SectionMarkerDao
 
 @Database(
     entities = [
@@ -10,9 +12,10 @@ import androidx.room.RoomDatabase
         NoteEvent::class,
         ChordEvent::class,
         StrumPattern::class,
-        StrumStep::class
+        StrumStep::class,
+        SectionMarker::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -22,4 +25,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun chordEventDao(): ChordEventDao
     abstract fun strumPatternDao(): StrumPatternDao
     abstract fun strumStepDao(): StrumStepDao
+    abstract fun sectionMarkerDao(): SectionMarkerDao
 }
