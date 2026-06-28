@@ -2,10 +2,10 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.hilt)
 }
+
 android {
-    namespace = "com.reasontouch.core.data"
+    namespace = "com.reasontouch.core.composition"
     compileSdk = 36
     defaultConfig { minSdk = 26 }
     compileOptions {
@@ -14,12 +14,9 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
 }
+
 dependencies {
-    implementation(project(":core:core-composition"))
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-    implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
 }

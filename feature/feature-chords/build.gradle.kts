@@ -5,7 +5,6 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
-
 android {
     namespace = "com.reasontouch.feature.chords"
     compileSdk = 36
@@ -17,9 +16,9 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
 }
-
 dependencies {
     implementation(project(":core:core-data"))
+    implementation(project(":core:core-composition"))
     implementation(project(":core:core-ui"))
     implementation(project(":core:core-audio"))
     implementation(project(":core:core-midi"))

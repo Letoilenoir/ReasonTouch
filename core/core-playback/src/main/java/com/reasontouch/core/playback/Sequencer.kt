@@ -116,10 +116,12 @@ class Sequencer @Inject constructor(
                         transport.update { it.copy(playheadBeat = loopS) }
                         schedulePass(loopS, origin)
                     }
+
                     beat >= endBeat -> {
                         transport.update { it.copy(playheadBeat = endBeat, isPlaying = false) }
                         break
                     }
+
                     else -> transport.update { it.copy(playheadBeat = beat) }
                 }
 
@@ -140,13 +142,20 @@ class Sequencer @Inject constructor(
     }
 
     private fun computeEndBeat(allNotes: Map<String, List<NoteEvent>>): Float {
-        // For COMPOSITION: Find last bar where notes START, round up to next bar
         val lastNoteBeat = allNotes.values.flatten().maxOfOrNull { it.beat } ?: 0f
         if (lastNoteBeat <= 0f) return 4f
 
-        // Which bar does the last note occur in? Round up to end of that bar
-        val barContainingNote = ceil(lastNoteBeat / 4f).toInt().coerceAtLeast(1)
-        return (barContainingNote * 4f).toFloat()
+        // Use epsilon-safe truncation instead of ceil
+        val epsilon = 0.001f
+        val barNumber = if (kotlin.math.abs(lastNoteBeat % 4f) < epsilon) {
+            // Note ends at bar boundary
+            (lastNoteBeat / 4f).toInt()
+        } else {
+            // Round up to next bar boundary
+            (lastNoteBeat / 4f).toInt() + 1
+        }.coerceAtLeast(1)
+
+        return (barNumber * 4f).toFloat()
     }
 }
 

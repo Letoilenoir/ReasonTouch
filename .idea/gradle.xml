@@ -12,6 +12,7 @@
             <option value="$PROJECT_DIR$/app" />
             <option value="$PROJECT_DIR$/core" />
             <option value="$PROJECT_DIR$/core/core-audio" />
+            <option value="$PROJECT_DIR$/core/core-composition" />
             <option value="$PROJECT_DIR$/core/core-data" />
             <option value="$PROJECT_DIR$/core/core-midi" />
             <option value="$PROJECT_DIR$/core/core-music" />
