@@ -1,5 +1,7 @@
 package com.reasontouch.feature.chords
 
+import com.reasontouch.core.data.ChordEvent
+
 /**
  * Converts ranked composition intents into a generation request.
  *
@@ -8,6 +10,7 @@ package com.reasontouch.feature.chords
 object GenerationPlanner {
 
     fun createRequest(
+        sourceProgression: List<ChordEvent>,
         analysis: ProgressionAnalysis,
         rankedIntents: List<IntentRanking>,
         targetSection: SectionType? = null,
@@ -21,6 +24,7 @@ object GenerationPlanner {
 
         return ProgressionGenerationRequest(
             sourceAnalysis = analysis,
+            sourceProgression = sourceProgression,
             primaryIntent = primaryIntent,
             targetSection = targetSection,
             targetEnergy = targetEnergy,
