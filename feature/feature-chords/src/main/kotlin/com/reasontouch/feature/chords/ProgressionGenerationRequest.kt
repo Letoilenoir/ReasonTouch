@@ -1,5 +1,7 @@
 package com.reasontouch.feature.chords
 
+import com.reasontouch.core.data.ChordEvent
+
 /**
  * Describes the musical goal for generating a new progression.
  *
@@ -9,6 +11,8 @@ package com.reasontouch.feature.chords
 data class ProgressionGenerationRequest(
 
     val sourceAnalysis: ProgressionAnalysis,
+
+    val sourceProgression: List<ChordEvent>,
 
     val primaryIntent: CompositionIntent,
 
