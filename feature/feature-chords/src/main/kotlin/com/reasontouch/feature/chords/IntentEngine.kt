@@ -18,45 +18,21 @@ object IntentEngine {
 
         if (stability >= 0.8f) {
 
-            intents += IntentRanking(
-                CompositionIntent.CONTRAST,
-                0.85f,
-                "A stable ending leaves room for a contrasting idea."
-            )
+            intents += IntentRanking(intent = CompositionIntent.CONTRAST, confidence = 0.85f, rationale = "A stable ending leaves room for a contrasting idea.")
 
-            intents += IntentRanking(
-                CompositionIntent.LIFT,
-                0.70f,
-                "The current harmony could support increased energy."
-            )
+            intents += IntentRanking(intent = CompositionIntent.LIFT, confidence = 0.70f, rationale = "The current harmony could support increased energy.")
 
         } else if (stability >= 0.4f) {
 
-            intents += IntentRanking(
-                CompositionIntent.EXPAND,
-                0.75f,
-                "The harmony can naturally be developed further."
-            )
+            intents += IntentRanking(intent = CompositionIntent.EXPAND, confidence = 0.75f, rationale = "The harmony can naturally be developed further.")
 
-            intents += IntentRanking(
-                CompositionIntent.CONTINUE,
-                0.70f,
-                "The musical flow remains open."
-            )
+            intents += IntentRanking(intent = CompositionIntent.CONTINUE, confidence = 0.70f, rationale = "The musical flow remains open.")
 
         } else {
 
-            intents += IntentRanking(
-                CompositionIntent.RESOLVE,
-                0.95f,
-                "The harmony suggests a strong sense of resolution."
-            )
+            intents += IntentRanking(intent = CompositionIntent.RESOLVE, confidence = 0.95f, rationale = "The harmony suggests a strong sense of resolution.")
 
-            intents += IntentRanking(
-                CompositionIntent.CONTINUE,
-                0.80f,
-                "Continuation is another natural possibility."
-            )
+            intents += IntentRanking(intent = CompositionIntent.CONTINUE, confidence = 0.80f, rationale = "Continuation is another natural possibility.")
         }
 
         return intents.sortedByDescending { it.confidence }

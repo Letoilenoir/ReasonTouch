@@ -48,7 +48,8 @@ object ProgressionAnalyzer {
             endingFunction = endingFunction,
             rootMovementIntervals = rootMovement,
             barCount = chords.size,
-            confidence = detectedKey.confidence
+            confidence = detectedKey.confidence,
+            functionalSequence = calculateFunctionalSequence(chords, detectedKey)
         )
     }
 
@@ -218,8 +219,20 @@ object ProgressionAnalyzer {
             endingFunction = HarmonicFunction.TONIC,
             rootMovementIntervals = emptyList(),
             barCount = 0,
-            confidence = 0.3f
+            confidence = 0.3f,
+            functionalSequence = emptyList()
         )
     }
 
+
+    private fun calculateFunctionalSequence(
+        chords: List<ChordEvent>,
+        detectedKey: KeyCandidate
+    ): List<HarmonicFunction> {
+        return chords.mapNotNull { chord ->
+            val theory = MusicTheory.parseChordName(chord.chordName) ?: return@mapNotNull null
+            val degree = MusicTheory.degreeOf(theory, detectedKey.root, detectedKey.isMinor) ?: return@mapNotNull null
+            MusicTheory.function(degree, detectedKey.isMinor)
+        }
+    }
 }

@@ -1,11 +1,28 @@
 package com.reasontouch.feature.chords
 
 data class ChordSuggestion(
-    val chord:       TheoryChord,
-    val degree:      Int,
-    val function:    HarmonicFunction,
+
+    val chord: TheoryChord,
+
+    val degree: Int,
+
+    val function: HarmonicFunction,
+
+    /**
+     * Relative confidence (0.0–1.0).
+     *
+     * This reflects how naturally this chord follows the
+     * current harmonic context according to the music theory
+     * rules used by the suggestion engine.
+     */
+    val confidence: Float,
+
+    /**
+     * Short explanation shown to the user.
+     */
     val description: String,
-    val isBorrowed:  Boolean = false
+
+    val isBorrowed: Boolean = false
 )
 
 data class BorrowedChord(
@@ -52,7 +69,13 @@ object ChordSuggestionEngine {
                 val funcLabel = function.name.lowercase()
                     .replaceFirstChar { it.uppercase() }
                 candidates.add(
-                    ChordSuggestion(chord, degree, function, "$roman — $funcLabel") to weight
+                    ChordSuggestion(
+                        chord = chord,
+                        degree = degree,
+                        function = function,
+                        confidence = weight.coerceIn(0f, 1f),
+                        description = "$roman — $funcLabel"
+                    ) to weight
                 )
             }
         }
@@ -71,7 +94,13 @@ object ChordSuggestionEngine {
             val function  = MusicTheory.function(degree, key.isMinor)
             val roman     = romanNumeral(degree, key.isMinor, chord.quality)
             val funcLabel = function.name.lowercase().replaceFirstChar { it.uppercase() }
-            ChordSuggestion(chord, degree, function, "$roman — $funcLabel")
+            ChordSuggestion(
+                chord = chord,
+                degree = degree,
+                function = function,
+                confidence = 1.0f,
+                description = "$roman — $funcLabel"
+            )
         }
     }
 

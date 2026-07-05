@@ -1,15 +1,20 @@
 package com.reasontouch.feature.chords.generation.strategies
 
+import com.reasontouch.core.data.ChordEvent
 import com.reasontouch.feature.chords.GeneratedProgression
 import com.reasontouch.feature.chords.ProgressionGenerationRequest
+import com.reasontouch.feature.chords.ChordSuggestionEngine
+import com.reasontouch.feature.chords.TheoryChord
 
 /**
- * Implements the CONTINUE compositional intent.
+ * Generates candidate continuations that preserve the
+ * musical character of the source progression.
  *
- * Initially this strategy simply preserves the user's seed progression.
+ * Uses ChordSuggestionEngine (existing music theory logic)
+ * to determine what naturally follows the last chord.
  *
- * Future iterations will extend the progression using
- * harmonic grammar and voice-leading.
+ * Returns purely harmonic suggestions (TheoryChord objects).
+ * No session/persistence data is created here.
  */
 object ContinueStrategy {
 
@@ -17,28 +22,62 @@ object ContinueStrategy {
         request: ProgressionGenerationRequest
     ): List<GeneratedProgression> {
 
-        val explanation = when (request.sourceAnalysis.endingFunction) {
+        val source = request.sourceProgression
 
-            com.reasontouch.feature.chords.HarmonicFunction.TONIC ->
-                "The progression feels complete. Continuing reinforces the established musical idea."
-
-            com.reasontouch.feature.chords.HarmonicFunction.PREDOMINANT ->
-                "The progression remains open, allowing further harmonic development."
-
-            com.reasontouch.feature.chords.HarmonicFunction.DOMINANT ->
-                "The progression naturally invites continuation towards resolution."
+        if (source.isEmpty()) {
+            return emptyList()
         }
 
-        return listOf(
+        // Get the last chord in the progression
+        val lastChord = source.lastOrNull() ?: return emptyList()
+        
+        // Ask ChordSuggestionEngine what naturally follows
+        val suggestions = ChordSuggestionEngine.suggest(
+            key = request.sourceAnalysis.key,
+            lastChordName = lastChord.chordName
+        )
 
+        if (suggestions.isEmpty()) {
+            return emptyList()
+        }
+
+        // Build multiple candidate continuations
+        val candidates = mutableListOf<GeneratedProgression>()
+
+        // Candidate 1: Most natural suggestion (highest confidence)
+        val topSuggestion = suggestions.first()
+        candidates.add(
             GeneratedProgression(
-
-                chords = request.sourceProgression,
-
-                confidence = 0.80f,
-
-                explanation = explanation
+                chords = listOf(topSuggestion.chord),
+                confidence = topSuggestion.confidence,
+                explanation = "Most natural continuation: ${topSuggestion.description}"
             )
         )
+
+        // Candidate 2: Second choice (if available)
+        if (suggestions.size > 1) {
+            val secondSuggestion = suggestions[1]
+            candidates.add(
+                GeneratedProgression(
+                    chords = listOf(secondSuggestion.chord),
+                    confidence = secondSuggestion.confidence,
+                    explanation = "Alternative continuation: ${secondSuggestion.description}"
+                )
+            )
+        }
+
+        // Candidate 3: Third choice (if available)
+        if (suggestions.size > 2) {
+            val thirdSuggestion = suggestions[2]
+            candidates.add(
+                GeneratedProgression(
+                    chords = listOf(thirdSuggestion.chord),
+                    confidence = thirdSuggestion.confidence,
+                    explanation = "Another option: ${thirdSuggestion.description}"
+                )
+            )
+        }
+
+        return candidates.sortedByDescending { it.confidence }
     }
 }
