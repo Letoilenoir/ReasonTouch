@@ -1,6 +1,5 @@
-package com.reasontouch.feature.chords.generation
+package com.reasontouch.feature.chords.generation.strategies
 
-import com.reasontouch.core.data.ChordEvent
 import com.reasontouch.feature.chords.GeneratedProgression
 import com.reasontouch.feature.chords.ProgressionGenerationRequest
 

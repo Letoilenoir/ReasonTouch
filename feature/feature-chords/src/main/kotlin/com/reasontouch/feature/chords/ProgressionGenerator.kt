@@ -2,7 +2,7 @@ package com.reasontouch.feature.chords
 
 import com.reasontouch.core.data.ChordEvent
 import com.reasontouch.feature.chords.CompositionIntent
-import com.reasontouch.feature.chords.generation.ContinueStrategy
+import com.reasontouch.feature.chords.generation.strategies.ContinueStrategy
 
 /**
  * Creates candidate chord progressions that fulfil a musical intention.
