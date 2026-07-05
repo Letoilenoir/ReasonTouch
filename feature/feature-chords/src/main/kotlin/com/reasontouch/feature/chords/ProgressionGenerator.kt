@@ -1,14 +1,15 @@
 package com.reasontouch.feature.chords
 
-import com.reasontouch.core.data.ChordEvent
 import com.reasontouch.feature.chords.CompositionIntent
 import com.reasontouch.feature.chords.generation.strategies.ContinueStrategy
 
 /**
- * Creates candidate chord progressions that fulfil a musical intention.
+ * Delegates chord progression generation to strategy-specific implementations.
  *
- * This is currently a scaffold.
- * Musical generation will be implemented incrementally.
+ * Takes a ProgressionGenerationRequest (with intent, key, source progression)
+ * and returns candidate GeneratedProgressions (purely harmonic suggestions).
+ *
+ * Each intent (CONTINUE, RESOLVE, LIFT, etc.) has its own strategy.
  */
 object ProgressionGenerator {
 
@@ -21,32 +22,17 @@ object ProgressionGenerator {
             CompositionIntent.CONTINUE ->
                 ContinueStrategy.generate(request)
 
+            CompositionIntent.RESOLVE ->
+                emptyList()  // TODO: ResolveStrategy
+
+            CompositionIntent.LIFT ->
+                emptyList()  // TODO: LiftStrategy
+
+            CompositionIntent.CONTRAST ->
+                emptyList()  // TODO: ContrastStrategy
+
             else ->
                 emptyList()
         }
-    }
-
-    private fun generateContinue(
-        request: ProgressionGenerationRequest
-    ): List<GeneratedProgression> {
-
-        // First implementation:
-        // simply repeat the existing progression.
-
-        return listOf(
-
-            GeneratedProgression(
-
-                chords = request.sourceProgression,
-
-                confidence = 0.80f,
-
-                explanation =
-                    "Repeats the established harmonic pattern to reinforce continuity."
-
-            )
-
-        )
-
     }
 }

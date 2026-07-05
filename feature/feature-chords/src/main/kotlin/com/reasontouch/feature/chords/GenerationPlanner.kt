@@ -1,6 +1,7 @@
 package com.reasontouch.feature.chords
 
 import com.reasontouch.core.data.ChordEvent
+import kotlin.collections.firstOrNull
 
 /**
  * Converts ranked composition intents into a generation request.
