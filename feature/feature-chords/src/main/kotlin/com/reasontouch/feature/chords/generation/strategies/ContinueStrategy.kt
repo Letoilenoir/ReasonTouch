@@ -4,11 +4,12 @@ import com.reasontouch.feature.chords.GeneratedProgression
 import com.reasontouch.feature.chords.ProgressionGenerationRequest
 
 /**
- * Generates candidate continuations that preserve the
- * musical character of the source progression.
+ * Implements the CONTINUE compositional intent.
  *
- * This first implementation is intentionally conservative.
- * It favours continuity over surprise.
+ * Initially this strategy simply preserves the user's seed progression.
+ *
+ * Future iterations will extend the progression using
+ * harmonic grammar and voice-leading.
  */
 object ContinueStrategy {
 
@@ -16,20 +17,28 @@ object ContinueStrategy {
         request: ProgressionGenerationRequest
     ): List<GeneratedProgression> {
 
-        val source = request.sourceProgression
+        val explanation = when (request.sourceAnalysis.endingFunction) {
 
-        if (source.isEmpty()) {
-            return emptyList()
+            com.reasontouch.feature.chords.HarmonicFunction.TONIC ->
+                "The progression feels complete. Continuing reinforces the established musical idea."
+
+            com.reasontouch.feature.chords.HarmonicFunction.PREDOMINANT ->
+                "The progression remains open, allowing further harmonic development."
+
+            com.reasontouch.feature.chords.HarmonicFunction.DOMINANT ->
+                "The progression naturally invites continuation towards resolution."
         }
 
         return listOf(
 
             GeneratedProgression(
-                chords = source,
-                confidence = 0.85f,
-                explanation = "Continue the established harmonic pattern."
-            )
 
+                chords = request.sourceProgression,
+
+                confidence = 0.80f,
+
+                explanation = explanation
+            )
         )
     }
 }
