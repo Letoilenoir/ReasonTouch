@@ -71,6 +71,7 @@ fun ManualWorkspace(
     var selectedPattern by remember { mutableStateOf<com.reasontouch.feature.chords.StepPattern?>(null) }
     var showSuggestDialog by remember { mutableStateOf(false) }
     var currentSuggestion by remember { mutableStateOf<PairingDecision?>(null) }
+    var currentOptions by remember { mutableStateOf<List<String>>(emptyList())}
 
     // Auto-apply preset on first non-null pattern selection (handled in StrumPatternTray callback)
 
@@ -273,6 +274,12 @@ fun ManualWorkspace(
             onSuggestNext = {
                 val suggestion = viewModel.suggestNextSection()
                 currentSuggestion = suggestion
+                currentOptions = listOf(
+                    "① Continue Naturally",
+                    "② Resolve",
+                    "③ Build Tension",
+                    "④ Surprise Me"
+                )
                 showSuggestDialog = true
             }
         )
@@ -315,10 +322,15 @@ fun ManualWorkspace(
         if (showSuggestDialog && currentSuggestion != null) {
             SuggestNextDialog(
                 decision = currentSuggestion!!,
-                onAccept = { barCount ->
-                    repeat(barCount / 4) {
+                options = currentOptions,
+                onOptionSelected = { selected ->
+
+                    // Temporary behaviour - all options still add the suggested bars
+
+                    repeat(currentSuggestion!!.suggestedBars / 4) {
                         viewModel.addBar()
                     }
+
                     showSuggestDialog = false
                     currentSuggestion = null
                 },

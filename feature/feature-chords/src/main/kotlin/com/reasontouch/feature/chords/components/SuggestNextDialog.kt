@@ -1,84 +1,158 @@
-package com.reasontouch.feature.chords.components
+﻿package com.reasontouch.feature.chords.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.reasontouch.core.ui.theme.ReasonTouchTheme
 import com.reasontouch.feature.chords.PairingDecision
-import com.reasontouch.feature.chords.PairingType
 
 @Composable
 fun SuggestNextDialog(
     decision: PairingDecision,
-    onAccept: (barCount: Int) -> Unit,
+    options: List<String>,
+    onOptionSelected: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val skin = ReasonTouchTheme.skin
+    
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
-                .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
-                .padding(24.dp)
+                .background(
+                    skin.panel,
+                    RoundedCornerShape(12.dp)
+                )
+                .padding(20.dp)
         ) {
-            // Title
+            // Title (in red/accent color)
             Text(
-                text = "🧠 SUGGEST NEXT",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 16.dp)
+                text = "SUGGEST NEXT",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = skin.accent,
+                modifier = Modifier.padding(bottom = 20.dp)
             )
-
-            // Pairing type + description
+            
+            // Intent type
             Text(
                 text = decision.type.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = skin.textPrimary,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
-
+            
+            // Rationale
             Text(
                 text = decision.rationale,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 16.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Normal,
+                color = skin.textSecondary,
+                modifier = Modifier.padding(bottom = 12.dp)
             )
-
-            // Suggested bars + confidence
+            
+            // Confidence/bars info
             Text(
                 text = "Suggested: ${decision.suggestedBars} bars (${(decision.confidence * 100).toInt()}% confident)",
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(bottom = 24.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Normal,
+                color = skin.textMuted,
+                modifier = Modifier.padding(bottom = 20.dp)
             )
-
-            // Buttons
-            Button(
-                onClick = { onAccept(decision.suggestedBars) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text("ADD ${decision.suggestedBars} BARS")
+            
+            // Section header
+            Text(
+                text = "Suggested continuations",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Normal,
+                color = skin.textSecondary,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            
+            // Option buttons with red outline
+            options.forEachIndexed { index, option ->
+                Button(
+                    onClick = { onOptionSelected(index) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .padding(bottom = 8.dp)
+                        .border(1.dp, skin.accent, RoundedCornerShape(8.dp)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = skin.panel,
+                        contentColor = skin.accent
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = option,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+                }
             }
-
-            Button(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors()
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Bottom action buttons
+            Row(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("CANCEL")
+                // Cancel button (left)
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                        .padding(end = 8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = skin.panelAlt,
+                        contentColor = skin.textSecondary
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "CANCEL",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+                }
+                
+                // Confirm button (right, in accent red)
+                Button(
+                    onClick = { if (options.isNotEmpty()) onOptionSelected(0) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = skin.accent,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "SELECT",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
     }
