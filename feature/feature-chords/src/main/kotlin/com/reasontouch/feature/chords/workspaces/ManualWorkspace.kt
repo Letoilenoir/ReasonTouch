@@ -40,6 +40,7 @@ import com.reasontouch.core.midi.StepState
 import com.reasontouch.feature.chords.PairingDecision
 import com.reasontouch.feature.chords.components.SuggestNextDialog
 
+
 // Theme colors
 private val PANEL = Color(0xFF2A2A32)
 private val BORDER = Color(0xFF3A3A45)
@@ -71,7 +72,9 @@ fun ManualWorkspace(
     var selectedPattern by remember { mutableStateOf<com.reasontouch.feature.chords.StepPattern?>(null) }
     var showSuggestDialog by remember { mutableStateOf(false) }
     var currentSuggestion by remember { mutableStateOf<PairingDecision?>(null) }
-    var currentOptions by remember { mutableStateOf<List<String>>(emptyList())}
+    var currentOptions by remember {
+        mutableStateOf<List<String>>(emptyList())
+    }
 
     // Auto-apply preset on first non-null pattern selection (handled in StrumPatternTray callback)
 

@@ -1,7 +1,6 @@
 ﻿package com.reasontouch.feature.chords.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,92 +29,88 @@ fun SuggestNextDialog(
     onDismiss: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
-    
+
     Dialog(onDismissRequest = onDismiss) {
+
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
                 .background(
-                    skin.panel,
-                    RoundedCornerShape(12.dp)
+                    color = skin.panel,
+                    shape = RoundedCornerShape(12.dp)
                 )
                 .padding(20.dp)
         ) {
-            // Title (in red/accent color)
+
+            // Title
             Text(
                 text = "SUGGEST NEXT",
+                color = skin.accent,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = skin.accent,
                 modifier = Modifier.padding(bottom = 20.dp)
             )
-            
-            // Intent type
+
+            // Pairing type
             Text(
                 text = decision.type.name,
+                color = skin.textPrimary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                color = skin.textPrimary,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
-            
-            // Rationale
+
+            // Explanation
             Text(
                 text = decision.rationale,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Normal,
                 color = skin.textSecondary,
+                fontSize = 13.sp,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
-            
-            // Confidence/bars info
+
+            // Confidence
             Text(
                 text = "Suggested: ${decision.suggestedBars} bars (${(decision.confidence * 100).toInt()}% confident)",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Normal,
                 color = skin.textMuted,
+                fontSize = 12.sp,
                 modifier = Modifier.padding(bottom = 20.dp)
             )
-            
-            // Section header
+
+            // Section heading
             Text(
                 text = "Suggested continuations",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Normal,
                 color = skin.textSecondary,
+                fontSize = 12.sp,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
-            
-            // Option buttons with red outline
+
+            // Phrase options
             options.forEachIndexed { index, option ->
+
                 Button(
                     onClick = { onOptionSelected(index) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp)
-                        .padding(bottom = 8.dp)
-                        .border(1.dp, skin.accent, RoundedCornerShape(8.dp)),
+                        .padding(bottom = 8.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = skin.panel,
-                        contentColor = skin.accent
+                        containerColor = skin.panelAlt,
+                        contentColor = skin.textPrimary
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
                         text = option,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Normal
+                        fontSize = 13.sp
                     )
                 }
             }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Bottom action buttons
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Cancel button (left)
+
                 Button(
                     onClick = onDismiss,
                     modifier = Modifier
@@ -130,14 +125,16 @@ fun SuggestNextDialog(
                 ) {
                     Text(
                         text = "CANCEL",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Normal
+                        fontSize = 13.sp
                     )
                 }
-                
-                // Confirm button (right, in accent red)
+
                 Button(
-                    onClick = { if (options.isNotEmpty()) onOptionSelected(0) },
+                    onClick = {
+                        if (options.isNotEmpty()) {
+                            onOptionSelected(0)
+                        }
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .height(44.dp),

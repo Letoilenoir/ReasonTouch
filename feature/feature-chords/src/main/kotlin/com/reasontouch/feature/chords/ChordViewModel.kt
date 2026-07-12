@@ -799,13 +799,43 @@ class ChordViewModel @Inject constructor(
         val lastChord =
             currentProgression.last().chordName.substringBefore(" ")
 
-        return ChordSuggestionEngine
+        val suggestions = ChordSuggestionEngine
             .suggest(
                 key = detectedKey,
                 lastChordName = lastChord
             )
             .take(4)
-            .map { it.chord.label }
+
+        return suggestions.mapIndexed { index, suggestion ->
+
+            val title = when (index) {
+                0 -> "Continue Naturally"
+                1 -> "Resolve"
+                2 -> "Build Tension"
+                else -> "Surprise Me"
+            }
+
+            var currentChord = suggestion.chord.label
+            val phrase = mutableListOf(currentChord)
+
+            repeat(3) {
+                val next = ChordSuggestionEngine
+                    .suggest(
+                        key = detectedKey,
+                        lastChordName = currentChord
+                    )
+                    .firstOrNull()
+
+                if (next != null) {
+                    currentChord = next.chord.label
+                    phrase.add(currentChord)
+                }
+            }
+
+            val phraseText = phrase.joinToString(" → ")
+
+            "$title\n$phraseText"
+        }
     }
 }
 
