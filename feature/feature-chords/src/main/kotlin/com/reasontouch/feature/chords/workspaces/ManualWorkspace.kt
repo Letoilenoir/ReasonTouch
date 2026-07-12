@@ -274,12 +274,19 @@ fun ManualWorkspace(
             onSuggestNext = {
                 val suggestion = viewModel.suggestNextSection()
                 currentSuggestion = suggestion
-                currentOptions = listOf(
-                    "① Continue Naturally",
-                    "② Resolve",
-                    "③ Build Tension",
-                    "④ Surprise Me"
-                )
+                val suggestions = viewModel.suggestNextOptions()
+
+                currentOptions =
+                    if (suggestions.isNotEmpty()) {
+                        suggestions
+                    } else {
+                        listOf(
+                            "Continue Naturally",
+                            "Resolve",
+                            "Build Tension",
+                            "Surprise Me"
+                        )
+                    }
                 showSuggestDialog = true
             }
         )

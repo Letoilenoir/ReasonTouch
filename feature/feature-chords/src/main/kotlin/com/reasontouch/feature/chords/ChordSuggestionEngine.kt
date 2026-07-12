@@ -1,5 +1,6 @@
 package com.reasontouch.feature.chords
 
+
 data class ChordSuggestion(
 
     val chord: TheoryChord,

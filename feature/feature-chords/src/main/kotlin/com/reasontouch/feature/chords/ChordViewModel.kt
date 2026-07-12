@@ -781,4 +781,31 @@ class ChordViewModel @Inject constructor(
         val analysis = ProgressionAnalyzer.analyze(currentProgression, detectedKey)
         return PairingEngine.suggestNext(analysis)
     }
+    fun suggestNextOptions(): List<String> {
+
+        val currentProgression = progression.value
+
+        if (currentProgression.isEmpty()) {
+            return emptyList()
+        }
+
+        val chordNames = currentProgression.map {
+            it.chordName.substringBefore(" ")
+        }
+
+        val detectedKeys = KeyDetector.detect(chordNames)
+        val detectedKey = detectedKeys.firstOrNull() ?: return emptyList()
+
+        val lastChord =
+            currentProgression.last().chordName.substringBefore(" ")
+
+        return ChordSuggestionEngine
+            .suggest(
+                key = detectedKey,
+                lastChordName = lastChord
+            )
+            .take(4)
+            .map { it.chord.label }
+    }
 }
+
