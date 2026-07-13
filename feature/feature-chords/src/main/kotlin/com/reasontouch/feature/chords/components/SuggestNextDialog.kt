@@ -1,6 +1,9 @@
-﻿package com.reasontouch.feature.chords.components
+package com.reasontouch.feature.chords.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.reasontouch.core.ui.theme.ReasonTouchTheme
@@ -37,9 +39,9 @@ fun SuggestNextDialog(
                 .fillMaxWidth(0.9f)
                 .background(
                     color = skin.panel,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(skin.cornerRadiusMedium)
                 )
-                .padding(20.dp)
+                .padding(skin.paddingXLarge)
         ) {
 
             // Title
@@ -48,7 +50,7 @@ fun SuggestNextDialog(
                 color = skin.accent,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = 20.dp)
+                modifier = Modifier.padding(bottom = skin.paddingXLarge)
             )
 
             // Pairing type
@@ -57,7 +59,7 @@ fun SuggestNextDialog(
                 color = skin.textPrimary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier.padding(bottom = skin.paddingSmall)
             )
 
             // Explanation
@@ -65,7 +67,7 @@ fun SuggestNextDialog(
                 text = decision.rationale,
                 color = skin.textSecondary,
                 fontSize = 13.sp,
-                modifier = Modifier.padding(bottom = 12.dp)
+                modifier = Modifier.padding(bottom = skin.paddingMedium)
             )
 
             // Confidence
@@ -73,7 +75,7 @@ fun SuggestNextDialog(
                 text = "Suggested: ${decision.suggestedBars} bars (${(decision.confidence * 100).toInt()}% confident)",
                 color = skin.textMuted,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(bottom = 20.dp)
+                modifier = Modifier.padding(bottom = skin.paddingXLarge)
             )
 
             // Section heading
@@ -81,31 +83,60 @@ fun SuggestNextDialog(
                 text = "Suggested continuations",
                 color = skin.textSecondary,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(bottom = 12.dp)
+                modifier = Modifier.padding(bottom = skin.paddingMedium)
             )
 
             // Phrase options
             options.forEachIndexed { index, option ->
 
-                Button(
-                    onClick = { onOptionSelected(index) },
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = skin.panelAlt,
-                        contentColor = skin.textPrimary
-                    ),
-                    shape = RoundedCornerShape(8.dp)
+                        .padding(bottom = skin.paddingSmall)
+                        .background(
+                            color = skin.panelAlt,
+                            shape = RoundedCornerShape(skin.cornerRadiusSmall)
+                        )
+                        .border(
+                            width = skin.borderWidth,
+                            color = skin.border,
+                            shape = RoundedCornerShape(skin.cornerRadiusSmall)
+                        )
+                        .clickable {
+                            onOptionSelected(index)
+                        }
+                        .padding(
+                            horizontal = skin.paddingLarge,
+                            vertical = skin.paddingMedium
+                        )
                 ) {
-                    Text(
-                        text = option,
-                        fontSize = 13.sp
-                    )
+
+                    Column {
+
+                        val lines = option.split("\n")
+
+                        Text(
+                            text = lines.first(),
+                            color = skin.textPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        if (lines.size > 1) {
+
+                            Spacer(modifier = Modifier.height(skin.paddingXSmall))
+
+                            Text(
+                                text = lines[1],
+                                color = skin.textSecondary,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(skin.spacingMedium))
 
             Row(
                 modifier = Modifier.fillMaxWidth()
@@ -115,13 +146,13 @@ fun SuggestNextDialog(
                     onClick = onDismiss,
                     modifier = Modifier
                         .weight(1f)
-                        .height(44.dp)
-                        .padding(end = 8.dp),
+                        .height(skin.buttonHeight)
+                        .padding(end = skin.paddingSmall),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = skin.panelAlt,
                         contentColor = skin.textSecondary
                     ),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(skin.buttonCornerRadius)
                 ) {
                     Text(
                         text = "CANCEL",
@@ -137,12 +168,12 @@ fun SuggestNextDialog(
                     },
                     modifier = Modifier
                         .weight(1f)
-                        .height(44.dp),
+                        .height(skin.buttonHeight),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = skin.accent,
                         contentColor = Color.White
                     ),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(skin.buttonCornerRadius)
                 ) {
                     Text(
                         text = "SELECT",

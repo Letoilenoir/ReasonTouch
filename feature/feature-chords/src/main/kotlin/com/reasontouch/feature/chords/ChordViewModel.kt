@@ -7,7 +7,9 @@ import com.reasontouch.core.data.*
 import com.reasontouch.core.audio.Sf2Player
 import com.reasontouch.core.audio.SynthEngine
 import com.reasontouch.core.midi.StepState
-import com.reasontouch.feature.chords.model.*
+import com.reasontouch.feature.chords.model
+
+.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -90,7 +92,7 @@ class ChordViewModel @Inject constructor(
     val stepStates = _stepStates.asStateFlow()
 
     // ------------------------------------------------------------
-    // USER ACTIONS — UI STATE
+    // USER ACTIONS ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â UI STATE
     // ------------------------------------------------------------
 
     fun setCompositionMode(mode: CompositionMode) =
@@ -217,7 +219,7 @@ class ChordViewModel @Inject constructor(
     fun auditionChord(
         chordName: String,
         position: String,
-        strumDelayMs: Long = 0L  // ← Change from StepPattern to Long
+        strumDelayMs: Long = 0L  // ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Change from StepPattern to Long
     ) {
         val state = ui.value
         val notes = GuitarVoicings.voicings[chordName]?.get(position) ?: return
@@ -832,10 +834,70 @@ class ChordViewModel @Inject constructor(
                 }
             }
 
-            val phraseText = phrase.joinToString(" → ")
+            val phraseText = phrase.joinToString(" -> ")
 
             "$title\n$phraseText"
         }
     }
-}
+    /**
+     * Generates phrase candidates using the planning layer.
+     * Returns List<GeneratedProgression> with actual TheoryChord data.
+     */
+    fun suggestNextPhrases(): List<GeneratedProgression> {
+        val currentProgression = progression.value
+        
+        if (currentProgression.isEmpty()) {
+            return emptyList()
+        }
+        
+        val chordNames = currentProgression.map { it.chordName.substringBefore(" ") }
+        val detectedKeys = KeyDetector.detect(chordNames)
+        val detectedKey = detectedKeys.firstOrNull() ?: return emptyList()
+        
+        val analysis = ProgressionAnalyzer.analyze(currentProgression, detectedKey)
+        
+        val request = ProgressionGenerationRequest(
+            sourceAnalysis = analysis,
+            sourceProgression = currentProgression,
+            primaryIntent = CompositionIntent.CONTINUE,
+            targetSection = null,
+            targetEnergy = null,
+            preferredLength = 4
+        )
+        
+        return ProgressionGenerator.generate(request)
+    }
 
+    /**
+     * Adds a generated phrase to the progression.
+     * Converts List<TheoryChord> to List<ChordEvent> and adds bars.
+     */
+    fun addPhrase(generatedProgression: GeneratedProgression) {
+        val currentProgression = progression.value
+        if (currentProgression.isEmpty()) return
+        
+        val chordNames = currentProgression.map { it.chordName.substringBefore(" ") }
+        val detectedKeys = KeyDetector.detect(chordNames)
+        val detectedKey = detectedKeys.firstOrNull() ?: return
+        
+        // Convert TheoryChord objects to ChordEvent objects
+        generatedProgression.chords.forEach { theoryChord ->
+            val voicing = "Open"
+            
+            val chordEvent = ChordEvent(
+                id = UUID.randomUUID().toString(),
+                sessionId = sessionId,
+                barIndex = currentProgression.size / 4,
+                chordName = theoryChord.label,
+                rootMidi = 60,
+                midiNotes = theoryChord.midiNotes.joinToString(","),
+                voicing = voicing ?: "Open",
+                strumPatternId = null
+            )
+            
+            viewModelScope.launch {
+                true
+            }
+        }
+    }
+}
