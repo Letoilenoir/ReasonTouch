@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reasontouch.feature.chords.ChordViewModel
+import com.reasontouch.feature.chords.GeneratedProgression
 import com.reasontouch.feature.chords.components.StrumPatternTray
 import com.reasontouch.feature.chords.components.SendProgressionToPianoRollDialog
 import com.reasontouch.feature.chords.StrumPatterns
@@ -72,6 +73,7 @@ fun ManualWorkspace(
     var selectedPattern by remember { mutableStateOf<com.reasontouch.feature.chords.StepPattern?>(null) }
     var showSuggestDialog by remember { mutableStateOf(false) }
     var currentSuggestion by remember { mutableStateOf<PairingDecision?>(null) }
+    var currentGeneratedPhrases by remember { mutableStateOf<List<GeneratedProgression>>(emptyList()) }
     var currentOptions by remember {
         mutableStateOf<List<String>>(emptyList())
     }
@@ -101,7 +103,7 @@ fun ManualWorkspace(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "✏️  MANUAL COMPOSITION",
+                                "ÃƒÂ¢Ã…â€œÃ‚ÂÃƒÂ¯Ã‚Â¸Ã‚Â  MANUAL COMPOSITION",
                                 color = ACCENT,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
@@ -116,7 +118,7 @@ fun ManualWorkspace(
                                     .clickable { showDescriptor = false }
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
-                                Text("✕", color = TEXT_DIM, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                Text("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¢", color = TEXT_DIM, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                             }
                         }
 
@@ -158,7 +160,7 @@ fun ManualWorkspace(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "ℹ SHOW MANUAL INFO",
+                            "ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¹ SHOW MANUAL INFO",
                             color = TEXT_DIM,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
@@ -216,7 +218,7 @@ fun ManualWorkspace(
                     selectedPattern = selectedPattern,
                     onPatternSelected = { pattern ->
                         selectedPattern = pattern
-                        viewModel.applyPreset(pattern)  // ← Update viewModel stepStates
+                        viewModel.applyPreset(pattern)  // ÃƒÂ¢Ã¢â‚¬Â Ã‚Â Update viewModel stepStates
                     },
                     patterns = StrumPatterns.groups,
                     modifier = Modifier.padding(horizontal = 12.dp)
@@ -249,7 +251,7 @@ fun ManualWorkspace(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "→ ROLL",
+                                "ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ROLL",
                                 color = Color(0xFF3DDC84),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
@@ -275,11 +277,15 @@ fun ManualWorkspace(
             onRemoveBar = viewModel::removeBar,
             onClear = viewModel::clearProgression,
             onSuggestNext = {
-                val suggestion = viewModel.suggestNextSection()
-                currentSuggestion = suggestion
-                val suggestions = viewModel.suggestNextOptions()
-
-                currentOptions =
+                  val suggestion = viewModel.suggestNextSection()
+                  currentSuggestion = suggestion
+                  
+                  // Get the actual generated phrases
+                  currentGeneratedPhrases = viewModel.suggestNextPhrases()
+                  
+                  val suggestions = viewModel.suggestNextOptions()
+                  
+                  currentOptions =
                     if (suggestions.isNotEmpty()) {
                         suggestions
                     } else {
@@ -297,7 +303,7 @@ fun ManualWorkspace(
     }
 
     // MODALS
-    // BassStyleSheet modal — will be added once extracted to shared components
+    // BassStyleSheet modal ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â will be added once extracted to shared components
     // For now, bass generation is disabled
 
     if (showSendDialog) {
@@ -533,7 +539,7 @@ fun FixedBottomBar(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "🧠 SUGGEST NEXT",
+                text = "ÃƒÂ°Ã…Â¸Ã‚Â§Ã‚Â  SUGGEST NEXT",
                 color = Color(0xFF38BDF8), fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace, letterSpacing = 0.5.sp
