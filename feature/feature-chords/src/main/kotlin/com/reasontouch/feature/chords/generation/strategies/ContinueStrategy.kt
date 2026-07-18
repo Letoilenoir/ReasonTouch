@@ -9,9 +9,12 @@ import com.reasontouch.feature.chords.TheoryChord
 import com.reasontouch.feature.chords.guitarLabel
 
 object ContinueStrategy {
-    fun generate(
-        request: ProgressionGenerationRequest
-    ): List<GeneratedProgression> {
+
+    private val VARIANT_LABELS = listOf(
+        "Closest Fit", "Alternate Voicing", "Brighter Option", "Contrasting Option"
+    )
+
+    fun generate(request: ProgressionGenerationRequest): List<GeneratedProgression> {
         val source = request.sourceProgression
         if (source.isEmpty()) return emptyList()
 
@@ -19,52 +22,59 @@ object ContinueStrategy {
             analysis = request.sourceAnalysis,
             phraseLength = request.preferredLength
         )
-        android.util.Log.d("ContinueDebug", "Trajectory: $trajectory")
-        val continuation = mutableListOf<TheoryChord>()
-        var currentChord = source.last().chordName
-        var confidenceSum = 0f
 
-        repeat(request.preferredLength) { position ->
-            val suggestions = ChordSuggestionEngine.suggest(
-                key = request.sourceAnalysis.key,
-                lastChordName = currentChord
-            )
-            if (suggestions.isEmpty()) return@repeat
+        val results = mutableListOf<GeneratedProgression>()
 
-            val targetFunction = trajectory.getOrNull(position)
-            val chosen = suggestions.firstOrNull { it.function == targetFunction }
-                ?: suggestions.first()
-            android.util.Log.d("ContinueDebug", "Position $position target=$targetFunction chosen=${chosen.chord.label} (${chosen.function}, degree=${chosen.degree})")
+        for (variantIndex in VARIANT_LABELS.indices) {
+            val continuation = mutableListOf<TheoryChord>()
+            var currentChord = source.last().chordName
+            var confidenceSum = 0f
 
+            repeat(request.preferredLength) { position ->
+                val suggestions = ChordSuggestionEngine.suggest(
+                    key = request.sourceAnalysis.key,
+                    lastChordName = currentChord
+                )
+                if (suggestions.isEmpty()) return@repeat
 
-            continuation += chosen.chord
-            confidenceSum += chosen.confidence
-            currentChord = chosen.chord.guitarLabel()
+                val targetFunction = trajectory.getOrNull(position)
+                val matching = suggestions.filter { it.function == targetFunction }
+                val pool = matching.ifEmpty { suggestions }
+
+                val rankForThisVariant = variantIndex.coerceAtMost(pool.size - 1)
+                val chosen = pool[rankForThisVariant]
+
+                continuation += chosen.chord
+                confidenceSum += chosen.confidence
+                currentChord = chosen.chord.guitarLabel()
+            }
+
+            if (continuation.isNotEmpty()) {
+                results.add(
+                    GeneratedProgression(
+                        chords = continuation,
+                        confidence = confidenceSum / continuation.size,
+                        explanation = "${VARIANT_LABELS[variantIndex]}: ${explanationFor(request.sourceAnalysis)}"
+                    )
+                )
+            }
         }
 
-        if (continuation.isEmpty()) return emptyList()
-
-        return listOf(
-            GeneratedProgression(
-                chords = continuation,
-                confidence = confidenceSum / continuation.size,
-                explanation = explanationFor(request.sourceAnalysis)
-            )
-        )
+        return results.distinctBy { it.chords.map { c -> c.label } }
     }
 
     private fun explanationFor(analysis: ProgressionAnalysis): String {
         return when {
             analysis.endsOnDominant() ->
-                "Resolves the preceding dominant into a settled continuation."
+                "resolves the preceding dominant into a settled continuation."
             analysis.isClosed() ->
-                "Reopens harmonic movement after a resolved phrase."
+                "reopens harmonic movement after a resolved phrase."
             analysis.isOscillatingProgression() ->
-                "Breaks the oscillating pattern with directional movement."
+                "breaks the oscillating pattern with directional movement."
             analysis.isDescendingProgression() ->
-                "Continues the descending harmonic motion."
+                "continues the descending harmonic motion."
             else ->
-                "Continues naturally from the preceding phrase."
+                "continues naturally from the preceding phrase."
         }
     }
 }

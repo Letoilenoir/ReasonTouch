@@ -22,6 +22,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.reasontouch.core.ui.theme.ReasonTouchTheme
 import com.reasontouch.feature.chords.PairingDecision
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 @Composable
 fun SuggestNextDialog(
@@ -31,6 +35,7 @@ fun SuggestNextDialog(
     onDismiss: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
 
     Dialog(onDismissRequest = onDismiss) {
 
@@ -89,21 +94,23 @@ fun SuggestNextDialog(
             // Phrase options
             options.forEachIndexed { index, option ->
 
+                val isSelected = index == selectedIndex
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = skin.paddingSmall)
                         .background(
-                            color = skin.panelAlt,
+                            color = if (isSelected) skin.accent.copy(alpha = 0.15f) else skin.panelAlt,
                             shape = RoundedCornerShape(skin.cornerRadiusSmall)
                         )
                         .border(
                             width = skin.borderWidth,
-                            color = skin.border,
+                            color = if (isSelected) skin.accent else skin.border,
                             shape = RoundedCornerShape(skin.cornerRadiusSmall)
                         )
                         .clickable {
-                            onOptionSelected(index)
+                            selectedIndex = index
                         }
                         .padding(
                             horizontal = skin.paddingLarge,
@@ -162,16 +169,17 @@ fun SuggestNextDialog(
 
                 Button(
                     onClick = {
-                        if (options.isNotEmpty()) {
-                            onOptionSelected(0)
-                        }
+                        selectedIndex?.let { onOptionSelected(it) }
                     },
+                    enabled = selectedIndex != null,
                     modifier = Modifier
                         .weight(1f)
                         .height(skin.buttonHeight),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = skin.accent,
-                        contentColor = Color.White
+                        contentColor = Color.White,
+                        disabledContainerColor = skin.panelAlt,
+                        disabledContentColor = skin.textMuted
                     ),
                     shape = RoundedCornerShape(skin.buttonCornerRadius)
                 ) {

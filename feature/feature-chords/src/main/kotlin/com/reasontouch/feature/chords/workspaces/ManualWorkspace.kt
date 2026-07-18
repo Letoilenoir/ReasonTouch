@@ -277,25 +277,12 @@ fun ManualWorkspace(
             onRemoveBar = viewModel::removeBar,
             onClear = viewModel::clearProgression,
             onSuggestNext = {
-                  val suggestion = viewModel.suggestNextSection()
-                  currentSuggestion = suggestion
-                  
-                  // Get the actual generated phrases
-                  currentGeneratedPhrases = viewModel.suggestNextPhrases()
-                  
-                  val suggestions = viewModel.suggestNextOptions()
-                  
-                  currentOptions =
-                    if (suggestions.isNotEmpty()) {
-                        suggestions
-                    } else {
-                        listOf(
-                            "Continue Naturally",
-                            "Resolve",
-                            "Build Tension",
-                            "Surprise Me"
-                        )
-                    }
+                val suggestion = viewModel.suggestNextSection()
+                currentSuggestion = suggestion
+
+                currentGeneratedPhrases = viewModel.suggestNextPhrases()
+                currentOptions = currentGeneratedPhrases.map { it.explanation }
+
                 showSuggestDialog = true
             }
         )
