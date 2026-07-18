@@ -853,7 +853,7 @@ class ChordViewModel @Inject constructor(
         val chordNames = currentProgression.map { it.chordName.substringBefore(" ") }
         val detectedKeys = KeyDetector.detect(chordNames)
         val detectedKey = detectedKeys.firstOrNull() ?: return emptyList()
-        
+        android.util.Log.d("ContinueDebug", "Detected key: ${detectedKey.label}, chords in progression: $chordNames")
         val analysis = ProgressionAnalyzer.analyze(currentProgression, detectedKey)
         
         val request = ProgressionGenerationRequest(
@@ -875,29 +875,33 @@ class ChordViewModel @Inject constructor(
     fun addPhrase(generatedProgression: GeneratedProgression) {
         val currentProgression = progression.value
         if (currentProgression.isEmpty()) return
-        
-        val chordNames = currentProgression.map { it.chordName.substringBefore(" ") }
-        val detectedKeys = KeyDetector.detect(chordNames)
-        val detectedKey = detectedKeys.firstOrNull() ?: return
-        
-        // Convert TheoryChord objects to ChordEvent objects
-        generatedProgression.chords.forEach { theoryChord ->
-            val voicing = "Open"
-            
-            val chordEvent = ChordEvent(
-                id = UUID.randomUUID().toString(),
-                sessionId = sessionId,
-                barIndex = currentProgression.size / 4,
-                chordName = theoryChord.label,
-                rootMidi = 60,
-                midiNotes = calculateMidiNotes(theoryChord.root).joinToString(","),
-                voicing = voicing ?: "Open",
-                strumPatternId = null
-            )
-            
-            viewModelScope.launch {
-                true
+
+        viewModelScope.launch {
+            val startBarIndex = progression.value.size
+
+            generatedProgression.chords.forEachIndexed { index, theoryChord ->
+                val chordEvent = ChordEvent(
+                    id = UUID.randomUUID().toString(),
+                    sessionId = sessionId,
+                    barIndex = startBarIndex + index,
+                    chordName = theoryChord.label,
+                    rootMidi = 60,
+                    midiNotes = calculateMidiNotes(theoryChord.root).joinToString(","),
+                    voicing = "Open",
+                    strumPatternId = null
+                )
+                repository.saveChord(chordEvent)
             }
+
+            val updatedSession = session.value?.copy(
+                totalBars = startBarIndex + generatedProgression.chords.size
+            )
+            if (updatedSession != null) {
+                repository.updateSession(updatedSession)
+            }
+
+            update { copy(statusMessage = null) }
+
         }
     }
     /**

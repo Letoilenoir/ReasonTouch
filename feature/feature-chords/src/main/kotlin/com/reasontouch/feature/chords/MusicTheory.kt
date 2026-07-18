@@ -163,11 +163,15 @@ object MusicTheory {
         7 to HarmonicFunction.DOMINANT
     )
 
-    // Valid harmonic function transitions
+    // Valid harmonic function transitions.
+    // DOMINANT -> PREDOMINANT is the deceptive-cadence path; TRANSITION_WEIGHTS
+    // already scored it at 0.15 but it was previously unreachable here.
     val TRANSITIONS = mapOf(
-        HarmonicFunction.TONIC        to listOf(HarmonicFunction.PREDOMINANT, HarmonicFunction.DOMINANT),
-        HarmonicFunction.PREDOMINANT  to listOf(HarmonicFunction.DOMINANT),
-        HarmonicFunction.DOMINANT     to listOf(HarmonicFunction.TONIC)
+        // TONIC -> TONIC allows relative motion within tonic function (e.g. C -> Am)
+        HarmonicFunction.TONIC        to listOf(HarmonicFunction.PREDOMINANT, HarmonicFunction.DOMINANT, HarmonicFunction.TONIC),
+        // PREDOMINANT -> TONIC is the plagal cadence (IV -> I)
+        HarmonicFunction.PREDOMINANT  to listOf(HarmonicFunction.DOMINANT, HarmonicFunction.TONIC),
+        HarmonicFunction.DOMINANT     to listOf(HarmonicFunction.TONIC, HarmonicFunction.PREDOMINANT)
     )
 
     // Weighted transitions for natural feel — tonic most likely after dominant,

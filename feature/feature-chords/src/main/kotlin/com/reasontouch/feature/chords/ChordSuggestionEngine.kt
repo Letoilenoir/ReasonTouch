@@ -62,8 +62,11 @@ object ChordSuggestionEngine {
                 val transitionWeights = MusicTheory.TRANSITION_WEIGHTS[lastFunction]
                     ?: emptyMap()
                 val baseWeight   = transitionWeights[function] ?: 0.5f
+                // Reduced from (1.3/1.2/1.1) so degree-1/4/5 remain favoured
+                // for single-chord suggestions without erasing other diatonic
+                // options (needed for phrase-level planning, e.g. Continue).
                 val degreeWeight = when (degree) {
-                    1 -> 1.3f; 5 -> 1.2f; 4 -> 1.1f; else -> 1.0f
+                    1 -> 1.1f; 5 -> 1.05f; 4 -> 1.03f; else -> 1.0f
                 }
                 val weight    = baseWeight * degreeWeight
                 val roman     = romanNumeral(degree, key.isMinor, chord.quality)

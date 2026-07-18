@@ -103,7 +103,7 @@ fun ManualWorkspace(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "ÃƒÂ¢Ã…â€œÃ‚ÂÃƒÂ¯Ã‚Â¸Ã‚Â  MANUAL COMPOSITION",
+                                "MANUAL COMPOSITION",
                                 color = ACCENT,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
@@ -118,7 +118,7 @@ fun ManualWorkspace(
                                     .clickable { showDescriptor = false }
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
-                                Text("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¢", color = TEXT_DIM, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                Text("HIDE", color = TEXT_DIM, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                             }
                         }
 
@@ -160,7 +160,7 @@ fun ManualWorkspace(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¹ SHOW MANUAL INFO",
+                            "SHOW MANUAL INFO",
                             color = TEXT_DIM,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
@@ -251,7 +251,7 @@ fun ManualWorkspace(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ROLL",
+                                "-> ROLL",
                                 color = Color(0xFF3DDC84),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
@@ -341,14 +341,13 @@ fun ManualWorkspace(
                 options = currentOptions,
                 onOptionSelected = { selected ->
 
-                    // Temporary behaviour - all options still add the suggested bars
-
-                    repeat(currentSuggestion!!.suggestedBars / 4) {
-                        viewModel.addBar()
+                    currentGeneratedPhrases.getOrNull(selected)?.let { phrase ->
+                        viewModel.addPhrase(phrase)
                     }
 
                     showSuggestDialog = false
                     currentSuggestion = null
+                    currentGeneratedPhrases = emptyList()
                 },
                 onDismiss = {
                     showSuggestDialog = false
@@ -539,7 +538,7 @@ fun FixedBottomBar(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "ÃƒÂ°Ã…Â¸Ã‚Â§Ã‚Â  SUGGEST NEXT",
+                text = "SUGGEST NEXT",
                 color = Color(0xFF38BDF8), fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace, letterSpacing = 0.5.sp
