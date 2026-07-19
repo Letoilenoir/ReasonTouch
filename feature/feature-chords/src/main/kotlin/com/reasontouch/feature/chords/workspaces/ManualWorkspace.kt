@@ -281,7 +281,16 @@ fun ManualWorkspace(
                 currentSuggestion = suggestion
 
                 currentGeneratedPhrases = viewModel.suggestNextPhrases()
-                currentOptions = currentGeneratedPhrases.map { it.explanation }
+
+                currentOptions = if (currentGeneratedPhrases.isNotEmpty()) {
+                    currentGeneratedPhrases.map { it.explanation }
+                } else {
+                    listOf(
+                        "${suggestion.type.name} pathway not yet implemented — " +
+                                "this suggestion would use ${suggestion.type.name} " +
+                                "generation once available."
+                    )
+                }
 
                 showSuggestDialog = true
             }
@@ -290,7 +299,7 @@ fun ManualWorkspace(
     }
 
     // MODALS
-    // BassStyleSheet modal ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â will be added once extracted to shared components
+    // BassStyleSheet modal will be added once extracted to shared components
     // For now, bass generation is disabled
 
     if (showSendDialog) {

@@ -789,27 +789,40 @@ class ChordViewModel @Inject constructor(
      */
     fun suggestNextPhrases(): List<GeneratedProgression> {
         val currentProgression = progression.value
-        
+
         if (currentProgression.isEmpty()) {
             return emptyList()
         }
-        
+
         val chordNames = currentProgression.map { it.chordName.substringBefore(" ") }
         val detectedKeys = KeyDetector.detect(chordNames)
         val detectedKey = detectedKeys.firstOrNull() ?: return emptyList()
-        android.util.Log.d("ContinueDebug", "Detected key: ${detectedKey.label}, chords in progression: $chordNames")
         val analysis = ProgressionAnalyzer.analyze(currentProgression, detectedKey)
-        
+
+        val pairingDecision = PairingEngine.suggestNext(analysis)
+        val intent = pairingDecision.type.toCompositionIntent()
+
         val request = ProgressionGenerationRequest(
             sourceAnalysis = analysis,
             sourceProgression = currentProgression,
-            primaryIntent = CompositionIntent.CONTINUE,
+            primaryIntent = intent,
             targetSection = null,
             targetEnergy = null,
             preferredLength = 4
         )
-        
+
         return ProgressionGenerator.generate(request)
+    }
+
+    private fun PairingType.toCompositionIntent(): CompositionIntent = when (this) {
+        PairingType.CONTINUE  -> CompositionIntent.CONTINUE
+        PairingType.LIFT      -> CompositionIntent.LIFT
+        PairingType.CONTRAST  -> CompositionIntent.CONTRAST
+        PairingType.RESOLVE   -> CompositionIntent.RESOLVE
+        PairingType.EXPAND    -> CompositionIntent.EXPAND
+        PairingType.SURPRISE  -> CompositionIntent.SURPRISE
+        PairingType.SIMPLIFY  -> CompositionIntent.SIMPLIFY
+        PairingType.MODULATE  -> CompositionIntent.DEVELOP  // closest existing intent; no direct equivalent yet
     }
 
     /**
