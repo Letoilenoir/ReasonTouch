@@ -170,7 +170,22 @@ fun ManualWorkspace(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
             }
-
+            // STRUM PATTERN (using shared StrumPatternTray)
+            item {
+                SectionLabel("STRUM PATTERN")
+            }
+            item {
+                StrumPatternTray(
+                    selectedPattern = selectedPattern,
+                    onPatternSelected = { pattern ->
+                        selectedPattern = pattern
+                        viewModel.applyPreset(pattern)  // Update viewModel stepStates
+                    },
+                    patterns = StrumPatterns.groups,
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
             // CATEGORY FILTER
             item {
                 SectionLabel("CATEGORY")
@@ -208,24 +223,6 @@ fun ManualWorkspace(
                     )
                 }
             }
-
-            // STRUM PATTERN (using shared StrumPatternTray)
-            item {
-                SectionLabel("STRUM PATTERN")
-            }
-            item {
-                StrumPatternTray(
-                    selectedPattern = selectedPattern,
-                    onPatternSelected = { pattern ->
-                        selectedPattern = pattern
-                        viewModel.applyPreset(pattern)  // ÃƒÂ¢Ã¢â‚¬Â Ã‚Â Update viewModel stepStates
-                    },
-                    patterns = StrumPatterns.groups,
-                    modifier = Modifier.padding(horizontal = 12.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
             // HARMONY PANEL (collapsible) - will be added once extracted to shared components
             // For now, harmony suggestions are disabled
 
