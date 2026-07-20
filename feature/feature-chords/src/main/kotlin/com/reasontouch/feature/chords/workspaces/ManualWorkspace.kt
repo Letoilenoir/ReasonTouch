@@ -140,7 +140,7 @@ fun ManualWorkspace(
                             fontFamily = FontFamily.Monospace
                         )
                         Text(
-                            text = "1. Select a chord and voicing\n2. Choose a strum pattern\n3. Add bars to build your progression\n4. Send to Piano Roll for arrangement",
+                            text = "1. Choose a strum pattern\n2. Select a chord and voicing\n3. Add bars to build your progression\n4. Send to Piano Roll for arrangement",
                             color = TEXT_DIM,
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
@@ -229,42 +229,9 @@ fun ManualWorkspace(
             // ACTION BUTTONS (Send to Roll only)
             // Note: Harmony suggest and Bass buttons will be added once those components are extracted to shared
             item {
-                if (progression.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Send to Piano Roll button
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color(0xFF1A2A1A))
-                                .border(1.dp, Color(0xFF3DDC84), RoundedCornerShape(4.dp))
-                                .clickable { showSendDialog = true }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "-> ROLL",
-                                color = Color(0xFF3DDC84),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-            }
-
-            item {
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
-
         // PROGRESSION DISPLAY (fixed bottom bar)
         FixedBottomBar(
             progression = progression,
@@ -273,10 +240,10 @@ fun ManualWorkspace(
             onAddBar = viewModel::addBar,
             onRemoveBar = viewModel::removeBar,
             onClear = viewModel::clearProgression,
+            onSendToRoll = { showSendDialog = true },
             onSuggestNext = {
                 val suggestion = viewModel.suggestNextSection()
                 currentSuggestion = suggestion
-
                 currentGeneratedPhrases = viewModel.suggestNextPhrases()
 
                 currentOptions = if (currentGeneratedPhrases.isNotEmpty()) {
@@ -474,7 +441,8 @@ fun FixedBottomBar(
     onAddBar: () -> Unit,
     onRemoveBar: (com.reasontouch.core.data.ChordEvent) -> Unit,
     onClear: () -> Unit,
-    onSuggestNext: () -> Unit
+    onSuggestNext: () -> Unit,
+    onSendToRoll: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -520,22 +488,45 @@ fun FixedBottomBar(
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp))
         }
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(Color(0xFF1A3A5A))
-                .clickable(onClick = onSuggestNext)
-                .padding(vertical = 12.dp),
-            contentAlignment = Alignment.Center
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = "SUGGEST NEXT",
-                color = Color(0xFF38BDF8), fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace, letterSpacing = 0.5.sp
-            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF1A3A5A))
+                    .clickable(onClick = onSuggestNext)
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "SUGGEST NEXT",
+                    color = Color(0xFF38BDF8), fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace, letterSpacing = 0.5.sp
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF1A2A1A))
+                    .border(1.dp, Color(0xFF3DDC84), RoundedCornerShape(4.dp))
+                    .clickable(onClick = onSendToRoll)
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "-> ROLL",
+                    color = Color(0xFF3DDC84), fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace, letterSpacing = 0.5.sp
+                )
+            }
         }
         Box(
             modifier = Modifier

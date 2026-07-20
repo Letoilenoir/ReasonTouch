@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -71,7 +72,9 @@ fun ReasonTouchApp(repository: SessionRepository) {
 
         val currentSessionId =
             navBackStackEntry?.arguments?.getString("sessionId") ?: ""
-
+        val currentSession by remember(currentSessionId) {
+            repository.getSession(currentSessionId)
+        }.collectAsState(initial = null)
         var onBackAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
         Column(
@@ -224,11 +227,14 @@ fun ReasonTouchApp(repository: SessionRepository) {
                     ) {
 
                         Text(
-                            text = "\u2699 SESSION",
+                            text = "\u2699 ${currentSession?.name?.uppercase() ?: "SESSION"}",
                             color = TEXT_DIM,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 90.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(6.dp))
