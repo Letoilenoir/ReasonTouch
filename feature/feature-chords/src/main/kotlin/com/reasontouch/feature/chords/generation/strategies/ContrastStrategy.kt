@@ -2,7 +2,6 @@ package com.reasontouch.feature.chords.generation.strategies
 
 import com.reasontouch.feature.chords.ChordSuggestionEngine
 import com.reasontouch.feature.chords.GeneratedProgression
-import com.reasontouch.feature.chords.ProgressionAnalysis
 import com.reasontouch.feature.chords.ProgressionGenerationRequest
 import com.reasontouch.feature.chords.TheoryChord
 import com.reasontouch.feature.chords.guitarLabel
@@ -61,7 +60,7 @@ object ContrastStrategy {
             }
 
             if (continuation.isNotEmpty()) {
-                val openingChordLabel = continuation.firstOrNull()?.label ?: ""
+                val openingChordLabel = continuation.firstOrNull()?.guitarLabel() ?: ""
                 results.add(
                     GeneratedProgression(
                         chords = continuation,
@@ -72,11 +71,7 @@ object ContrastStrategy {
                 )
             }
         }
-
         return results.distinctBy { it.chords.map { c -> c.label } }
     }
-
-    private fun explanationFor(analysis: ProgressionAnalysis): String {
-        return "introduces a borrowed chord for genuine character change after a resolved, stable phrase."
-    }
 }
+

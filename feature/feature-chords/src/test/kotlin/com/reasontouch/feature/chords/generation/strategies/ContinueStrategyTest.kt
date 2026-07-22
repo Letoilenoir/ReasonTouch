@@ -206,4 +206,52 @@ class ContinueStrategyTest {
 
         assertTrue(candidates.isEmpty())
     }
+
+    @Test
+    fun `contrast opens with a borrowed chord and generates exactly the requested length`() {
+        val progression = buildProgression("F", "G", "C", "C")
+        val key = KeyDetector.detect(progression.map { it.chordName }).first()
+        val analysis = ProgressionAnalyzer.analyze(progression, key)
+
+        val request = ProgressionGenerationRequest(
+            sourceAnalysis = analysis,
+            sourceProgression = progression,
+            primaryIntent = CompositionIntent.CONTRAST,
+            targetSection = null,
+            targetEnergy = null,
+            preferredLength = 4
+        )
+
+        val candidates = ProgressionGenerator.generate(request)
+
+        assertTrue("Expected at least one CONTRAST candidate", candidates.isNotEmpty())
+        candidates.forEach { candidate ->
+            assertEquals("Expected exactly 4 chords", 4, candidate.chords.size)
+        }
+    }
+
+    @Test
+    fun `contrast produces three distinct borrowed-chord variants`() {
+        val progression = buildProgression("F", "G", "C", "C")
+        val key = KeyDetector.detect(progression.map { it.chordName }).first()
+        val analysis = ProgressionAnalyzer.analyze(progression, key)
+
+        val request = ProgressionGenerationRequest(
+            sourceAnalysis = analysis,
+            sourceProgression = progression,
+            primaryIntent = CompositionIntent.CONTRAST,
+            targetSection = null,
+            targetEnergy = null,
+            preferredLength = 4
+        )
+
+        val candidates = ProgressionGenerator.generate(request)
+
+        assertEquals(
+            "Expected exactly 3 distinct borrowed-chord variants (bVII, iv, bVI)",
+            3,
+            candidates.size
+        )
+    }
+
 }
