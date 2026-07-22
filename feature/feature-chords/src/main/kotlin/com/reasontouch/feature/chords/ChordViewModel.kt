@@ -841,7 +841,7 @@ class ChordViewModel @Inject constructor(
                     id = UUID.randomUUID().toString(),
                     sessionId = sessionId,
                     barIndex = startBarIndex + index,
-                    chordName = theoryChord.label,
+                    chordName = theoryChord.guitarLabel(),
                     rootMidi = 60,
                     midiNotes = calculateMidiNotes(theoryChord.root).joinToString(","),
                     voicing = "Open",

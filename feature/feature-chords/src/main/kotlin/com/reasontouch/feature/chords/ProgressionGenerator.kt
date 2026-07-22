@@ -1,7 +1,7 @@
 package com.reasontouch.feature.chords
-
 import com.reasontouch.feature.chords.CompositionIntent
 import com.reasontouch.feature.chords.generation.strategies.ContinueStrategy
+import com.reasontouch.feature.chords.generation.strategies.ContrastStrategy
 
 /**
  * Delegates chord progression generation to strategy-specific implementations.
@@ -29,7 +29,7 @@ object ProgressionGenerator {
                 emptyList()  // TODO: LiftStrategy
 
             CompositionIntent.CONTRAST ->
-                emptyList()  // TODO: ContrastStrategy
+                ContrastStrategy.generate(request)
 
             else ->
                 emptyList()
