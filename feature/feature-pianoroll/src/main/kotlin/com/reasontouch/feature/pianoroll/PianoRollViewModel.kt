@@ -11,6 +11,16 @@ import com.reasontouch.core.data.NoteEvent
 import com.reasontouch.core.data.Session
 import com.reasontouch.core.data.SessionRepository
 import com.reasontouch.core.playback.PlaybackController
+import com.reasontouch.feature.chords.CompositionIntent
+import com.reasontouch.feature.chords.GeneratedProgression
+import com.reasontouch.feature.chords.KeyDetector
+import com.reasontouch.feature.chords.PairingDecision
+import com.reasontouch.feature.chords.PairingEngine
+import com.reasontouch.feature.chords.PairingType
+import com.reasontouch.feature.chords.ProgressionAnalyzer
+import com.reasontouch.feature.chords.ProgressionGenerationRequest
+import com.reasontouch.feature.chords.ProgressionGenerator
+import com.reasontouch.feature.chords.guitarLabel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -813,5 +823,95 @@ class PianoRollViewModel @Inject constructor(
         return (
                 Math.round(beat / snapValue) * snapValue
                 )
+    }
+
+    fun suggestNextPhrases(): List<GeneratedProgression> {
+        val currentProgression = chords.value
+
+        if (currentProgression.isEmpty()) {
+            return emptyList()
+        }
+
+        val chordNames = currentProgression.map { it.chordName.substringBefore(" ") }
+        val detectedKeys = KeyDetector.detect(chordNames)
+        val detectedKey = detectedKeys.firstOrNull() ?: return emptyList()
+        val analysis = ProgressionAnalyzer.analyze(currentProgression, detectedKey)
+
+        val pairingDecision = PairingEngine.suggestNext(analysis)
+        val intent = pairingDecision.type.toCompositionIntent()
+
+        val request = ProgressionGenerationRequest(
+            sourceAnalysis = analysis,
+            sourceProgression = currentProgression,
+            primaryIntent = intent,
+            targetSection = null,
+            targetEnergy = null,
+            preferredLength = 4
+        )
+
+        return ProgressionGenerator.generate(request)
+    }
+
+    fun suggestNextSection(): PairingDecision {
+        val currentProgression = chords.value
+        if (currentProgression.isEmpty()) {
+            return PairingDecision(
+                type = PairingType.CONTINUE,
+                suggestedBars = 4,
+                confidence = 0.3f,
+                rationale = "Could not detect key"
+            )
+        }
+        val chordNames = currentProgression.map { it.chordName.substringBefore(" ") }
+        val detectedKeys = KeyDetector.detect(chordNames)
+        val detectedKey = detectedKeys.firstOrNull() ?: return PairingDecision(
+            type = PairingType.CONTINUE,
+            suggestedBars = 4,
+            confidence = 0.3f,
+            rationale = "Could not detect key"
+        )
+        val analysis = ProgressionAnalyzer.analyze(currentProgression, detectedKey)
+        return PairingEngine.suggestNext(analysis)
+    }
+
+    fun addPhrase(generatedProgression: GeneratedProgression) {
+        val currentProgression = chords.value
+        if (currentProgression.isEmpty()) return
+
+        viewModelScope.launch {
+            val startBarIndex = chords.value.size
+
+            generatedProgression.chords.forEachIndexed { index, theoryChord ->
+                val chordEvent = ChordEvent(
+                    id = UUID.randomUUID().toString(),
+                    sessionId = sessionId,
+                    barIndex = startBarIndex + index,
+                    chordName = theoryChord.guitarLabel(),
+                    rootMidi = 60,
+                    midiNotes = theoryChord.midiNotes.joinToString(","),
+                    voicing = "Open",
+                    strumPatternId = null
+                )
+                repository.saveChord(chordEvent)
+            }
+
+            val updatedSession = session.value?.copy(
+                totalBars = startBarIndex + generatedProgression.chords.size
+            )
+            if (updatedSession != null) {
+                repository.updateSession(updatedSession)
+            }
+        }
+    }
+
+    private fun PairingType.toCompositionIntent(): CompositionIntent = when (this) {
+        PairingType.CONTINUE  -> CompositionIntent.CONTINUE
+        PairingType.LIFT      -> CompositionIntent.LIFT
+        PairingType.CONTRAST  -> CompositionIntent.CONTRAST
+        PairingType.RESOLVE   -> CompositionIntent.RESOLVE
+        PairingType.EXPAND    -> CompositionIntent.EXPAND
+        PairingType.SURPRISE  -> CompositionIntent.SURPRISE
+        PairingType.SIMPLIFY  -> CompositionIntent.SIMPLIFY
+        PairingType.MODULATE  -> CompositionIntent.DEVELOP
     }
 }
