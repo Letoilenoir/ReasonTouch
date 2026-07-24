@@ -843,7 +843,7 @@ class ChordViewModel @Inject constructor(
                     barIndex = startBarIndex + index,
                     chordName = theoryChord.guitarLabel(),
                     rootMidi = 60,
-                    midiNotes = calculateMidiNotes(theoryChord.root).joinToString(","),
+                    midiNotes = theoryChord.midiNotes.joinToString(","),
                     voicing = "Open",
                     strumPatternId = null
                 )
@@ -861,25 +861,5 @@ class ChordViewModel @Inject constructor(
 
         }
     }
-    /**
-     * Calculate MIDI notes for a chord based on its root.
-     * Returns a simple voicing with root, third, and fifth.
-     */
-    private fun calculateMidiNotes(root: NoteClass): List<Int> {
-        val rootMidi = when(root) {
-            NoteClass.C -> 60
-            NoteClass.Cs -> 61
-            NoteClass.D -> 62
-            NoteClass.Ds -> 63
-            NoteClass.E -> 64
-            NoteClass.F -> 65
-            NoteClass.Fs -> 66
-            NoteClass.G -> 67
-            NoteClass.Gs -> 68
-            NoteClass.A -> 69
-            NoteClass.As -> 70
-            NoteClass.B -> 71
-        }
-        return listOf(rootMidi, rootMidi + 4, rootMidi + 7)  // Root, third, fifth
-        }
+
 }
