@@ -114,6 +114,16 @@ fun PianoRollScreen(
         }
     }
 
+    val playheadBeat by viewModel.playheadBeat.collectAsState()
+    val isPlaying    by viewModel.isPlaying.collectAsState()
+    val hasClipboard by viewModel.hasClipboard.collectAsState()
+    val drawDuration by viewModel.drawDuration.collectAsState()
+    var showInstrumentPanel by remember { mutableStateOf(false) }
+    var showSuggestDialog by remember { mutableStateOf(false) }
+    var currentSuggestion by remember { mutableStateOf<com.reasontouch.feature.chords.PairingDecision?>(null) }
+    var currentGeneratedPhrases by remember { mutableStateOf<List<com.reasontouch.feature.chords.GeneratedProgression>>(emptyList()) }
+    var currentOptions by remember { mutableStateOf<List<String>>(emptyList()) }
+
     val session      by viewModel.session.collectAsState()
     val tracks       by viewModel.tracks.collectAsState()
     val activeIndex  by viewModel.activeTrackIndex.collectAsState()
@@ -125,13 +135,6 @@ fun PianoRollScreen(
     val loopEnabled  by viewModel.loopEnabled.collectAsState()
     val loopStart    by viewModel.loopStart.collectAsState()
     val loopEnd      by viewModel.loopEnd.collectAsState()
-    val playheadBeat by viewModel.playheadBeat.collectAsState()
-    val isPlaying    by viewModel.isPlaying.collectAsState()
-    val hasClipboard by viewModel.hasClipboard.collectAsState()
-    val drawDuration by viewModel.drawDuration.collectAsState()
-
-    var showInstrumentPanel by remember { mutableStateOf(false) }
-
     val bpm       = session?.bpm ?: 120
     val totalBars = session?.totalBars ?: 4
 
@@ -175,8 +178,33 @@ fun PianoRollScreen(
             onTool            = viewModel::setTool,
             onSnapCycle       = { viewModel.setSnapIndex((snapIndex + 1) % viewModel.snapValues.size) },
             onLoopToggle      = viewModel::toggleLoop,
-            onInstrumentClick = { showInstrumentPanel = !showInstrumentPanel }
+            onInstrumentClick = { showInstrumentPanel = !showInstrumentPanel },
+            onSuggestNext     = {
+                val suggestion = viewModel.suggestNextSection()
+                currentSuggestion = suggestion
+                currentGeneratedPhrases = viewModel.suggestNextPhrases()
+                currentOptions = currentGeneratedPhrases.map { it.explanation }
+                showSuggestDialog = true
+            }
         )
+        if (showSuggestDialog && currentSuggestion != null) {
+            com.reasontouch.feature.chords.components.SuggestNextDialog(
+                decision = currentSuggestion!!,
+                options = currentOptions,
+                onOptionSelected = { selected ->
+                    currentGeneratedPhrases.getOrNull(selected)?.let { phrase ->
+                        viewModel.addPhrase(phrase)
+                    }
+                    showSuggestDialog = false
+                    currentSuggestion = null
+                    currentGeneratedPhrases = emptyList()
+                },
+                onDismiss = {
+                    showSuggestDialog = false
+                    currentSuggestion = null
+                }
+            )
+        }
 
         if (uiState.hasSelection) {
             SelectionActionBar(
@@ -190,7 +218,7 @@ fun PianoRollScreen(
             )
         }
 
-        // Floating instrument panel � appears above track row when open
+        // Floating instrument panel - appears above track row when open
         if (showInstrumentPanel) {
             val activeTrack = tracks.getOrNull(activeIndex)
             if (activeTrack != null) {
@@ -396,7 +424,8 @@ fun PianoRollToolbar(
     onTool:            (PianoRollViewModel.Tool) -> Unit,
     onSnapCycle:       () -> Unit,
     onLoopToggle:      () -> Unit,
-    onInstrumentClick: () -> Unit
+    onInstrumentClick: () -> Unit,
+    onSuggestNext:     () -> Unit
 ) {
     val activeTrack = uiState.tracks.getOrNull(uiState.activeIndex)
     val emoji       = if (activeTrack != null) emojiForTrack(activeTrack.name) else "\uD83C\uDFB5"
@@ -431,7 +460,16 @@ fun PianoRollToolbar(
             onClick        = onLoopToggle
         )
         Divider()
-        // Instrument selector button � right side, weight fills remaining space
+        ToolChip(
+            label          = "SUGGEST",
+            selected       = false,
+            selectedColor  = Color(0xFF1A3A5A),
+            selectedBorder = Color(0xFF38BDF8),
+            selectedText   = Color(0xFF38BDF8),
+            onClick        = onSuggestNext
+        )
+        Divider()
+        // Instrument selector button - right side, weight fills remaining space
         Box(
             modifier = Modifier
                 .weight(1f)

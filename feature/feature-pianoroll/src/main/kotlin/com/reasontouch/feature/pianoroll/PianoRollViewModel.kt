@@ -1,5 +1,6 @@
 package com.reasontouch.feature.pianoroll
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -62,6 +63,22 @@ class PianoRollViewModel @Inject constructor(
 
     val chords: StateFlow<List<ChordEvent>> =
         repository.getChordsForSession(sessionId)
+            .map { chordList ->
+
+                Log.e(
+                    "BOUDIE",
+                    "Repository returned ${chordList.size} chord(s)"
+                )
+
+                chordList.forEachIndexed { index, chord ->
+                    Log.e(
+                        "BOUDIE",
+                        "[$index] ${chord.chordName}"
+                    )
+                }
+
+                chordList
+            }
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5000),
@@ -853,7 +870,19 @@ class PianoRollViewModel @Inject constructor(
     }
 
     fun suggestNextSection(): PairingDecision {
+
+        Log.e("BOUDIE", "========================================")
+        Log.e("BOUDIE", "suggestNextSection() ENTERED")
+        Log.e("BOUDIE", "========================================")
+
         val currentProgression = chords.value
+
+        Log.e("BOUDIE", "Session = $sessionId")
+        Log.e("BOUDIE", "Chord count = ${currentProgression.size}")
+
+        currentProgression.forEachIndexed { index, chord ->
+            Log.e("BOUDIE", "[$index] ${chord.chordName}")
+        }
         if (currentProgression.isEmpty()) {
             return PairingDecision(
                 type = PairingType.CONTINUE,

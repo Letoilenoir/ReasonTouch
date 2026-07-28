@@ -1,5 +1,6 @@
 package com.reasontouch.feature.chords
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -185,7 +186,16 @@ class ChordViewModel @Inject constructor(
                 voicing = pos,
                 strumPatternId = null
             )
-            repository.saveChord(chordEvent)
+            Log.e("BOUDIE", "Saving chord:")
+            Log.e("BOUDIE", "Session = $sessionId")
+            Log.e("BOUDIE", "Bar = $barIndex")
+            Log.e("BOUDIE", "Chord = ${chordEvent.chordName}")
+            try {
+                repository.saveChord(chordEvent)
+                Log.e("BOUDIE", "Save COMPLETE for bar $barIndex")
+            } catch (e: Exception) {
+                Log.e("BOUDIE", "Save FAILED for bar $barIndex: ${e.javaClass.simpleName}: ${e.message}", e)
+            }
             val updatedSession = session.value?.copy(totalBars = progression.value.size + 1)
             if (updatedSession != null) {
                 repository.updateSession(updatedSession)
@@ -760,8 +770,19 @@ class ChordViewModel @Inject constructor(
     }
 
     // STAGE 4: Pairing Engine Integration
+
     fun suggestNextSection(): PairingDecision {
+
         val currentProgression = progression.value
+
+        Log.e("BOUDIE", "====================================")
+        Log.e("BOUDIE", "ChordViewModel suggestNextSection()")
+        Log.e("BOUDIE", "progression size = ${currentProgression.size}")
+
+        currentProgression.forEachIndexed { i, chord ->
+            Log.e("BOUDIE", "[$i] ${chord.chordName}")
+        }
+
         if (currentProgression.isEmpty()) {
             return PairingDecision(
                 type = PairingType.CONTINUE,
@@ -771,16 +792,23 @@ class ChordViewModel @Inject constructor(
             )
         }
 
-        val chordNames = currentProgression.map { it.chordName.substringBefore(" ") }
+        val chordNames = currentProgression.map {
+            it.chordName.substringBefore(" ")
+        }
+
         val detectedKeys = KeyDetector.detect(chordNames)
-        val detectedKey = detectedKeys.firstOrNull() ?: return PairingDecision(
-            type = PairingType.CONTINUE,
-            suggestedBars = 4,
-            confidence = 0.3f,
-            rationale = "Could not detect key"
-        )
-        
-        val analysis = ProgressionAnalyzer.analyze(currentProgression, detectedKey)
+
+        val detectedKey = detectedKeys.firstOrNull()
+            ?: return PairingDecision(
+                type = PairingType.CONTINUE,
+                suggestedBars = 4,
+                confidence = 0.3f,
+                rationale = "Could not detect key"
+            )
+
+        val analysis =
+            ProgressionAnalyzer.analyze(currentProgression, detectedKey)
+
         return PairingEngine.suggestNext(analysis)
     }
     /**
@@ -788,32 +816,111 @@ class ChordViewModel @Inject constructor(
      * Returns List<GeneratedProgression> with actual TheoryChord data.
      */
     fun suggestNextPhrases(): List<GeneratedProgression> {
+
+        android.util.Log.e("PAIRTRACE", "========================================")
+        android.util.Log.e("PAIRTRACE", "suggestNextPhrases() ENTERED")
+        android.util.Log.e("PAIRTRACE", "Progression bars = ${progression.value.size}")
+
         val currentProgression = progression.value
 
+        currentProgression.forEachIndexed { index, chord ->
+            android.util.Log.e(
+                "PAIRTRACE",
+                "Bar $index : ${chord.chordName}"
+            )
+        }
+
         if (currentProgression.isEmpty()) {
+            android.util.Log.e("PAIRTRACE", "Progression EMPTY")
             return emptyList()
         }
 
-        val chordNames = currentProgression.map { it.chordName.substringBefore(" ") }
-        val detectedKeys = KeyDetector.detect(chordNames)
-        val detectedKey = detectedKeys.firstOrNull() ?: return emptyList()
-        val analysis = ProgressionAnalyzer.analyze(currentProgression, detectedKey)
+        val chordNames = currentProgression.map {
+            it.chordName.substringBefore(" ")
+        }
 
-        val pairingDecision = PairingEngine.suggestNext(analysis)
-        val intent = pairingDecision.type.toCompositionIntent()
-
-        val request = ProgressionGenerationRequest(
-            sourceAnalysis = analysis,
-            sourceProgression = currentProgression,
-            primaryIntent = intent,
-            targetSection = null,
-            targetEnergy = null,
-            preferredLength = 4
+        android.util.Log.e(
+            "PAIRTRACE",
+            "Chord list = $chordNames"
         )
 
-        return ProgressionGenerator.generate(request)
-    }
+        val detectedKeys = KeyDetector.detect(chordNames)
 
+        android.util.Log.e(
+            "PAIRTRACE",
+            "Detected keys = $detectedKeys"
+        )
+
+        val detectedKey = detectedKeys.firstOrNull()
+
+        if (detectedKey == null) {
+            android.util.Log.e("PAIRTRACE", "NO KEY DETECTED")
+            return emptyList()
+        }
+
+        android.util.Log.e(
+            "PAIRTRACE",
+            "Using key = $detectedKey"
+        )
+
+        val analysis =
+            ProgressionAnalyzer.analyze(currentProgression, detectedKey)
+
+        android.util.Log.e(
+            "PAIRTRACE",
+            "Analysis = $analysis"
+        )
+
+        val pairingDecision =
+            PairingEngine.suggestNext(analysis)
+
+        android.util.Log.e(
+            "PAIRTRACE",
+            "Decision = $pairingDecision"
+        )
+
+        val intent =
+            pairingDecision.type.toCompositionIntent()
+
+        android.util.Log.e(
+            "PAIRTRACE",
+            "Intent = $intent"
+        )
+
+        val request =
+            ProgressionGenerationRequest(
+                sourceAnalysis = analysis,
+                sourceProgression = currentProgression,
+                primaryIntent = intent,
+                targetSection = null,
+                targetEnergy = null,
+                preferredLength = 4
+            )
+
+        android.util.Log.e(
+            "PAIRTRACE",
+            "Calling ProgressionGenerator..."
+        )
+
+        val generated =
+            ProgressionGenerator.generate(request)
+
+        android.util.Log.e(
+            "PAIRTRACE",
+            "Generator returned ${generated.size} phrase(s)"
+        )
+
+        generated.forEachIndexed { index, phrase ->
+            android.util.Log.e(
+                "PAIRTRACE",
+                "Phrase $index : ${phrase.chords.map { it.guitarLabel() }}"
+            )
+        }
+
+        android.util.Log.e("PAIRTRACE", "suggestNextPhrases() EXIT")
+
+        return generated
+    }
     private fun PairingType.toCompositionIntent(): CompositionIntent = when (this) {
         PairingType.CONTINUE  -> CompositionIntent.CONTINUE
         PairingType.LIFT      -> CompositionIntent.LIFT
