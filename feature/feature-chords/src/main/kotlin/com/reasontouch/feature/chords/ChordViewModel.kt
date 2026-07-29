@@ -186,16 +186,7 @@ class ChordViewModel @Inject constructor(
                 voicing = pos,
                 strumPatternId = null
             )
-            Log.e("BOUDIE", "Saving chord:")
-            Log.e("BOUDIE", "Session = $sessionId")
-            Log.e("BOUDIE", "Bar = $barIndex")
-            Log.e("BOUDIE", "Chord = ${chordEvent.chordName}")
-            try {
-                repository.saveChord(chordEvent)
-                Log.e("BOUDIE", "Save COMPLETE for bar $barIndex")
-            } catch (e: Exception) {
-                Log.e("BOUDIE", "Save FAILED for bar $barIndex: ${e.javaClass.simpleName}: ${e.message}", e)
-            }
+            repository.saveChord(chordEvent)
             val updatedSession = session.value?.copy(totalBars = progression.value.size + 1)
             if (updatedSession != null) {
                 repository.updateSession(updatedSession)
@@ -772,17 +763,7 @@ class ChordViewModel @Inject constructor(
     // STAGE 4: Pairing Engine Integration
 
     fun suggestNextSection(): PairingDecision {
-
         val currentProgression = progression.value
-
-        Log.e("BOUDIE", "====================================")
-        Log.e("BOUDIE", "ChordViewModel suggestNextSection()")
-        Log.e("BOUDIE", "progression size = ${currentProgression.size}")
-
-        currentProgression.forEachIndexed { i, chord ->
-            Log.e("BOUDIE", "[$i] ${chord.chordName}")
-        }
-
         if (currentProgression.isEmpty()) {
             return PairingDecision(
                 type = PairingType.CONTINUE,

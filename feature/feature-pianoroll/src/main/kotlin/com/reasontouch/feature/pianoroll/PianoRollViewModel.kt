@@ -63,22 +63,6 @@ class PianoRollViewModel @Inject constructor(
 
     val chords: StateFlow<List<ChordEvent>> =
         repository.getChordsForSession(sessionId)
-            .map { chordList ->
-
-                Log.e(
-                    "BOUDIE",
-                    "Repository returned ${chordList.size} chord(s)"
-                )
-
-                chordList.forEachIndexed { index, chord ->
-                    Log.e(
-                        "BOUDIE",
-                        "[$index] ${chord.chordName}"
-                    )
-                }
-
-                chordList
-            }
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5000),
@@ -842,21 +826,17 @@ class PianoRollViewModel @Inject constructor(
                 )
     }
 
-    fun suggestNextPhrases(): List<GeneratedProgression> {
-        val currentProgression = chords.value
-
+    suspend fun suggestNextPhrases(): List<GeneratedProgression> {
+        val currentProgression = repository.getChordsForSessionOnce(sessionId)
         if (currentProgression.isEmpty()) {
             return emptyList()
         }
-
         val chordNames = currentProgression.map { it.chordName.substringBefore(" ") }
         val detectedKeys = KeyDetector.detect(chordNames)
         val detectedKey = detectedKeys.firstOrNull() ?: return emptyList()
         val analysis = ProgressionAnalyzer.analyze(currentProgression, detectedKey)
-
         val pairingDecision = PairingEngine.suggestNext(analysis)
         val intent = pairingDecision.type.toCompositionIntent()
-
         val request = ProgressionGenerationRequest(
             sourceAnalysis = analysis,
             sourceProgression = currentProgression,
@@ -865,24 +845,12 @@ class PianoRollViewModel @Inject constructor(
             targetEnergy = null,
             preferredLength = 4
         )
-
         return ProgressionGenerator.generate(request)
     }
 
-    fun suggestNextSection(): PairingDecision {
-
-        Log.e("BOUDIE", "========================================")
-        Log.e("BOUDIE", "suggestNextSection() ENTERED")
-        Log.e("BOUDIE", "========================================")
-
-        val currentProgression = chords.value
-
-        Log.e("BOUDIE", "Session = $sessionId")
-        Log.e("BOUDIE", "Chord count = ${currentProgression.size}")
-
-        currentProgression.forEachIndexed { index, chord ->
-            Log.e("BOUDIE", "[$index] ${chord.chordName}")
-        }
+    // NEW:
+    suspend fun suggestNextSection(): PairingDecision {
+        val currentProgression = repository.getChordsForSessionOnce(sessionId)
         if (currentProgression.isEmpty()) {
             return PairingDecision(
                 type = PairingType.CONTINUE,
@@ -902,13 +870,13 @@ class PianoRollViewModel @Inject constructor(
         val analysis = ProgressionAnalyzer.analyze(currentProgression, detectedKey)
         return PairingEngine.suggestNext(analysis)
     }
-
+    // NEW:
     fun addPhrase(generatedProgression: GeneratedProgression) {
-        val currentProgression = chords.value
-        if (currentProgression.isEmpty()) return
-
         viewModelScope.launch {
-            val startBarIndex = chords.value.size
+            val currentProgression = repository.getChordsForSessionOnce(sessionId)
+            if (currentProgression.isEmpty()) return@launch
+
+            val startBarIndex = currentProgression.size
 
             generatedProgression.chords.forEachIndexed { index, theoryChord ->
                 val chordEvent = ChordEvent(

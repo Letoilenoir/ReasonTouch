@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 // GmInstrument defined locally to avoid cross-module dependency
 data class TrackInstrument(val label: String, val program: Int)
 
@@ -171,6 +173,7 @@ fun PianoRollScreen(
         if (!isPlaying && playheadBeat == 0f) state.scrollX = 0f
     }
 
+    val scope = rememberCoroutineScope()
     Column(modifier = Modifier.fillMaxSize().background(BG)) {
 
         PianoRollToolbar(
@@ -180,11 +183,13 @@ fun PianoRollScreen(
             onLoopToggle      = viewModel::toggleLoop,
             onInstrumentClick = { showInstrumentPanel = !showInstrumentPanel },
             onSuggestNext     = {
-                val suggestion = viewModel.suggestNextSection()
-                currentSuggestion = suggestion
-                currentGeneratedPhrases = viewModel.suggestNextPhrases()
-                currentOptions = currentGeneratedPhrases.map { it.explanation }
-                showSuggestDialog = true
+                scope.launch {
+                    val suggestion = viewModel.suggestNextSection()
+                    currentSuggestion = suggestion
+                    currentGeneratedPhrases = viewModel.suggestNextPhrases()
+                    currentOptions = currentGeneratedPhrases.map { it.explanation }
+                    showSuggestDialog = true
+                }
             }
         )
         if (showSuggestDialog && currentSuggestion != null) {

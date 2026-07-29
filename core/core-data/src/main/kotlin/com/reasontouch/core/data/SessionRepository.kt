@@ -44,6 +44,8 @@ class SessionRepository @Inject constructor(
     // -- Chords --------------------------------------------
     fun getChordsForSession(sessionId: String): Flow<List<ChordEvent>> =
         chordDao.getChordsForSession(sessionId)
+    suspend fun getChordsForSessionOnce(sessionId: String): List<ChordEvent> =
+        chordDao.getChordsForSessionOnce(sessionId)
     suspend fun saveChord(chord: ChordEvent) = chordDao.insertChord(chord)
     suspend fun saveChords(chords: List<ChordEvent>) = chordDao.insertChords(chords)
     suspend fun updateChord(chord: ChordEvent) = chordDao.updateChord(chord)
@@ -101,7 +103,7 @@ class SessionRepository @Inject constructor(
     // -- Preset pattern seeding ----------------------------
     suspend fun seedPresetsIfEmpty() {
         val existing = strumPatternDao.getPresetPatterns()
-        // Only seed once — checked via one-shot query
+        // Only seed once ï¿½ checked via one-shot query
         val presets = buildPresetPatterns()
         presets.forEach { (pattern, steps) ->
             strumPatternDao.insertPattern(pattern)
@@ -112,7 +114,7 @@ class SessionRepository @Inject constructor(
     private fun buildPresetPatterns(): List<Pair<StrumPattern, List<StrumStep>>> {
         val result = mutableListOf<Pair<StrumPattern, List<StrumStep>>>()
 
-        // All Down — every beat, all down strums
+        // All Down ï¿½ every beat, all down strums
         val allDown = StrumPattern(
             name = "All Down",
             beats = 4, subdivisions = 4,
@@ -129,7 +131,7 @@ class SessionRepository @Inject constructor(
         }
         result.add(Pair(allDown, allDownSteps))
 
-        // Down/Up 8ths — alternating every 2 steps
+        // Down/Up 8ths ï¿½ alternating every 2 steps
         val downUp8 = StrumPattern(
             name = "Down/Up 8ths",
             beats = 4, subdivisions = 4,
@@ -146,14 +148,14 @@ class SessionRepository @Inject constructor(
         }
         result.add(Pair(downUp8, downUp8Steps))
 
-        // Folk — D DU UDU
+        // Folk ï¿½ D DU UDU
         val folk = StrumPattern(
             name = "Folk",
             beats = 4, subdivisions = 4,
             strumSpeed = "NATURAL",
             isPreset = true
         )
-        // Steps 0,2,4,6,7,8,10,11 active — D.DU.UDU
+        // Steps 0,2,4,6,7,8,10,11 active ï¿½ D.DU.UDU
         val folkActive = setOf(0, 2, 4, 6, 7, 8, 10, 11)
         val folkDir = mapOf(0 to "DOWN", 2 to "DOWN", 4 to "DOWN",
             6 to "UP", 7 to "UP", 8 to "DOWN", 10 to "UP", 11 to "DOWN")
@@ -187,7 +189,7 @@ class SessionRepository @Inject constructor(
         }
         result.add(Pair(rock, rockSteps))
 
-        // Reggae — upstrokes on offbeats
+        // Reggae ï¿½ upstrokes on offbeats
         val reggae = StrumPattern(
             name = "Reggae",
             beats = 4, subdivisions = 4,

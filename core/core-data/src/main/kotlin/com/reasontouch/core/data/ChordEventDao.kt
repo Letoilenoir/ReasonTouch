@@ -14,6 +14,9 @@ interface ChordEventDao {
     @Query("SELECT * FROM chord_events WHERE sessionId = :sessionId ORDER BY barIndex ASC")
     fun getChordsForSession(sessionId: String): Flow<List<ChordEvent>>
 
+    @Query("SELECT * FROM chord_events WHERE sessionId = :sessionId ORDER BY barIndex ASC")
+    suspend fun getChordsForSessionOnce(sessionId: String): List<ChordEvent>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertChord(chord: ChordEvent)
 
