@@ -142,17 +142,18 @@ class Sequencer @Inject constructor(
     }
 
     private fun computeEndBeat(allNotes: Map<String, List<NoteEvent>>): Float {
-        val lastNoteBeat = allNotes.values.flatten().maxOfOrNull { it.beat } ?: 0f
-        if (lastNoteBeat <= 0f) return 4f
+        val lastNoteEnd = allNotes.values.flatten()
+            .maxOfOrNull { it.beat + it.duration } ?: 0f
+        if (lastNoteEnd <= 0f) return 4f
 
         // Use epsilon-safe truncation instead of ceil
         val epsilon = 0.001f
-        val barNumber = if (kotlin.math.abs(lastNoteBeat % 4f) < epsilon) {
-            // Note ends at bar boundary
-            (lastNoteBeat / 4f).toInt()
+        val barNumber = if (kotlin.math.abs(lastNoteEnd % 4f) < epsilon) {
+            // Note ends exactly at a bar boundary
+            (lastNoteEnd / 4f).toInt()
         } else {
-            // Round up to next bar boundary
-            (lastNoteBeat / 4f).toInt() + 1
+            // Round up to include the bar this note ends within
+            (lastNoteEnd / 4f).toInt() + 1
         }.coerceAtLeast(1)
 
         return (barNumber * 4f).toFloat()

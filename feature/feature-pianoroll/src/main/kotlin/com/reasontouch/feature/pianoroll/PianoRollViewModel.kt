@@ -843,7 +843,7 @@ class PianoRollViewModel @Inject constructor(
             primaryIntent = intent,
             targetSection = null,
             targetEnergy = null,
-            preferredLength = 4
+            preferredLength = pairingDecision.suggestedBars
         )
         return ProgressionGenerator.generate(request)
     }
@@ -877,12 +877,17 @@ class PianoRollViewModel @Inject constructor(
             if (currentProgression.isEmpty()) return@launch
 
             val startBarIndex = currentProgression.size
+            val beatsPerBar = (session.value?.timeSignatureNumerator ?: 4).toFloat()
+            val chordTrack = tracks.value.firstOrNull { it.name == "CHORD" }
+
+            val newNotes = mutableListOf<NoteEvent>()
 
             generatedProgression.chords.forEachIndexed { index, theoryChord ->
+                val barIndex = startBarIndex + index
                 val chordEvent = ChordEvent(
                     id = UUID.randomUUID().toString(),
                     sessionId = sessionId,
-                    barIndex = startBarIndex + index,
+                    barIndex = barIndex,
                     chordName = theoryChord.guitarLabel(),
                     rootMidi = 60,
                     midiNotes = theoryChord.midiNotes.joinToString(","),
@@ -890,6 +895,33 @@ class PianoRollViewModel @Inject constructor(
                     strumPatternId = null
                 )
                 repository.saveChord(chordEvent)
+
+                if (chordTrack != null) {
+                    val beatStart = barIndex * beatsPerBar
+                    theoryChord.midiNotes.forEach { midiNote ->
+                        newNotes.add(
+                            NoteEvent(
+                                id = UUID.randomUUID().toString(),
+                                trackId = chordTrack.id,
+                                pitch = 108 - midiNote,
+                                beat = beatStart,
+                                duration = beatsPerBar,
+                                velocity = 80
+                            )
+                        )
+                    }
+                }
+            }
+
+            if (newNotes.isNotEmpty()) {
+                repository.saveNotes(newNotes)
+                val current = _allNotes.value.toMutableMap()
+                if (chordTrack != null) {
+                    current[chordTrack.id] =
+                        (current[chordTrack.id] ?: emptyList()) + newNotes
+                }
+                _allNotes.value = current
+                updateActiveNotes()
             }
 
             val updatedSession = session.value?.copy(
