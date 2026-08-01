@@ -1,0 +1,28 @@
+﻿@startuml MoodWorkspace
+
+title MoodWorkspace Architecture
+
+class MoodWorkspace {
+}
+
+class MoodViewModel {
+    +selectMood()
+    +mapMoodToMusic()
+}
+
+class MoodToMusicMapper
+class ChordSuggestionEngine
+class BassGenerator
+class DrumMachine
+class PlaybackController
+class MidiRouter
+
+MoodWorkspace --> MoodViewModel
+MoodViewModel --> MoodToMusicMapper
+MoodViewModel --> ChordSuggestionEngine
+MoodViewModel --> BassGenerator
+MoodViewModel --> DrumMachine
+MoodViewModel --> PlaybackController
+MoodViewModel --> MidiRouter
+
+@enduml

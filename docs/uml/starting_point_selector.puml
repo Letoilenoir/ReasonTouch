@@ -1,0 +1,26 @@
+﻿@startuml StartingPointSelector
+
+title StartingPointSelector Architecture
+
+class StartingPointSelector {
+}
+
+class StartingPointViewModel {
+    +selectStartingPoint()
+    +navigateToWorkspace()
+}
+
+class InspireWorkspace
+class ManualWorkspace
+class MoodWorkspace
+class ProgressionWorkspace
+class NavigationController
+
+StartingPointSelector --> StartingPointViewModel
+StartingPointViewModel --> NavigationController
+StartingPointViewModel --> InspireWorkspace
+StartingPointViewModel --> ManualWorkspace
+StartingPointViewModel --> MoodWorkspace
+StartingPointViewModel --> ProgressionWorkspace
+
+@enduml
