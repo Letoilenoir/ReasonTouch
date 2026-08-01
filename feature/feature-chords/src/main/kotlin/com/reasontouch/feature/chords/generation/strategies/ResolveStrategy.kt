@@ -28,6 +28,7 @@ object ResolveStrategy {
 
         for (variantIndex in VARIANT_LABELS.indices) {
             val continuation = mutableListOf<TheoryChord>()
+            val usedChords = mutableSetOf<TheoryChord>()
             var currentChord = source.last().chordName
             var confidenceSum = 0f
 
@@ -50,12 +51,20 @@ object ResolveStrategy {
 
                 val matching = suggestions.filter { it.function == targetFunction }
                 val pool = matching.ifEmpty { suggestions }
-                val rankForThisVariant = variantIndex.coerceAtMost(pool.size - 1)
-                val chosen = pool[rankForThisVariant]
+                // Prefer chords not already used earlier in this continuation,
+                // falling back to the full function-matched pool if excluding
+                // used chords would leave nothing — this matters most on the
+                // final step, where TONIC + unused together narrow the pool
+                // the most of any position.
+                val unusedPool = pool.filterNot { it.chord in usedChords }
+                val finalPool = unusedPool.ifEmpty { pool }
+                val rankForThisVariant = variantIndex.coerceAtMost(finalPool.size - 1)
+                val chosen = finalPool[rankForThisVariant]
 
                 continuation += chosen.chord
                 confidenceSum += chosen.confidence
                 currentChord = chosen.chord.guitarLabel()
+                usedChords += chosen.chord
             }
 
             if (continuation.isNotEmpty()) {

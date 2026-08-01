@@ -24,14 +24,13 @@ object ContrastStrategy {
 
         for (variantIndex in borrowed.indices) {
             val continuation = mutableListOf<TheoryChord>()
+            val usedChords = mutableSetOf<TheoryChord>()
             var currentChord = source.last().chordName
             var confidenceSum = 0f
             var stepCount = 0
             var variantSymbol = ""
-
             for ((position, targetFunction) in plan.trajectory.withIndex()) {
                 val useBorrowedHere = position == plan.borrowedChordPosition && borrowed.isNotEmpty()
-
                 if (useBorrowedHere) {
                     val borrowedIndex = variantIndex.coerceAtMost(borrowed.size - 1)
                     val chosen = borrowed[borrowedIndex]
@@ -40,22 +39,27 @@ object ContrastStrategy {
                     currentChord = chosen.chord.guitarLabel()
                     stepCount++
                     variantSymbol = chosen.symbol
+                    usedChords += chosen.chord
                 } else {
                     val suggestions = ChordSuggestionEngine.suggest(
                         key = request.sourceAnalysis.key,
                         lastChordName = currentChord
                     )
                     if (suggestions.isEmpty()) continue
-
                     val matching = suggestions.filter { it.function == targetFunction }
                     val pool = matching.ifEmpty { suggestions }
-                    val rank = variantIndex.coerceAtMost(pool.size - 1)
-                    val chosen = pool[rank]
-
+                    // Prefer chords not already used earlier in this continuation
+                    // (including the borrowed chord, if one was placed already),
+                    // falling back to the full pool if that excludes everything.
+                    val unusedPool = pool.filterNot { it.chord in usedChords }
+                    val finalPool = unusedPool.ifEmpty { pool }
+                    val rank = variantIndex.coerceAtMost(finalPool.size - 1)
+                    val chosen = finalPool[rank]
                     continuation += chosen.chord
                     confidenceSum += chosen.confidence
                     currentChord = chosen.chord.guitarLabel()
                     stepCount++
+                    usedChords += chosen.chord
                 }
             }
 

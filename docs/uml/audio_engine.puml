@@ -1,0 +1,46 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam dpi 150
+
+package "Core Audio" {
+    class AudioEngine {
+        +start()
+        +stop()
+        +render(buffer)
+    }
+
+    class DrumMachine {
+        +generatePattern()
+        +applySwing()
+    }
+
+    class BassGenerator {
+        +generateBassline()
+    }
+
+    class ChordSuggestionEngine {
+        +suggestProgression(key, scale)
+    }
+
+    class MidiRouter {
+        +routeTo(track)
+    }
+
+    class PlaybackController {
+        +play()
+        +pause()
+        +seek(position)
+    }
+}
+
+AudioEngine --> DrumMachine : uses
+AudioEngine --> BassGenerator : uses
+AudioEngine --> ChordSuggestionEngine : uses
+AudioEngine --> MidiRouter : sends MIDI
+AudioEngine --> PlaybackController : controls
+
+DrumMachine --> MidiRouter : outputs MIDI
+BassGenerator --> MidiRouter : outputs MIDI
+ChordSuggestionEngine --> MidiRouter : outputs MIDI
+
+@enduml

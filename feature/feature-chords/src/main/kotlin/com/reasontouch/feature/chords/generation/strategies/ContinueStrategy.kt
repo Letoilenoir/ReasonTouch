@@ -27,26 +27,29 @@ object ContinueStrategy {
 
         for (variantIndex in VARIANT_LABELS.indices) {
             val continuation = mutableListOf<TheoryChord>()
+            val usedChords = mutableSetOf<TheoryChord>()
             var currentChord = source.last().chordName
             var confidenceSum = 0f
-
             repeat(request.preferredLength) { position ->
                 val suggestions = ChordSuggestionEngine.suggest(
                     key = request.sourceAnalysis.key,
                     lastChordName = currentChord
                 )
                 if (suggestions.isEmpty()) return@repeat
-
                 val targetFunction = trajectory.getOrNull(position)
                 val matching = suggestions.filter { it.function == targetFunction }
                 val pool = matching.ifEmpty { suggestions }
-
-                val rankForThisVariant = variantIndex.coerceAtMost(pool.size - 1)
-                val chosen = pool[rankForThisVariant]
-
+                // Prefer chords not already used earlier in this continuation,
+                // falling back to the full pool if that would exclude everything
+                // (e.g. only one diatonic candidate exists for this function).
+                val unusedPool = pool.filterNot { it.chord in usedChords }
+                val finalPool = unusedPool.ifEmpty { pool }
+                val rankForThisVariant = variantIndex.coerceAtMost(finalPool.size - 1)
+                val chosen = finalPool[rankForThisVariant]
                 continuation += chosen.chord
                 confidenceSum += chosen.confidence
                 currentChord = chosen.chord.guitarLabel()
+                usedChords += chosen.chord
             }
 
             if (continuation.isNotEmpty()) {
