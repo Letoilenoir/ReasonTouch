@@ -68,7 +68,7 @@ object ProgressionAnalyzer {
         val cadenceBonus = when (cadenceType) {
             CadenceType.AUTHENTIC -> 0.05f
             CadenceType.PLAGAL -> 0.03f
-            CadenceType.DECEPTIVE -> -0.15f
+            CadenceType.DECEPTIVE -> -0.45f
             CadenceType.HALF -> -0.10f
             CadenceType.INTERRUPTED -> -0.05f
             CadenceType.OPEN -> -0.20f

@@ -155,6 +155,15 @@ object PairingEngine {
                 )
             }
 
+            endingFunction == HarmonicFunction.PREDOMINANT -> {
+                PairingDecision(
+                    type = PairingType.RESOLVE,
+                    suggestedBars = 4,
+                    confidence = 0.75f,
+                    rationale = "Unresolved and off the tonic → resolution needed"
+                )
+            }
+
             tension > 0.7f -> {
                 PairingDecision(
                     type = PairingType.CONTINUE,
