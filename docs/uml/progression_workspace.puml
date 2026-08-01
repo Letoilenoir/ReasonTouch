@@ -1,0 +1,24 @@
+﻿@startuml ProgressionWorkspace
+
+title ProgressionWorkspace Architecture
+
+class ProgressionWorkspace {
+}
+
+class ProgressionViewModel {
+    +updateProgression()
+    +setKeyAndScale()
+}
+
+class ChordSuggestionEngine
+class BassGenerator
+class PlaybackController
+class MidiRouter
+
+ProgressionWorkspace --> ProgressionViewModel
+ProgressionViewModel --> ChordSuggestionEngine
+ProgressionViewModel --> BassGenerator
+ProgressionViewModel --> PlaybackController
+ProgressionViewModel --> MidiRouter
+
+@enduml

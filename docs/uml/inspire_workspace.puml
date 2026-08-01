@@ -1,0 +1,28 @@
+﻿@startuml InspireWorkspace
+
+title InspireWorkspace Architecture
+
+class InspireWorkspace {
+}
+
+class InspireViewModel {
+    +generateChordProgression()
+    +generateBassline()
+    +generateDrumPattern()
+    +updateWorkspaceState()
+}
+
+class ChordSuggestionEngine
+class BassGenerator
+class DrumMachine
+class PlaybackController
+class MidiRouter
+
+InspireWorkspace --> InspireViewModel
+InspireViewModel --> ChordSuggestionEngine
+InspireViewModel --> BassGenerator
+InspireViewModel --> DrumMachine
+InspireViewModel --> PlaybackController
+InspireViewModel --> MidiRouter
+
+@enduml

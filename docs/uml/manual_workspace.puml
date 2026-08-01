@@ -1,0 +1,20 @@
+﻿@startuml ManualWorkspace
+
+title ManualWorkspace Architecture
+
+class ManualWorkspace {
+}
+
+class ManualViewModel {
+    +applyManualEdit()
+    +updateNoteModel()
+}
+
+class MidiRouter
+class PlaybackController
+
+ManualWorkspace --> ManualViewModel
+ManualViewModel --> MidiRouter
+ManualViewModel --> PlaybackController
+
+@enduml
