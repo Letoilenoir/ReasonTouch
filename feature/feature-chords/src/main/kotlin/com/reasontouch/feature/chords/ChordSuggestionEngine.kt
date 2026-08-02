@@ -36,9 +36,26 @@ object ChordSuggestionEngine {
 
     private const val MAX_SUGGESTIONS = 4
 
+    /**
+     * There are exactly 7 diatonic chords in any key -- this is the true
+     * ceiling for requesting the full pool, not a guess. Phrase-generation
+     * strategies (Continue/Contrast/Resolve) pass this so their own
+     * function-filtering and same-continuation exclusion logic always has
+     * every matching diatonic candidate available, rather than being
+     * silently starved by MAX_SUGGESTIONS' default curation for the
+     * single-chord manual suggestion UI. See docs/handoffs -- the cap was
+     * confirmed (by hand-traced weight math) to let exactly one TONIC-
+     * function candidate survive when the "last chord" is itself TONIC-
+     * function, because TRANSITION_WEIGHTS has no explicit TONIC->TONIC
+     * entry and degree-weighting only breaks the resulting 4-way tie in
+     * favour of degree 1.
+     */
+    const val FULL_DIATONIC_POOL = 7
+
     fun suggest(
         key:           KeyCandidate,
-        lastChordName: String?
+        lastChordName: String?,
+        maxResults:    Int = MAX_SUGGESTIONS
     ): List<ChordSuggestion> {
         val diatonic     = MusicTheory.diatonicChords(key.root, key.isMinor)
         val lastTheory   = lastChordName?.let { MusicTheory.parseChordName(it) }
@@ -88,7 +105,8 @@ object ChordSuggestionEngine {
             .sortedByDescending { it.second }
             .map { it.first }
             .distinctBy { it.degree }
-            .take(MAX_SUGGESTIONS)
+            .take(maxResults)
+
     }
 
     fun suggestAll(key: KeyCandidate): List<ChordSuggestion> {

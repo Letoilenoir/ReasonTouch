@@ -35,7 +35,8 @@ object ResolveStrategy {
             repeat(request.preferredLength) { position ->
                 val suggestions = ChordSuggestionEngine.suggest(
                     key = request.sourceAnalysis.key,
-                    lastChordName = currentChord
+                    lastChordName = currentChord,
+                    maxResults = ChordSuggestionEngine.FULL_DIATONIC_POOL
                 )
                 if (suggestions.isEmpty()) return@repeat
 
