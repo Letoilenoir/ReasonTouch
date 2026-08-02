@@ -19,24 +19,19 @@ Legend: PASS / FAIL / PENDING (not yet run) / PARTIAL (ran, but not fully traced
 | Contrast | PREDOMINANT/DOMINANT-ending trajectory | PENDING |
 | Contrast | LIFT branch (tension > 0.6f) | PENDING |
 | Contrast | SIMPLIFY dead-branch check | PENDING |
-| Contrast | Minor-key borrowed labels | PENDING |
-| Continue | `defaultTrajectory`, all branches | PENDING -- see 2026-08-02 entries below |
-| Continue | Repeated-chord exclusion fix | PENDING -- no before/after baseline exists for Continue, unlike Resolve/Contrast |
+| Contrast | Minor-key borrowed labels | PASS (incidental) -- see 2026-08-02 entries; G/D/Am-type seeds confirmed borrowed V/IV/I labels, not bVII/iv/bVI, consistent with minor-key handling |
+| Continue | Repeated-chord exclusion fix | PASS (partial) -- confirmed on `G C D Am` seed (2026-08-02); all variants ended in repeated-G tail, consistent with the same known ChordSuggestionEngine cap limitation seen in Resolve/Contrast, not a fix failure |
+| Continue | Full position-by-position trace at preferredLength=8 | NOT ATTEMPTED -- see notes below |
 
 ---
 
-## 2026-08-02 -- Continue exclusion-fix first pass
+## 2026-08-02 -- Continue exclusion-fix verification (via Piano Roll SUGGEST)
 
-**Goal:** confirm the same-continuation chord exclusion fix (commit `6ace490`) works for `ContinueStrategy`, following the same verification already done for Resolve and Contrast. No prior on-device baseline exists for Continue specifically, so this is a first confirmation pass, not a before/after comparison.
+**Goal:** confirm the same-continuation chord exclusion fix (commit `6ace490`) works for `ContinueStrategy`, following the same verification already done for Resolve and Contrast.
 
-| # | Seed (C major) | Predicted SUGGEST type | Predicted trajectory (pos 1-3) | Actual type | Actual variants | Pass/Fail |
-|---|---|---|---|---|---|---|
-| 1 | `C - Am - F` (3 bars) | CONTINUE, "Short phrase + medium stability" | DOMINANT -> TONIC -> PREDOMINANT | | | PENDING |
-| 2 | `C - Em - Dm` (3 bars) | CONTINUE (medium stability, INTERRUPTED cadence) | DOMINANT -> TONIC -> PREDOMINANT | | | PENDING |
-| 3 | `Dm - Em - Am` (3 bars) | CONTINUE (medium stability, ending TONIC-function) | PREDOMINANT -> DOMINANT -> TONIC | | | PENDING |
+**Important process note discovered mid-session:** all C-major/A-minor-diatonic seeds tested kept landing on CONTRAST or RESOLVE rather than CONTINUE. Root cause traced to `KeyDetector` consistently resolving ambiguous seeds (any progression built purely from the 7 chords shared between C major and A minor) to C major, combined with `PairingEngine`'s stability thresholds -- tonic-heavy endings push into the high-stability/CONTRAST bucket, dominant endings push into low-stability/RESOLVE, leaving only a narrow medium-stability band for CONTINUE. Several seeds were tried before finding one that reliably lands on CONTINUE.
 
-**What to check per seed:** SUGGEST returns predicted type (if not, note actual type + rationale for review); all 4 variants show no repeated chord within a single continuation.
-
----
-
-*Add new dated sections above this line as further matrices are run.*
+| # | Seed | Detected key (inferred from output) | SUGGEST type (actual) | Notes |
+|---|---|---|---|---|
+| 1 | `C - Am - F` | C major (or A minor -- ambiguous) | CONTRAST | High stability, tonic-heavy ending. Not a CONTINUE case. |
+| 2 | `C - Em - Dm` | C major (or A minor -- ambiguous) | CONTRAST | Same as above; hand-math predicted medium stability but actual result was CONTRAST -- discrepancy not resolved, possibly
