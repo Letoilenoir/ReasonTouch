@@ -7,6 +7,26 @@ Legend: PASS / FAIL / PENDING (not yet run) / PARTIAL (ran, but not fully traced
 ---
 
 ## Coverage summary (updated as entries are added)
+---
+
+## 2026-08-04 (continued) -- Exhaustion-rotation fix centralized and rolled out to all 4 strategies
+
+**Full details:** `docs/handoffs/ReasonTouch_Handoff_2026-08-04_LiftStrategy_ExhaustionFix.md`
+
+Following the fix and full hand-trace verification in `LiftStrategy.kt` (documented above), the identical selection logic (function-filter -> exclusion -> exhaustion-rotation fallback) was extracted into a new shared file, `ChordCandidateSelector.kt`, rather than copy-pasting the fix into `ContinueStrategy.kt`/`ContrastStrategy.kt`/`ResolveStrategy.kt` independently. Rationale: the four strategies already carried near-identical copies of this logic, which is exactly how the original bug went unnoticed in three files after being found in one -- centralizing it means any future fix only needs to happen once.
+
+**Rollout sequence:**
+1. `ChordCandidateSelector.select()` created, compiled standalone.
+2. `LiftStrategy.kt` retrofitted to call it (replacing its inline block). Re-ran `run lift investigation seeds` -- output byte-for-byte identical to the pre-refactor confirmed-good run, confirming the extraction was a pure refactor with no behavior change.
+3. `ContinueStrategy.kt`, `ContrastStrategy.kt`, `ResolveStrategy.kt` retrofitted identically.
+4. One brace-mismatch error during the Lift retrofit (old/new code replacement consumed too much surrounding context, deleting the `continuation`/`confidenceSum`/`currentChord`/`usedChords` update lines and misplacing `if (continuation.isNotEmpty())` inside the `repeat` block) -- caught via full-file `Get-Content` inspection before rebuilding, same discipline as prior brace-mismatch incidents this project.
+5. Re-ran `run key detector investigation seeds` (confirms Continue at preferredLength=8 via the `G C D Am` seed) and a new dedicated `run exhaustion rotation regression seeds` test (added specifically to close the gap for Contrast and Resolve at preferredLength=8, using seeds closely related to the original bug-discovery seeds).
+
+**Result: all 4 strategies confirmed rotating correctly at preferredLength=8, no frozen tails.** Side benefit observed across Continue, Resolve, and Lift (not yet specifically checked for Contrast): candidate counts increased by one in several cases, since genuine chord diversity in the tail means fewer variants collapse into duplicates via the final `distinctBy` dedup step.
+
+**Not yet done:** stale inline comments in `ContinueStrategy.kt`/`ContrastStrategy.kt`/`ResolveStrategy.kt` describing the old (now-centralized) exclusion logic should be cleaned up -- not incorrect, just redundant now that the real logic lives in `ChordCandidateSelector.kt`. Also worth considering a small dedicated regression test file for `ChordCandidateSelector` itself, given how much manual re-verification (4 separate seed runs) went into confirming it -- a permanent test would catch future regressions automatically.
+
+---
 
 | Strategy | Branch | Status |
 |---|---|---|
@@ -15,20 +35,19 @@ Legend: PASS / FAIL / PENDING (not yet run) / PARTIAL (ran, but not fully traced
 | Resolve | `defaultTrajectory` TONIC/DOMINANT | PENDING |
 | Resolve | `CadenceType.DECEPTIVE` | BLOCKED -- see multi-option PairingDecision design item |
 | Resolve | `isClosed()` (`reopenThenResolveTrajectory`) | BLOCKED -- same reason |
-| Resolve | Exhaustion-rotation fix (2026-08-04) | **NOT YET APPLIED** |
+| Resolve | Exhaustion-rotation fix (2026-08-04) | **PASS -- confirmed via `C Am F G` seed at preferredLength=8, rotates cleanly (C Em F Am C Em Am C), 4 distinct candidates survive dedup vs. usual 3** |
 | Contrast | TONIC-ending trajectory | PASS -- full 8-bar trace, all 3 variants |
 | Contrast | PREDOMINANT/DOMINANT-ending trajectory | PENDING |
 | Contrast | LIFT branch (tension > 0.6f) | PENDING |
 | Contrast | SIMPLIFY dead-branch check | PENDING |
 | Contrast | Minor-key borrowed labels | PASS (incidental) |
-| Contrast | Exhaustion-rotation fix (2026-08-04) | **NOT YET APPLIED** |
+| Contrast | Exhaustion-rotation fix (2026-08-04) | **PASS -- confirmed via `Am F G C` seed at preferredLength=8 (direct descendant of the original Am-Am-Am-Am/C-C-C-C bug seeds), rotates cleanly across all 3 variants** |
 | Continue | Repeated-chord exclusion fix at preferredLength=4 | PASS -- confirmed clean across all 7 investigation seeds |
-| Continue | Exhaustion-rotation fix (2026-08-04) | **NOT YET APPLIED** -- known-affected seed available: `G C D Am` at preferredLength=8, see 2026-08-03 entry |
+| Continue | Exhaustion-rotation fix (2026-08-04) | **PASS -- confirmed via `G C D Am` seed at preferredLength=8 (D G C Bm Em G Bm Em, was frozen as D G C Bm G G G G pre-fix), 4th distinct candidate survives dedup vs. usual 3** |
 | Lift | Implemented (2026-08-04) | DONE -- trajectory logic + routing confirmed via real PairingEngine seed (`Bdim G Bdim C`) |
-| Lift | Exhaustion-rotation fix | **PASS -- fixed and fully hand-traced, confirmed correct against live LIFT_TRACE output.** See `docs/handoffs/ReasonTouch_Handoff_2026-08-04_LiftStrategy_ExhaustionFix.md` for full mechanism and fix history (two attempts, second one verified). |
+| Lift | Exhaustion-rotation fix (2026-08-04) | **PASS -- fixed, fully hand-traced against live instrumented output, independently re-confirmed after `ChordCandidateSelector` extraction (byte-for-byte identical output pre/post refactor)** |
+| (all strategies) | Exhaustion-rotation fix -- overall rollout | **COMPLETE. All 4 strategies confirmed via direct seed comparison at preferredLength=8. Centralized in `ChordCandidateSelector.kt` (new shared object) rather than duplicated per-strategy -- see rollout details below.** |
 | (all strategies) | KeyDetector tie-break hypothesis | DISPROVEN AND CLOSED (2026-08-03) |
----
----
 
 ## 2026-08-04 -- LiftStrategy built; exhaustion-rotation bug found, root-caused, and fixed (Lift only)
 

@@ -5,19 +5,19 @@ Update this file directly as tasks are completed, added, or reprioritized -- thi
 **Last updated:** 2026-08-03
 
 ---
-## URGENT -- exhaustion-rotation bug affecting all 4 strategies at preferredLength=8
+## RESOLVED -- exhaustion-rotation bug (was: URGENT, affecting all 4 strategies at preferredLength=8)
 
-Found and root-caused 2026-08-04 while building LiftStrategy. Full detail: `docs/handoffs/ReasonTouch_Handoff_2026-08-04_LiftStrategy_ExhaustionFix.md`.
+Found and root-caused 2026-08-04 while building LiftStrategy. Fixed, centralized into a new shared `ChordCandidateSelector.kt`, and rolled out to all 4 strategies. Full detail: `docs/handoffs/ReasonTouch_Handoff_2026-08-04_LiftStrategy_ExhaustionFix.md` and `docs/testing/Strategy_Test_Log.md`'s 2026-08-04 entries.
 
-Once a harmonic function's candidate pool exhausts within a single continuation (normal at preferredLength=8, e.g. Contrast/Lift's hardcoded 8-bar suggestions), the shared exclusion/fallback pattern freezes onto one identical chord for every remaining position, instead of rotating through the exhausted pool. Fixed in `LiftStrategy.kt` (verified via full hand-trace against instrumented output). **Not yet applied to `ContinueStrategy.kt`, `ContrastStrategy.kt`, `ResolveStrategy.kt`** -- same code shape, same fix needed.
-
-- [x] Fix confirmed in `LiftStrategy.kt`
-- [ ] Apply identical fix to `ContinueStrategy.kt`
-- [ ] Apply identical fix to `ContrastStrategy.kt`
-- [ ] Apply identical fix to `ResolveStrategy.kt`
-- [ ] Re-run harness seeds for all three post-fix, confirm no regressions (known-affected seed for Continue: `G C D Am` at preferredLength=8)
-- [ ] Strip all `*_TRACE` temporary debug logging from all 4 strategy files once rollout confirmed
-- [ ] Update Strategy_Test_Log.md coverage summary once all 4 confirmed
+- [x] Fix confirmed in `LiftStrategy.kt` (full hand-trace)
+- [x] Logic extracted to shared `ChordCandidateSelector.kt`
+- [x] `LiftStrategy.kt` retrofitted, re-confirmed byte-for-byte identical output
+- [x] `ContinueStrategy.kt` retrofitted, confirmed via `G C D Am` @ preferredLength=8
+- [x] `ContrastStrategy.kt` retrofitted, confirmed via `Am F G C` @ preferredLength=8
+- [x] `ResolveStrategy.kt` retrofitted, confirmed via `C Am F G` @ preferredLength=8
+- [ ] Strip stale inline exclusion-logic comments from Continue/Contrast/Resolve (now describes centralized logic, not what's actually inline)
+- [ ] Consider a dedicated `ChordCandidateSelectorTest.kt` regression suite, given how much manual re-verification went into confirming this fix
+- [ ] `*_TRACE` temporary debug logging already removed during the `ChordCandidateSelector` retrofit -- no cleanup needed here
 
 ## URGENT -- live empty-suggestion bug affecting 3 CompositionIntents
 
