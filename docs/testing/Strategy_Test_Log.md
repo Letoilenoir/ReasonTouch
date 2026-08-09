@@ -10,21 +10,37 @@ Legend: PASS / FAIL / PENDING (not yet run) / PARTIAL (ran, but not fully traced
 
 | Strategy | Branch | Status |
 |---|---|---|
-| Resolve | `endsOnDominant()` (HALF) | PASS -- verified twice (2026-07-31, 2026-08-01 repeat-fix retest) |
-| Resolve | `defaultTrajectory` PREDOMINANT | PASS -- all 3 variants traced (2026-08-01) |
+| Resolve | `endsOnDominant()` (HALF) | PASS -- verified twice |
+| Resolve | `defaultTrajectory` PREDOMINANT | PASS -- all 3 variants traced |
 | Resolve | `defaultTrajectory` TONIC/DOMINANT | PENDING |
-| Resolve | `CadenceType.DECEPTIVE` | BLOCKED -- PairingEngine routes to SURPRISE, never RESOLVE. See multi-option PairingDecision design item. |
-| Resolve | `isClosed()` (`reopenThenResolveTrajectory`) | BLOCKED -- suggestAfterHighStability() has no RESOLVE path. Same blocker as above. |
-| Contrast | TONIC-ending trajectory | PASS -- full 8-bar trace, all 3 variants (2026-08-01) |
+| Resolve | `CadenceType.DECEPTIVE` | BLOCKED -- see multi-option PairingDecision design item |
+| Resolve | `isClosed()` (`reopenThenResolveTrajectory`) | BLOCKED -- same reason |
+| Resolve | Exhaustion-rotation fix (2026-08-04) | **NOT YET APPLIED** |
+| Contrast | TONIC-ending trajectory | PASS -- full 8-bar trace, all 3 variants |
 | Contrast | PREDOMINANT/DOMINANT-ending trajectory | PENDING |
 | Contrast | LIFT branch (tension > 0.6f) | PENDING |
 | Contrast | SIMPLIFY dead-branch check | PENDING |
-| Contrast | Minor-key borrowed labels | PASS (incidental) -- see 2026-08-02 entries; G/D/Am-type seeds confirmed borrowed V/IV/I labels, not bVII/iv/bVI, consistent with minor-key handling |
-| Continue | Repeated-chord exclusion fix | PASS (partial) -- confirmed on `G C D Am` seed (2026-08-02); all variants ended in repeated-G tail, consistent with the same known ChordSuggestionEngine cap limitation seen in Resolve/Contrast, not a fix failure |
-| Continue | Full position-by-position trace at preferredLength=8 | NOT ATTEMPTED -- see notes below |
-
+| Contrast | Minor-key borrowed labels | PASS (incidental) |
+| Contrast | Exhaustion-rotation fix (2026-08-04) | **NOT YET APPLIED** |
+| Continue | Repeated-chord exclusion fix at preferredLength=4 | PASS -- confirmed clean across all 7 investigation seeds |
+| Continue | Exhaustion-rotation fix (2026-08-04) | **NOT YET APPLIED** -- known-affected seed available: `G C D Am` at preferredLength=8, see 2026-08-03 entry |
+| Lift | Implemented (2026-08-04) | DONE -- trajectory logic + routing confirmed via real PairingEngine seed (`Bdim G Bdim C`) |
+| Lift | Exhaustion-rotation fix | **PASS -- fixed and fully hand-traced, confirmed correct against live LIFT_TRACE output.** See `docs/handoffs/ReasonTouch_Handoff_2026-08-04_LiftStrategy_ExhaustionFix.md` for full mechanism and fix history (two attempts, second one verified). |
+| (all strategies) | KeyDetector tie-break hypothesis | DISPROVEN AND CLOSED (2026-08-03) |
+---
 ---
 
+## 2026-08-04 -- LiftStrategy built; exhaustion-rotation bug found, root-caused, and fixed (Lift only)
+
+**Full details:** `docs/handoffs/ReasonTouch_Handoff_2026-08-04_LiftStrategy_ExhaustionFix.md`
+
+**Summary:** Built `LiftStrategy`/`LiftTargeting` (alternating DOMINANT/PREDOMINANT trajectory, avoids TONIC). Found via direct temporary instrumentation (`*_TRACE` println logging inside the exclusion/fallback block) that once a harmonic function's candidate pool exhausts at `preferredLength=8`, the existing fallback (`variantIndex.coerceAtMost(finalPool.size - 1)` as a fixed rank) freezes onto one identical chord forever, rather than rotating through the exhausted pool. This is present in all 4 strategies (shared code shape), and supersedes/sharpens the 2026-08-03 "tonic exhaustion" finding -- exhaustion itself is real and expected (only 2-3 diatonic candidates per function), but the *frozen fallback rank* on top of it was an actual, fixable bug, not an inherent limit.
+
+**Fix (Lift only so far):** replace the fixed `variantIndex` rank with `(variantIndex + timesRevisited) % finalPool.size`, where `timesRevisited` counts matching chords in the growing `continuation` list (NOT `usedChords`, which is a `Set` and saturates -- this was a first, failed fix attempt, also documented in the handoff doc). Verified via complete manual hand-trace against real instrumented output, all 8 positions, exact match.
+
+**Status:** applied and confirmed in `LiftStrategy.kt` only. `ContinueStrategy.kt`, `ContrastStrategy.kt`, `ResolveStrategy.kt` still have the frozen-fallback bug as of this entry -- see Task_List.md.
+
+---
 ## 2026-08-02 -- Continue exclusion-fix verification (via Piano Roll SUGGEST)
 
 **Goal:** confirm the same-continuation chord exclusion fix (commit `6ace490`) works for `ContinueStrategy`, following the same verification already done for Resolve and Contrast.
