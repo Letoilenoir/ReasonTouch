@@ -50,17 +50,13 @@ object ResolveStrategy {
                     trajectory.getOrNull(position)
                 }
 
-                val matching = suggestions.filter { it.function == targetFunction }
-                val pool = matching.ifEmpty { suggestions }
-                // Prefer chords not already used earlier in this continuation,
-                // falling back to the full function-matched pool if excluding
-                // used chords would leave nothing — this matters most on the
-                // final step, where TONIC + unused together narrow the pool
-                // the most of any position.
-                val unusedPool = pool.filterNot { it.chord in usedChords }
-                val finalPool = unusedPool.ifEmpty { pool }
-                val rankForThisVariant = variantIndex.coerceAtMost(finalPool.size - 1)
-                val chosen = finalPool[rankForThisVariant]
+                val chosen = ChordCandidateSelector.select(
+                    suggestions = suggestions,
+                    targetFunction = targetFunction,
+                    continuation = continuation,
+                    usedChords = usedChords,
+                    variantIndex = variantIndex
+                ) ?: return@repeat
 
                 continuation += chosen.chord
                 confidenceSum += chosen.confidence

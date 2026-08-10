@@ -1,0 +1,69 @@
+@startuml
+title Combined Composition Flow – Manual, Assisted, Guided Paths
+
+actor User as U
+
+' Entry points
+participant "ManualWorkspace" as MW
+participant "AssistedWorkspace" as AW
+participant "GuidedWorkspace" as GW
+
+' Shared modules
+participant "SeedGenerator\n(Mood / Progression / Inspire)" as SG
+participant "GuidedDecisionEngine" as GDE
+participant "ProgressionGenerationRequest" as PGR
+participant "ProgressionAnalysis" as PA
+participant "PairingEngine" as PE
+participant "Strategy\n(Lift / Resolve / Contrast / Continue)" as STRAT
+participant "ChordSuggestionEngine" as CSE
+participant "GeneratedProgression" as GP
+
+== Entry Point Selection ==
+U -> MW : Manual Path\n(User selects chords)
+U -> AW : Assisted Path\n(User selects Mood / Pattern / Inspire)
+U -> GW : Guided Path\n(User selects intention / section / role)
+
+== Manual Path ==
+MW -> PGR : Build request with raw chords
+
+== Assisted Path ==
+AW -> SG : Request assisted seed
+SG --> AW : Return seed progression
+AW -> PGR : Build request with assisted seed
+
+== Guided Path (Proposed) ==
+GW -> GDE : Request guidance\n(intention → section → role)
+GDE --> GW : Provide contextual options
+GW -> SG : Request contextual seed
+SG --> GW : Return guided seed
+GW -> PGR : Build request with guided seed
+
+== Convergence: Key Inference ==
+PGR -> PA : Analyse progression\n(determine key, functions,\nstability, tension, cadence)
+PA --> PGR : Return key-aware analysis
+
+note right of PA
+KEY IS DETERMINED HERE
+All paths converge at this point.
+end note
+
+== Strategy Routing ==
+PGR -> PE : Request strategy\n(using stability + tension)
+PE --> STRAT : Select strategy
+
+== Phrase Generation ==
+loop For each chord in continuation
+    STRAT -> CSE : suggest(key, lastChord)
+    CSE --> STRAT : ranked diatonic suggestions
+    STRAT -> STRAT : filter by function\n(DOM/PD/TONIC)
+    STRAT -> STRAT : choose chord\n(variantIndex, unused pool)
+end loop
+
+STRAT --> GP : Build GeneratedProgression
+GP --> U : Display continuation
+
+== Guided Path Loop ==
+U -> GW : Choose next section / intention
+GW -> GDE : Continue guided composition
+
+@enduml

@@ -1,0 +1,37 @@
+@startuml
+title Manual Path – User-Driven Seed → Key Inference → Strategy Routing
+
+actor User as U
+
+participant "ManualWorkspace" as MW
+participant "ProgressionGenerationRequest" as PGR
+participant "ProgressionAnalysis" as PA
+participant "PairingEngine" as PE
+participant "Strategy (Lift/Resolve/Contrast/Continue)" as STRAT
+participant "ChordSuggestionEngine" as CSE
+participant "GeneratedProgression" as GP
+
+== User enters chords manually ==
+U -> MW : Select chords (C, G, Bdim, C)
+MW -> PGR : Build request with raw chord list
+
+== Key inference ==
+PGR -> PA : Analyse progression\n(determine key, functions,\nstability, tension, cadence)
+PA --> PGR : Return key-aware analysis
+
+== Strategy routing ==
+PGR -> PE : Request strategy\n(using stability + tension)
+PE --> STRAT : Select strategy
+
+== Phrase generation ==
+loop For each chord
+    STRAT -> CSE : suggest(key, lastChord)
+    CSE --> STRAT : ranked diatonic suggestions
+    STRAT -> STRAT : filter by function\n(DOM/PD/TONIC)
+    STRAT -> STRAT : choose chord
+end loop
+
+STRAT --> GP : Build GeneratedProgression
+GP --> U : Display continuation
+
+@enduml

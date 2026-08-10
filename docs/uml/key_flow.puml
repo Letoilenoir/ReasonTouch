@@ -1,0 +1,58 @@
+@startuml
+title Key Determination & Strategy Flow (ReasonTouch)
+
+actor User as U
+
+participant "ManualWorkspace" as MW
+participant "ProgressionGenerationRequest" as PGR
+participant "ProgressionAnalysis" as PA
+participant "ChordSuggestionEngine" as CSE
+participant "PairingEngine" as PE
+participant "Strategy (Lift/Resolve/Contrast/Continue)" as STRAT
+participant "GeneratedProgression" as GP
+
+== User Input ==
+
+U -> MW : Select chords manually\n(e.g., C, G, Bdim, C)
+MW -> PGR : Build ProgressionGenerationRequest\nwith raw chord list
+
+== Key Inference ==
+
+PGR -> PA : Analyze progression\n(determine key, functions, cadence,\nstability, tension)
+PA --> PGR : Return analysis\n(key inferred here)
+
+note right of PA
+KEY IS DETERMINED HERE
+- scale-degree mapping
+- functional roles (TONIC/PD/DOM)
+- cadence classification
+- stability & tension
+end note
+
+== Strategy Routing ==
+
+PGR -> PE : Request strategy selection\n(using stability + tension)
+PE --> STRAT : Select strategy\n(e.g., LiftStrategy)
+
+note right of PE
+PairingEngine does NOT determine key.
+It only consumes the key-aware analysis.
+end note
+
+== Phrase Generation ==
+
+loop For each chord in continuation
+    STRAT -> CSE : suggest(key, lastChord)\n(key passed implicitly)
+    CSE --> STRAT : diatonic pool + ranked suggestions
+    STRAT -> STRAT : filter by function\n(DOM/PD/TONIC)
+    STRAT -> STRAT : choose chord\n(variantIndex, unused pool)
+end loop
+
+STRAT --> GP : Build GeneratedProgression\n(chords + confidence + explanation)
+
+== Output ==
+
+GP --> U : Display generated phrase\n(key-aware continuation)
+
+@enduml
+

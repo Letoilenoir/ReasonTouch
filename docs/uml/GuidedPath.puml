@@ -1,0 +1,54 @@
+@startuml
+title Guided Path – Multi-Step Composition Assistant (Proposed)
+
+actor User as U
+
+participant "GuidedWorkspace" as GW
+participant "GuidedDecisionEngine" as GDE
+participant "SeedGenerator" as SG
+participant "ProgressionGenerationRequest" as PGR
+participant "ProgressionAnalysis" as PA
+participant "PairingEngine" as PE
+participant "Strategy" as STRAT
+participant "ChordSuggestionEngine" as CSE
+participant "GeneratedProgression" as GP
+
+== Step 1: User chooses musical intention ==
+U -> GW : Select intention\n(uplifting, dark, cinematic, etc.)
+GW -> GDE : Request contextual guidance
+
+== Step 2: Guided section selection ==
+U -> GW : Choose section\n(intro, verse, chorus, bridge)
+GW -> GDE : Request section-specific seed options
+
+== Step 3: Guided harmonic role ==
+U -> GW : Choose role\n(stable, tense, transitional, resolving)
+GW -> SG : Request seed candidates\n(based on intention + section + role)
+SG --> GW : Return contextualised seed
+
+== Step 4: Build request ==
+GW -> PGR : Build request with chosen seed
+
+== Step 5: Key inference ==
+PGR -> PA : Analyse seed\n(determine key, functions,\nstability, tension)
+PA --> PGR : Return key-aware analysis
+
+== Step 6: Strategy routing ==
+PGR -> PE : Request strategy
+PE --> STRAT : Select strategy
+
+== Step 7: Phrase generation ==
+loop For each chord
+    STRAT -> CSE : suggest(key, lastChord)
+    CSE --> STRAT : ranked suggestions
+    STRAT -> STRAT : filter + choose chord
+end loop
+
+STRAT --> GP : Build GeneratedProgression
+GP --> U : Display continuation
+
+== Step 8: Guided next-step decision ==
+U -> GW : Choose next section or intention
+GW -> GDE : Continue multi-step composition
+
+@enduml

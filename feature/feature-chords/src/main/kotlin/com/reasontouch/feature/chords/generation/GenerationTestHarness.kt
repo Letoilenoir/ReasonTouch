@@ -156,10 +156,102 @@ object GenerationTestHarness {
      * docs/testing/Strategy_Test_Log.md, 2026-08-03.
      */
     fun runLiftInvestigationSeeds() {
+        // First attempt (2026-08-03): does NOT route to LIFT via real
+        // PairingEngine. All-plain-triad progressions cap tension at 0.55
+        // (a lone DOMINANT chord's max), never clearing the > 0.6f
+        // threshold, since qualityTension for plain MAJ/MIN triads is only
+        // 0.3 -- there is no diatonic quality available strong enough to
+        // push the average past the line without at least one DIM chord.
+        // Kept here as a documented negative example, not a working seed.
         testSeedProgression("G", "Bdim", "G", "C", primaryIntent = CompositionIntent.LIFT)
         testSeedProgression(
             "G", "Bdim", "G", "C",
             primaryIntent = CompositionIntent.LIFT,
+            preferredLength = 8
+        )
+
+        // Corrected seed (2026-08-03): leans on the diminished vii° chord
+        // (Bdim, degree 7) specifically, since DIM's qualityTension (0.9)
+        // is the only diatonic quality high enough to clear the 0.6f
+        // average threshold. Hand-traced: stability ~0.94 (ends TONIC),
+        // tension ~0.625 (avg of Bdim/G/Bdim/C chord tensions) -- should
+        // route to LIFT via suggestAfterHighStability()'s tension branch.
+        testSeedProgression("Bdim", "G", "Bdim", "C", primaryIntent = CompositionIntent.LIFT)
+        testSeedProgression(
+            "Bdim", "G", "Bdim", "C",
+            primaryIntent = CompositionIntent.LIFT,
+            preferredLength = 8
+        )
+    }
+
+    /**
+     * Targeted re-verification of the exhaustion-rotation fix (2026-08-04,
+     * see docs/handoffs/ReasonTouch_Handoff_2026-08-04_LiftStrategy_ExhaustionFix.md)
+     * for CONTRAST and RESOLVE specifically, at preferredLength=8 -- the
+     * condition that actually triggers pool exhaustion. LiftStrategy and
+     * ContinueStrategy have both already been re-confirmed post-fix; these
+     * two seeds close the gap for the remaining strategies.
+     *
+     * Am F G C is close to the original seed that first surfaced the
+     * Am-Am-Am-Am / C-C-C-C frozen-tail pattern during CONTRAST testing
+     * (2026-08-01/03 sessions). C Am F G is RESOLVE's own original
+     * problem seed from the same period. Both are direct before/after
+     * comparisons against known-bad pre-fix behavior.
+     */
+    fun runExhaustionRotationRegressionSeeds() {
+        testSeedProgression(
+            "Am", "F", "G", "C",
+            primaryIntent = CompositionIntent.CONTRAST,
+            preferredLength = 8
+        )
+        testSeedProgression(
+            "C", "Am", "F", "G",
+            primaryIntent = CompositionIntent.RESOLVE,
+            preferredLength = 8
+        )
+    }
+
+    /**
+     * Targets EXPAND's two PairingEngine trigger conditions
+     * (suggestAfterMediumStability): HALF cadence ("Ends on V -> explore
+     * harmonically") and the medium-stability default ("Medium stability
+     * -> harmonic exploration").
+     *
+     * IMPORTANT open question this seed set is designed to answer: HALF
+     * cadence's functionStability contribution is inherently low (0.15,
+     * per calculateHarmonicStability()'s functionStability table) --
+     * hand math suggests a HALF-cadence seed may structurally never
+     * reach medium stability (0.4-0.7) regardless of other bonuses,
+     * meaning it would always fall into suggestAfterLowStability() and
+     * route to RESOLVE instead of ever reaching EXPAND's HALF-cadence
+     * branch. If seed 1 below reports RESOLVE rather than EXPAND, that
+     * confirms EXPAND's HALF-cadence rationale is dead code via the live
+     * PairingEngine path, same category of finding as the already-
+     * confirmed-dead SIMPLIFY branch and RESOLVE's DECEPTIVE branch --
+     * worth logging in Strategy_Test_Log.md / Task_List.md if so.
+     */
+    fun runExpandInvestigationSeeds() {
+        // Seed 1: targets HALF cadence. Hand-traced: Dm -> G, ends on G
+        // (DOMINANT, HALF cadence), functionStability=0.15, cadence
+        // bonus -0.10, no tonic chords present -> stability ~0.05.
+        // Expected to land in LOW stability, not medium -- likely to
+        // route to RESOLVE, not EXPAND. See doc comment above.
+        testSeedProgression("Dm", "G", primaryIntent = CompositionIntent.EXPAND)
+
+        // Seed 2: targets the medium-stability default branch. Hand-
+        // traced: C Am Dm Em F, ends on F (PREDOMINANT),
+        // functionStability=0.45, Em->F cadence=INTERRUPTED (-0.05),
+        // 3 of 5 chords are TONIC-function (C, Am, Em) -> tonic bonus
+        // +0.09 -> stability ~0.49 (medium range), barCount=5 (>4),
+        // cadence not HALF/DECEPTIVE -> should hit the else branch,
+        // routing to EXPAND.
+        testSeedProgression(
+            "C", "Am", "Dm", "Em", "F",
+            primaryIntent = CompositionIntent.EXPAND
+        )
+        testSeedProgression(
+            "C", "Am", "Dm", "Em", "F",
+            primaryIntent = CompositionIntent.EXPAND,
             preferredLength = 8
         )
     }

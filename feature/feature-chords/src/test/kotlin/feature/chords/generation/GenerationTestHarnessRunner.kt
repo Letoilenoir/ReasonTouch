@@ -25,4 +25,14 @@ class GenerationTestHarnessRunner {
     fun `run lift investigation seeds`() {
         GenerationTestHarness.runLiftInvestigationSeeds()
     }
+
+    @Test
+    fun `run exhaustion rotation regression seeds`() {
+        GenerationTestHarness.runExhaustionRotationRegressionSeeds()
+    }
+
+    @Test
+    fun `run expand investigation seeds`() {
+        GenerationTestHarness.runExpandInvestigationSeeds()
+    }
 }

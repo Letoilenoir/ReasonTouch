@@ -38,15 +38,13 @@ object ContinueStrategy {
                 )
                 if (suggestions.isEmpty()) return@repeat
                 val targetFunction = trajectory.getOrNull(position)
-                val matching = suggestions.filter { it.function == targetFunction }
-                val pool = matching.ifEmpty { suggestions }
-                // Prefer chords not already used earlier in this continuation,
-                // falling back to the full pool if that would exclude everything
-                // (e.g. only one diatonic candidate exists for this function).
-                val unusedPool = pool.filterNot { it.chord in usedChords }
-                val finalPool = unusedPool.ifEmpty { pool }
-                val rankForThisVariant = variantIndex.coerceAtMost(finalPool.size - 1)
-                val chosen = finalPool[rankForThisVariant]
+                val chosen = ChordCandidateSelector.select(
+                    suggestions = suggestions,
+                    targetFunction = targetFunction,
+                    continuation = continuation,
+                    usedChords = usedChords,
+                    variantIndex = variantIndex
+                ) ?: return@repeat
                 continuation += chosen.chord
                 confidenceSum += chosen.confidence
                 currentChord = chosen.chord.guitarLabel()

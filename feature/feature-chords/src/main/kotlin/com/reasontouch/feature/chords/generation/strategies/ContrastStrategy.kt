@@ -47,15 +47,13 @@ object ContrastStrategy {
                         maxResults = ChordSuggestionEngine.FULL_DIATONIC_POOL
                     )
                     if (suggestions.isEmpty()) continue
-                    val matching = suggestions.filter { it.function == targetFunction }
-                    val pool = matching.ifEmpty { suggestions }
-                    // Prefer chords not already used earlier in this continuation
-                    // (including the borrowed chord, if one was placed already),
-                    // falling back to the full pool if that excludes everything.
-                    val unusedPool = pool.filterNot { it.chord in usedChords }
-                    val finalPool = unusedPool.ifEmpty { pool }
-                    val rank = variantIndex.coerceAtMost(finalPool.size - 1)
-                    val chosen = finalPool[rank]
+                    val chosen = ChordCandidateSelector.select(
+                        suggestions = suggestions,
+                        targetFunction = targetFunction,
+                        continuation = continuation,
+                        usedChords = usedChords,
+                        variantIndex = variantIndex
+                    ) ?: continue
                     continuation += chosen.chord
                     confidenceSum += chosen.confidence
                     currentChord = chosen.chord.guitarLabel()

@@ -2,6 +2,7 @@ package com.reasontouch.feature.chords
 import com.reasontouch.feature.chords.CompositionIntent
 import com.reasontouch.feature.chords.generation.strategies.ContinueStrategy
 import com.reasontouch.feature.chords.generation.strategies.ContrastStrategy
+import com.reasontouch.feature.chords.generation.strategies.ExpandStrategy
 import com.reasontouch.feature.chords.generation.strategies.LiftStrategy
 import com.reasontouch.feature.chords.generation.strategies.ResolveStrategy
 
@@ -32,6 +33,8 @@ object ProgressionGenerator {
 
             CompositionIntent.CONTRAST ->
                 ContrastStrategy.generate(request)
+            CompositionIntent.EXPAND ->
+                ExpandStrategy.generate(request)
 
             else ->
                 emptyList()

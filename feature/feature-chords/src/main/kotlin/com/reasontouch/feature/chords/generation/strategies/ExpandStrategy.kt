@@ -6,16 +6,16 @@ import com.reasontouch.feature.chords.ProgressionGenerationRequest
 import com.reasontouch.feature.chords.TheoryChord
 import com.reasontouch.feature.chords.guitarLabel
 
-object LiftStrategy {
+object ExpandStrategy {
     private val VARIANT_LABELS = listOf(
-        "Driving Alternation", "Alternate Voicing", "Extended Approach", "Contrasting Approach"
+        "Harmonic Tour", "Alternate Voicing", "Extended Approach", "Contrasting Approach"
     )
 
     fun generate(request: ProgressionGenerationRequest): List<GeneratedProgression> {
         val source = request.sourceProgression
         if (source.isEmpty()) return emptyList()
 
-        val trajectory = LiftTargeting.deriveTrajectory(
+        val trajectory = ExpandTargeting.deriveTrajectory(
             analysis = request.sourceAnalysis,
             phraseLength = request.preferredLength
         )
@@ -57,8 +57,8 @@ object LiftStrategy {
                     GeneratedProgression(
                         chords = continuation,
                         confidence = confidenceSum / continuation.size,
-                        explanation = "${VARIANT_LABELS[variantIndex]}: sustains the phrase's " +
-                                "existing energy with continuous harmonic motion, avoiding a tonic landing."
+                        explanation = "${VARIANT_LABELS[variantIndex]}: tours the diatonic " +
+                                "harmonic territory rather than settling on any single functional goal."
                     )
                 )
             }

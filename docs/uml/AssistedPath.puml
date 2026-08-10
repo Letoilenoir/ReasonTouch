@@ -1,0 +1,43 @@
+@startuml
+title Assisted Path – Assisted Seed → Key Inference → Strategy Routing
+
+actor User as U
+
+participant "AssistedWorkspace" as AW
+participant "SeedGenerator (Mood/Progression/Inspire)" as SG
+participant "ProgressionGenerationRequest" as PGR
+participant "ProgressionAnalysis" as PA
+participant "PairingEngine" as PE
+participant "Strategy" as STRAT
+participant "ChordSuggestionEngine" as CSE
+participant "GeneratedProgression" as GP
+
+== User selects Assisted mode ==
+U -> AW : Choose Mood / Progression / Inspire
+
+== Assisted seed generation ==
+AW -> SG : Request seed suggestions
+SG --> AW : Return seed progression
+
+== Build request ==
+AW -> PGR : Build request with seed
+
+== Key inference ==
+PGR -> PA : Analyse seed\n(determine key, functions,\nstability, tension)
+PA --> PGR : Return key-aware analysis
+
+== Strategy routing ==
+PGR -> PE : Request strategy
+PE --> STRAT : Select strategy
+
+== Phrase generation ==
+loop For each chord
+    STRAT -> CSE : suggest(key, lastChord)
+    CSE --> STRAT : ranked suggestions
+    STRAT -> STRAT : filter + choose chord
+end loop
+
+STRAT --> GP : Build GeneratedProgression
+GP --> U : Display continuation
+
+@enduml
