@@ -53,12 +53,26 @@ Recommend treating these as two phases of one underlying "retain and surface alt
 
 ---
 
-## 7. Open questions, not yet resolved
+## 7. Third piece of evidence: PairingEngine's stability threshold gap
 
+Found 2026-08-04 while verifying EXPAND, and worth recording here rather than only as a bug report, because it changes how the fix should be approached.
+
+**The finding:** `PairingEngine.suggestNext()`'s three-way stability branch (`stability >= 0.8f`, `stability in 0.4f..0.7f`, `else`) leaves `[0.7, 0.8)` uncovered. Any progression whose `harmonicStability` lands in that tenth-wide gap silently falls into the `else` (low-stability) branch, regardless of being much closer to high-stability territory. Confirmed via a real seed (`C Am Dm Em F` in F major, stability=0.78, routed to CONTINUE via low-stability logic despite being nearly high-stability).
+
+**Why this belongs in this document, not just as a standalone bug fix:** the instinctive fix is to pick a single corrected boundary (e.g. widen the medium range to `stability < 0.8f`, closing the gap at exactly 0.8). But that doesn't actually resolve the underlying problem -- it just relocates it. Whatever boundary value is chosen, there will always be some stability value sitting right at that new edge, where the "true" answer is genuinely ambiguous between two adjacent categories. A hard single threshold can never eliminate boundary cases; it can only move where they occur.
+
+**This is the same shape of problem as the DECEPTIVE-cadence case in Section 3-4** (a case where the "correct" answer -- SURPRISE or RESOLVE -- is genuinely disputable, not just under-computed) -- except this time the ambiguity is quantitative (a stability score near a boundary) rather than qualitative (a cadence type that could reasonably support two different musical readings). Together they make a stronger combined case: **the engine's core design of always forcing one deterministic winner is going to keep producing cases like this, in different forms, as long as it stays single-answer.** Multi-option `PairingDecision` isn't just a fix for the two specific dead branches already identified -- it's a structural answer to an entire category of "the forced single answer loses something real" cases, including ones not yet discovered.
+
+**Decision:** the threshold gap is being left unfixed for now, deliberately, rather than patched with a provisional single boundary. Per the app's design philosophy ("if we impose a decision on a user, we are effectively building the composition for them"), the more honest fix for a genuinely boundary-straddling case is very likely "offer more than one direction," not "pick a slightly different single cutoff." Revisit once intent-level choice (Section 3) is actually designed -- this gap may resolve itself as a natural consequence of that work, rather than needing its own separate fix.
+
+---
+
+## 8. Open questions, not yet resolved
 1. Does intent-level choice show competing `PairingDecision`s as tabs/segmented control before drilling into variants, or some other layout?
 2. For chord-level choice: does swapping one position re-run any downstream logic (e.g. does changing bar 3 affect whether bar 4's candidate pool should be recomputed, given strategies currently chain position-to-position via `currentChord`), or is each position's pool frozen at original-generation time regardless of edits to earlier positions?
 3. Should chord-level swap UI live inline in the SUGGEST dialog itself, or open a secondary view (closer to how `HarmonyPanel` currently works as its own panel)?
 4. Does either feature want its own regression test coverage pattern (e.g. asserting `GeneratedProgression` retains full pools, not just winners), and if so, should that be added now while `ResolveStrategyTest.kt`/`LiftStrategyTest.kt` etc. are being written, to avoid a second retrofit later?
+5. **New (2026-08-04):** does the eventual multi-option design need to handle quantitative boundary ambiguity (the stability threshold gap) with the same mechanism as qualitative ambiguity (DECEPTIVE cadence's dual reading), or do these warrant different UI treatments despite sharing a root cause?
 
 ---
 
