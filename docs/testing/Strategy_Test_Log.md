@@ -131,7 +131,39 @@ Seed 7 re-run at `preferredLength = 8` (matching the on-device 2026-08-02 result
 | Continue | Repeated-chord exclusion fix at preferredLength=4 | **PASS -- confirmed clean across all 7 investigation seeds, headless via GenerationTestHarness** |
 | Continue | Tonic-function exhaustion at preferredLength=8 | **NEW FINDING, not a regression -- see above. Logged as separate task list item, not a defect in the 2026-08-02 fixes.** |
 | (all strategies) | KeyDetector tie-break hypothesis | **DISPROVEN AND CLOSED** -- KeyDetector correctly finds best-fit key per seed; no default-to-C-major behavior exists. |
-
+| Expand | Trajectory logic (3-function cycle) + exhaustion-rotation | PASS -- confirmed via forced-intent seeds, both length 4 and 8, no frozen tails |
+| Expand | Medium-stability default routing | PENDING -- retry seed needed, see 2026-08-04 key-ambiguity notes |
+| Expand | HALF-cadence routing | **PROVEN DEAD -- see Task_List.md. Mathematical ceiling (~0.20) can never reach medium-stability floor (0.4). Not a testing gap, a structural fact.** |
+---
 ---
 
+## 2026-08-04 (continued) -- ExpandStrategy built and verified; medium-stability routing seed-hunt exhausted without success
+
+**Strategy logic: fully verified.** `ExpandTargeting`/`ExpandStrategy` implemented (3-function cycle: TONIC->PREDOMINANT->DOMINANT, starting one step after the source's ending function). Confirmed via forced-intent seeds at both preferredLength=4 and 8 -- genuine 3-function cycling in output, no frozen tails (ChordCandidateSelector's exhaustion-rotation fix confirmed working for Expand too), diversity-bonus candidate count increases at length 8 same as other strategies.
+
+**HALF-cadence routing: proven mathematically dead.** `suggestAfterMediumStability()`'s HALF branch ("Ends on V -> explore harmonically") can never fire via live PairingEngine. Proof: `functionStability(DOMINANT) = 0.15` and HALF's `cadenceBonus = -0.10` are both fixed whenever a progression ends on the dominant (`detectCadence()` guarantees any degree-5 ending classifies as HALF). Maximum possible stability via `functionDistributionBonus` alone: `0.15 - 0.10 + 0.15 = 0.20` ceiling -- far below the 0.4 medium-stability floor. Confirmed empirically too: every HALF-cadence seed tried (`Dm G`, `G Em C D Bm`) routed to RESOLVE, never EXPAND. Same category as SIMPLIFY and RESOLVE's DECEPTIVE branch -- see `Task_List.md`.
+
+**Medium-stability-default routing: PENDING, not dead, but seed construction proved much harder than expected.** Nine seed attempts across this session, all either missing the [0.4, 0.7] range or landing in it but hitting a different medium-stability branch (`barCount<=4`->CONTINUE) instead of the `else`->EXPAND default. Full attempt log, useful for whoever picks this up next:
+
+| # | Seed | Detected key | Stability | Outcome | Why it missed |
+|---|---|---|---|---|---|
+| 1 | `Dm G` | G major | 82% | High (CONTRAST) | HALF-cadence attempt, not medium-targeted |
+| 2 | `C Am Dm Em F` | F major | 78% | Falls in the [0.7,0.8) threshold gap -> low-stability routing (CONTINUE) | Wrong key assumed (predicted C major); this is also the seed that discovered the threshold gap (see Task_List.md) |
+| 3 | `Dm Am Dm Gm` | D minor | **47%** | Medium range, but `barCount=4` triggers the `barCount<=4` check first -> CONTINUE, not EXPAND's `else` | Correct range, wrong sibling branch -- closest clean hit all session |
+| 4 | `C F Dm G Am` | A minor | 92% | High (CONTRAST) | Wrong key assumed (predicted C major); ends on Am=i=TONIC in A minor |
+| 5 | `G Em C D Bm` | E minor | 8% | Low (RESOLVE) | Wrong key assumed (predicted G major); ends on Bm=v=DOMINANT in E minor, HALF cadence |
+| 6 | `Dm Am Dm Gm C` | D minor | 16% | Low (RESOLVE) | Extended seed 3 with C, wrongly assumed TONIC-function; C is actually degree VII = DOMINANT function in D minor (MINOR_FUNCTIONS mapping) |
+| 7 | `Dm Am Dm Gm F` | D minor | 96% | High (CONTRAST) | Extended seed 3 with F, correctly TONIC-function this time, but ending-chord function change alone swings stability ~50 points (functionStability contributes 0.95 of the total for any TONIC ending) -- any edit that changes what the progression ends on dominates the whole calculation |
+| 8 | `Dm Am Dm Am Gm` | D minor | 36% | Low (RESOLVE, "Unresolved and off the tonic") | Preserved the correct ending (Gm) from seed 3, but repeating Am introduced a second DOMINANT-function chord, triggering `dominantPenalty=-0.1` -- a mechanism not accounted for, dragged 47%->36%, just below the medium floor |
+
+**Root causes of the difficulty, generalized for future reference:**
+1. Hand-predicting `KeyDetector`'s output for short/ambiguous progressions remains unreliable (repeated finding across multiple sessions now) -- 5 of 8 seeds above detected a different key than assumed.
+2. `calculateHarmonicStability()`'s `functionStability` term (0.95/0.45/0.15 for TONIC/PREDOMINANT/DOMINANT) dominates the total score -- changing the progression's *ending function* swings stability by ~30-80 points, dwarfing every other bonus/penalty combined. Safe seed construction must hold the ending chord's function fixed and vary only earlier chords.
+3. Scale-degree-to-function mapping must be checked against the *actual detected key*, not assumed by analogy to relative major/minor (e.g. degree VII is DOMINANT-function in minor keys, not TONIC-adjacent as its relative-major intuition might suggest).
+4. `dominantPenalty` (any second degree-5 chord anywhere in the progression, not just the ending) is an easy-to-forget swing factor when extending a seed.
+5. `barCount<=4` is checked *before* the `else`/EXPAND branch inside `suggestAfterMediumStability()` -- a seed with correct stability range and correct cadence type still needs `barCount>4` specifically to reach EXPAND rather than its CONTINUE sibling.
+
+**Recommendation for next attempt:** start from seed 3 (`Dm Am Dm Gm`, confirmed 47%, D minor) and extend to 5 bars by inserting a chord *before* position 3 that is diatonic, not degree-5 (avoiding the dominant-penalty), and not the final position (avoiding the ending-function-dominance problem) -- e.g. `Dm Edim Am Dm Gm` (inserting Edim, degree ii=PREDOMINANT, between the first Dm and Am). Not attempted this session; logged as the next concrete idea rather than a tenth blind guess.
+
+---
 *Add new dated sections above this line as further matrices are run.*
