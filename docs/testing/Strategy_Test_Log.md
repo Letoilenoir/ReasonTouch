@@ -9,6 +9,35 @@ Legend: PASS / FAIL / PENDING (not yet run) / PARTIAL (ran, but not fully traced
 ## Coverage summary (updated as entries are added)
 ---
 
+## 2026-08-04 (continued) -- SurpriseStrategy built and verified; live routing seed-hunt unsuccessful, KeyDetector mechanism now precisely understood
+
+**Strategy logic: fully verified.** `SurpriseTargeting`/`SurpriseStrategy` implemented (primes an expected cadential resolution via PREDOMINANT->DOMINANT trajectory, then substitutes a borrowed chord at the FINAL position instead of the expected tonic -- generalizing the deceptive-cadence pattern V-expecting-I-landing-on-vi to a whole phrase). Confirmed via forced-intent seeds at both preferredLength=4 and 8: borrowed chord correctly lands at the final position in every candidate, diatonic trajectory beforehand shows genuine PREDOMINANT/DOMINANT alternation with no frozen tails (ChordCandidateSelector's exhaustion-rotation fix confirmed working for Surprise too).
+
+**Live routing (CadenceType.DECEPTIVE): NOT YET CONFIRMED.** Five seed attempts, all failed to produce a genuine DECEPTIVE cadence classification via live KeyDetector+ProgressionAnalyzer:
+
+| # | Seed | Detected key | Cadence | Why it missed |
+|---|---|---|---|---|
+| 1 | `C F G Am` | A minor | INTERRUPTED | Incorrectly assumed "already confirmed" from earlier session work without re-verification -- see KeyDetector mechanism finding below for the actual cause |
+| 2 | `C F G Am` (length 8) | A minor | INTERRUPTED | Same seed, same result |
+| 3 | `C F G Am` (unforced routing) | A minor | INTERRUPTED | Routed to CONTRAST, not SURPRISE -- confirms #1's cadence misclassification carries through to real PairingEngine behavior |
+| 4 | `C F Bdim G Am` | A minor | INTERRUPTED | Bdim wrongly assumed C-major-exclusive; it's diatonic to BOTH keys (vii in C major, ii in A minor per MINOR_QUALITIES), did nothing to disambiguate |
+| 5 | `C F G Am F` | **F major** | INTERRUPTED | Fix correctly removed A minor's advantage (see below) but the seed wasn't anchored enough to hold C major over every other candidate key -- F major won instead, a third key not previously considered |
+
+**KeyDetector mechanism now fully traced (KeyDetector.kt reviewed directly) -- root cause of the whole seed-hunt difficulty:**
+
+`KeyDetector.detect()` scores every candidate key by: `matchCount * 1.0` (chords diatonically valid in that key) + `tonicBonus (1.5)` if any chord is scale-degree-1 + `dominantBonus (1.2)` if any chord is scale-degree-5 + **`lastChordBonus (1.3)` if the progression's LAST chord is that key's tonic**.
+
+Hand-traced `C F G Am` exactly: C major scores 7.7 (5 matches + tonic bonus for C + dominant bonus for G, no last-chord bonus since Am isn't C major's tonic). A minor scores 7.8 (5 matches + tonic bonus for Am as ITS tonic + last-chord bonus since Am IS A minor's tonic, but no dominant bonus since A minor's dominant is E, not present). **A minor wins by exactly 0.1 -- entirely due to lastChordBonus.**
+
+**This is a structural conflict, not a one-off coincidence:** any seed constructed to end on the deceptive cadence's "surprise" landing chord (vi, by definition -- that's what makes it deceptive) will, by KeyDetector's own scoring, tend to make the relative minor's tonic-ending bonus fire, competing directly against the very key needed for the cadence to classify as DECEPTIVE rather than a strong VII->i close in the relative minor. **The DECEPTIVE cadence and KeyDetector's lastChordBonus pull in opposite directions for any seed shaped like "end on the relative-minor-styled vi chord."**
+
+**Not yet resolved.** Recommendation for next attempt: anchor the seed harder toward C major specifically using a chord degree that differs in ROOT (not just quality) between C major and A minor -- e.g. degree IV is F in both keys (unhelpful, as seen), but degree ii differs: C major's ii is Dm (minor quality, root D), A minor's ii is Bdim (diminished, root B) -- entirely different roots. A seed using Dm specifically as an anchor, ending on a chord that is NOT any competing key's tonic (avoiding F major's trap from attempt 5 too), is the next concrete idea -- not attempted this session.
+
+**Given 5 consecutive misses across a well-understood, precisely-traced mechanism, further blind seed construction was judged unproductive for this session. Logged as PENDING rather than forcing a sixth attempt.**
+
+---
+---
+
 ## 2026-08-04 (continued) -- Exhaustion-rotation fix centralized and rolled out to all 4 strategies
 
 **Full details:** `docs/handoffs/ReasonTouch_Handoff_2026-08-04_LiftStrategy_ExhaustionFix.md`
