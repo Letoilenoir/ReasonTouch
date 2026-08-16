@@ -35,4 +35,9 @@ class GenerationTestHarnessRunner {
     fun `run expand investigation seeds`() {
         GenerationTestHarness.runExpandInvestigationSeeds()
     }
+
+    @Test
+    fun `run surprise investigation seeds`() {
+        GenerationTestHarness.runSurpriseInvestigationSeeds()
+    }
 }

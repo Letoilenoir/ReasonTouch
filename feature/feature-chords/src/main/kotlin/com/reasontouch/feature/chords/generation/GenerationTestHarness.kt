@@ -254,5 +254,146 @@ object GenerationTestHarness {
             primaryIntent = CompositionIntent.EXPAND,
             preferredLength = 8
         )
+
+        // Batch of 3 candidate seeds (2026-08-04), cast deliberately wide
+        // rather than hand-predicted precisely -- prior attempts to
+        // hand-calculate stability have repeatedly missed due to
+        // KeyDetector picking a different key than assumed. Goal: find
+        // at least one that lands cleanly in [0.4, 0.7] with real margin,
+        // to test EXPAND's medium-stability default branch properly.
+        testSeedProgression(
+            "Dm", "Am", "Dm", "Gm",
+            primaryIntent = CompositionIntent.EXPAND
+        )
+        testSeedProgression(
+            "C", "F", "Dm", "G", "Am",
+            primaryIntent = CompositionIntent.EXPAND
+        )
+        testSeedProgression(
+            "G", "Em", "C", "D", "Bm",
+            primaryIntent = CompositionIntent.EXPAND
+        )
+
+        // Seed A extended by one bar (2026-08-04): Dm Am Dm Gm landed
+        // cleanly in medium stability (47%) but barCount=4 triggered
+        // suggestAfterMediumStability()'s barCount<=4 check first,
+        // routing to CONTINUE instead of EXPAND's else branch. Adding
+        // a 5th chord to clear that check while staying in the same
+        // key/stability neighborhood.
+        testSeedProgression(
+            "Dm", "Am", "Dm", "Gm", "C",
+            primaryIntent = CompositionIntent.EXPAND
+        )
+
+        // Correction: previous attempt added "C" assuming TONIC-adjacent
+        // function, but in D minor C is degree VII = DOMINANT function
+        // (MINOR_FUNCTIONS mapping), not TONIC -- swung stability from
+        // 47% down to 16% and flipped ending function to DOMINANT,
+        // routing to RESOLVE. Using F (degree III = TONIC function,
+        // same category as Dm itself) instead, to stay in the same
+        // functional neighborhood as the already-confirmed 47% seed.
+        testSeedProgression(
+            "Dm", "Am", "Dm", "Gm", "F",
+            primaryIntent = CompositionIntent.EXPAND
+        )
+
+        // Second correction: adding F (also TONIC-function, degree III)
+        // swung stability to 96% -- ending-chord function dominates the
+        // whole calculation (functionStability contributes 0.95 alone
+        // for a TONIC ending), so ANY change to the ending chord's
+        // function overwhelms everything else. Fix: preserve the exact
+        // same ending (Gm, PREDOMINANT) as the confirmed-47% seed,
+        // insert the extra bar BEFORE it instead of after.
+        testSeedProgression(
+            "Dm", "Am", "Dm", "Am", "Gm",
+            primaryIntent = CompositionIntent.EXPAND
+        )
+    }
+
+    /**
+     * Targets SURPRISE's single PairingEngine trigger condition
+     * (suggestAfterMediumStability's cadenceType == DECEPTIVE check).
+     * Reuses "C F G Am" -- already confirmed 2026-08-04 (Resolve work)
+     * to classify as a genuine deceptive cadence (real V=G resolving
+     * to vi=Am rather than I=C) after the calculateHarmonicStability()
+     * DECEPTIVE penalty fix (-0.15 -> -0.45). Should land in medium
+     * stability and route to SURPRISE via live PairingEngine -- if not,
+     * this would be a genuinely new finding given the seed's cadence
+     * classification is already independently confirmed correct.
+     *
+     * First two calls force primaryIntent=SURPRISE directly, to verify
+     * SurpriseStrategy's own trajectory/borrowed-chord-placement logic
+     * in isolation. Third call omits primaryIntent entirely, letting
+     * PairingEngine's real decision drive generation -- this is the
+     * actual end-to-end routing confirmation.
+     */
+    fun runSurpriseInvestigationSeeds() {
+        testSeedProgression(
+            "C", "F", "G", "Am",
+            primaryIntent = CompositionIntent.SURPRISE
+        )
+        testSeedProgression(
+            "C", "F", "G", "Am",
+            primaryIntent = CompositionIntent.SURPRISE,
+            preferredLength = 8
+        )
+
+        // Real routing test -- no forced primaryIntent. This is what
+        // actually confirms (or refutes) SURPRISE's live reachability.
+        testSeedProgression("C", "F", "G", "Am")
+
+        // Correction (2026-08-04): the seed above was previously
+        // (incorrectly) asserted as "already confirmed" to be a genuine
+        // deceptive cadence, based on a claim from earlier session work
+        // that was not re-verified before reuse -- it wasn't re-checked
+        // against a fresh KeyDetector run and turned out to detect as A
+        // minor here, not C major, reclassifying the cadence as
+        // INTERRUPTED (VII->i) rather than DECEPTIVE (V->vi). This is
+        // GENUINELY UNTESTED, not a re-confirmation: adding Bdim (vii'
+        // in C major) before the G->Am motion, since Bdim is diatonic to
+        // C major but NOT present in A minor's natural diatonic set at
+        // all -- intended to rule out the A-minor reinterpretation
+        // entirely, forcing C major detection. Unverified until run.
+        testSeedProgression("C", "F", "Bdim", "G", "Am")
+
+        // Second correction (2026-08-04): the Bdim attempt above also
+        // missed -- Bdim is diatonic to BOTH keys (vii deg in C major,
+        // ii deg in A minor), not C-major-exclusive as claimed. Traced
+        // KeyDetector.kt directly: A minor won by exactly 0.1 because
+        // every seed so far ended on Am, triggering KeyDetector's
+        // lastChordBonus (1.3) for A minor's tonic -- the very property
+        // that defines "deceptive cadence ending on vi" simultaneously
+        // makes A minor's own tonic-ending bonus fire. Fix: don't end
+        // the SEED on Am. Same G->Am deceptive motion mid-progression,
+        // but appending F afterward -- F is degree IV in C major (no
+        // bonus either way) and degree VI in A minor (not degree 1, so
+        // A minor loses its lastChordBonus entirely). Hand-traced:
+        // C major score stays 7.7, A minor drops to 6.5. Should finally
+        // detect C major. Unverified until run.
+        testSeedProgression("C", "F", "G", "Am", "F")
+
+        // Corrected approach: rather than trying to neutralize the
+        // ending-chord bonus by adding a non-tonic chord after Am,
+        // reinforce C major's OWN bonuses directly so they outweigh
+        // A minor's lastChordBonus regardless of what the seed ends on.
+        // Hand-traced against KeyDetector.kt's actual weighted formula
+        // (matchCount*1.0 + tonicBonus*1.5 + dominantBonus*1.2 +
+        // lastChordBonus*1.3, no mood bias):
+        //   C major: repeating C once gives matchCount=5, tonicBonus
+        //   fires twice (2*1.5=3.0), dominantBonus once (G present,
+        //   1.2), lastChordBonus=0 (Am != degree 1 in C major).
+        //   Total = 5 + 3.0 + 1.2 + 0 = 9.2
+        //   A minor: matchCount=5, tonicBonus once (Am present, 1.5),
+        //   dominantBonus=0 (no degree-5 chord present in A minor
+        //   reading -- E is A minor's V, not present here),
+        //   lastChordBonus fires (Am=degree 1, 1.3).
+        //   Total = 5 + 1.5 + 0 + 1.3 = 7.8
+        // C major should win by a full 1.4, not the 0.1 margin that
+        // made every prior seed attempt flip to A minor. Cadence:
+        // G(deg5)->Am(deg6) in C major = genuine DECEPTIVE. Stability:
+        // 0.95(TONIC ending) - 0.45(DECEPTIVE) + 0.06(2/5 tonic
+        // distribution bonus) = ~0.56, medium range -> should route
+        // to SURPRISE via suggestAfterMediumStability()'s first check.
+        testSeedProgression("C", "C", "F", "G", "Am")
     }
 }

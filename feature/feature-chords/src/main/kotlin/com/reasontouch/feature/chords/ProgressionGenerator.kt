@@ -5,6 +5,7 @@ import com.reasontouch.feature.chords.generation.strategies.ContrastStrategy
 import com.reasontouch.feature.chords.generation.strategies.ExpandStrategy
 import com.reasontouch.feature.chords.generation.strategies.LiftStrategy
 import com.reasontouch.feature.chords.generation.strategies.ResolveStrategy
+import com.reasontouch.feature.chords.generation.strategies.SurpriseStrategy
 
 /**
  * Delegates chord progression generation to strategy-specific implementations.
@@ -36,6 +37,8 @@ object ProgressionGenerator {
             CompositionIntent.EXPAND ->
                 ExpandStrategy.generate(request)
 
+            CompositionIntent.SURPRISE ->
+                SurpriseStrategy.generate(request)
             else ->
                 emptyList()
         }
