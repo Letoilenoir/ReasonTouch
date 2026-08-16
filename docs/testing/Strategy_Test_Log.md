@@ -195,4 +195,17 @@ Seed 7 re-run at `preferredLength = 8` (matching the on-device 2026-08-02 result
 **Recommendation for next attempt:** start from seed 3 (`Dm Am Dm Gm`, confirmed 47%, D minor) and extend to 5 bars by inserting a chord *before* position 3 that is diatonic, not degree-5 (avoiding the dominant-penalty), and not the final position (avoiding the ending-function-dominance problem) -- e.g. `Dm Edim Am Dm Gm` (inserting Edim, degree ii=PREDOMINANT, between the first Dm and Am). Not attempted this session; logged as the next concrete idea rather than a tenth blind guess.
 
 ---
+---
+
+## 2026-08-04 (continued) -- SurpriseStrategy built and fully verified; all 5 built strategies now confirmed working
+
+**Strategy logic: fully verified.** `SurpriseTargeting`/`SurpriseStrategy` implemented (primes an expected resolution via PREDOMINANT/DOMINANT alternation, then substitutes a borrowed chord at the FINAL position -- generalizing the deceptive cadence's "expect V->I, get V->vi" pattern to a whole phrase). Confirmed correct via forced-intent testing (`C F G Am`, A minor): trajectory, borrowed-chord substitution at the correct position, and ChordCandidateSelector's exhaustion-rotation fix all verified at both length 4 and 8.
+
+**Live PairingEngine routing: CONFIRMED**, via `C C F G Am` -- detected key C major, stability 56%, cadence DECEPTIVE, routed to SURPRISE ("Deceptive cadence -> unexpected turn", 75% confidence). Every prediction (key, stability, cadence, routing decision) matched exactly on the first attempt using the corrected methodology below. This is the first genuinely successful real-routing confirmation for SURPRISE, closing out the last open verification question for this strategy.
+
+### Corrected seed-construction methodology (established this session, should be used for all future seed work)
+
+Root cause of repeated seed-prediction failures across this session (EXPAND and SURPRISE both): hand-*intuiting* which key `KeyDetector` would pick, rather than *computing* its actual weighted formula. `KeyDetector.kt`'s scoring is precise and mechanical:
+
+
 *Add new dated sections above this line as further matrices are run.*
