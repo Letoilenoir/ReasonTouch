@@ -21,6 +21,7 @@ import com.reasontouch.feature.chords.PairingType
 import com.reasontouch.feature.chords.ProgressionAnalyzer
 import com.reasontouch.feature.chords.ProgressionGenerationRequest
 import com.reasontouch.feature.chords.ProgressionGenerator
+import com.reasontouch.feature.chords.SuggestionWorkflow
 import com.reasontouch.feature.chords.guitarLabel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -826,49 +827,20 @@ class PianoRollViewModel @Inject constructor(
                 )
     }
 
+    // Delegates to SuggestionWorkflow (feature-chords module) -- see that
+    // file for the shared logic and Task_List.md for why this was
+    // consolidated. Still suspend: the progression is fetched fresh from
+    // the repository rather than via the chords StateFlow, unchanged from
+    // the original behavior.
+
     suspend fun suggestNextPhrases(): List<GeneratedProgression> {
         val currentProgression = repository.getChordsForSessionOnce(sessionId)
-        if (currentProgression.isEmpty()) {
-            return emptyList()
-        }
-        val chordNames = currentProgression.map { it.chordName.substringBefore(" ") }
-        val detectedKeys = KeyDetector.detect(chordNames)
-        val detectedKey = detectedKeys.firstOrNull() ?: return emptyList()
-        val analysis = ProgressionAnalyzer.analyze(currentProgression, detectedKey)
-        val pairingDecision = PairingEngine.suggestNext(analysis)
-        val intent = pairingDecision.type.toCompositionIntent()
-        val request = ProgressionGenerationRequest(
-            sourceAnalysis = analysis,
-            sourceProgression = currentProgression,
-            primaryIntent = intent,
-            targetSection = null,
-            targetEnergy = null,
-            preferredLength = pairingDecision.suggestedBars
-        )
-        return ProgressionGenerator.generate(request)
+        return SuggestionWorkflow.suggestNextPhrases(currentProgression)
     }
 
-    // NEW:
     suspend fun suggestNextSection(): PairingDecision {
         val currentProgression = repository.getChordsForSessionOnce(sessionId)
-        if (currentProgression.isEmpty()) {
-            return PairingDecision(
-                type = PairingType.CONTINUE,
-                suggestedBars = 4,
-                confidence = 0.3f,
-                rationale = "Could not detect key"
-            )
-        }
-        val chordNames = currentProgression.map { it.chordName.substringBefore(" ") }
-        val detectedKeys = KeyDetector.detect(chordNames)
-        val detectedKey = detectedKeys.firstOrNull() ?: return PairingDecision(
-            type = PairingType.CONTINUE,
-            suggestedBars = 4,
-            confidence = 0.3f,
-            rationale = "Could not detect key"
-        )
-        val analysis = ProgressionAnalyzer.analyze(currentProgression, detectedKey)
-        return PairingEngine.suggestNext(analysis)
+        return SuggestionWorkflow.suggestNextSection(currentProgression)
     }
     // NEW:
     fun addPhrase(generatedProgression: GeneratedProgression) {
