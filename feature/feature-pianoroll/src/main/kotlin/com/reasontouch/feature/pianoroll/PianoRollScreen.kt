@@ -122,10 +122,10 @@ fun PianoRollScreen(
     val drawDuration by viewModel.drawDuration.collectAsState()
     var showInstrumentPanel by remember { mutableStateOf(false) }
     var showSuggestDialog by remember { mutableStateOf(false) }
-    var currentSuggestion by remember { mutableStateOf<com.reasontouch.feature.chords.PairingDecision?>(null) }
-    var currentGeneratedPhrases by remember { mutableStateOf<List<com.reasontouch.feature.chords.GeneratedProgression>>(emptyList()) }
-    var currentOptions by remember { mutableStateOf<List<String>>(emptyList()) }
+    var currentSuggestions by remember {
+        mutableStateOf<List<com.reasontouch.feature.chords.SuggestionWorkflow.SuggestionOption>>(emptyList())
 
+    }
     val session      by viewModel.session.collectAsState()
     val tracks       by viewModel.tracks.collectAsState()
     val activeIndex  by viewModel.activeTrackIndex.collectAsState()
@@ -184,29 +184,27 @@ fun PianoRollScreen(
             onInstrumentClick = { showInstrumentPanel = !showInstrumentPanel },
             onSuggestNext     = {
                 scope.launch {
-                    val suggestion = viewModel.suggestNextSection()
-                    currentSuggestion = suggestion
-                    currentGeneratedPhrases = viewModel.suggestNextPhrases()
-                    currentOptions = currentGeneratedPhrases.map { it.explanation }
+                    currentSuggestions = viewModel.suggestNextOptions()
                     showSuggestDialog = true
                 }
             }
         )
-        if (showSuggestDialog && currentSuggestion != null) {
+        if (showSuggestDialog && currentSuggestions.isNotEmpty()) {
             com.reasontouch.feature.chords.components.SuggestNextDialog(
-                decision = currentSuggestion!!,
-                options = currentOptions,
-                onOptionSelected = { selected ->
-                    currentGeneratedPhrases.getOrNull(selected)?.let { phrase ->
-                        viewModel.addPhrase(phrase)
-                    }
+                suggestions = currentSuggestions,
+                onOptionSelected = { intentType, phraseIndex ->
+                    currentSuggestions
+                        .firstOrNull { it.option.type == intentType }
+                        ?.phrases
+                        ?.getOrNull(phraseIndex)
+                        ?.let { phrase -> viewModel.addPhrase(phrase) }
+
                     showSuggestDialog = false
-                    currentSuggestion = null
-                    currentGeneratedPhrases = emptyList()
+                    currentSuggestions = emptyList()
                 },
                 onDismiss = {
                     showSuggestDialog = false
-                    currentSuggestion = null
+                    currentSuggestions = emptyList()
                 }
             )
         }

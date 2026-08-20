@@ -85,4 +85,65 @@ object SuggestionWorkflow {
         PairingType.SIMPLIFY  -> CompositionIntent.SIMPLIFY
         PairingType.MODULATE  -> CompositionIntent.DEVELOP  // closest existing intent; no direct equivalent yet
     }
+
+/**
+ * One ranked intent paired with its generated phrase candidates. Used by the multi-option
+ * SUGGEST NEXT dialog -- IntentOption alone (from PairingEngine) doesn't carry phrases,
+ * since phrase generation is a SuggestionWorkflow-level concern, not a PairingEngine one.
+ */
+data class SuggestionOption(
+    val option: IntentOption,
+    val phrases: List<GeneratedProgression>
+)
+
+/**
+ * Multi-option entry point for the SUGGEST NEXT dialog. Computes the analysis once, then
+ * generates phrases for every ranked intent (not just the top one) so the dialog can offer
+ * intent-level choice per the 2026-08-03 design note ("if we impose a decision on the user,
+ * we are effectively building the composition for them").
+ *
+ * Falls back to a single-entry list (empty phrases) for the same two edge cases
+ * suggestNextSection() handles -- empty progression / undetected key -- so callers can
+ * treat the dialog's input uniformly rather than special-casing "no options yet".
+ */
+fun suggestNextOptionsWithPhrases(progression: List<ChordEvent>): List<SuggestionOption> {
+    if (progression.isEmpty()) {
+        val fallback = IntentOption(
+            type = PairingType.CONTINUE,
+            suggestedBars = 4,
+            confidence = 0.5f,
+            rationale = "No progression yet - start with any 4-bar section",
+            isAboveThreshold = true
+        )
+        return listOf(SuggestionOption(fallback, emptyList()))
+    }
+
+    val chordNames = progression.map { it.chordName.substringBefore(" ") }
+    val detectedKey = KeyDetector.detect(chordNames).firstOrNull()
+    if (detectedKey == null) {
+        val fallback = IntentOption(
+            type = PairingType.CONTINUE,
+            suggestedBars = 4,
+            confidence = 0.3f,
+            rationale = "Could not detect key",
+            isAboveThreshold = false
+        )
+        return listOf(SuggestionOption(fallback, emptyList()))
+    }
+
+    val analysis = ProgressionAnalyzer.analyze(progression, detectedKey)
+    val decisionSet = PairingEngine.suggestNextMulti(analysis)
+
+    return decisionSet.options.map { option ->
+        val request = ProgressionGenerationRequest(
+            sourceAnalysis = analysis,
+            sourceProgression = progression,
+            primaryIntent = option.type.toCompositionIntent(),
+            targetSection = null,
+            targetEnergy = null,
+            preferredLength = option.suggestedBars
+        )
+        SuggestionOption(option = option, phrases = ProgressionGenerator.generate(request))
+    }
+}
 }

@@ -842,6 +842,17 @@ class PianoRollViewModel @Inject constructor(
         val currentProgression = repository.getChordsForSessionOnce(sessionId)
         return SuggestionWorkflow.suggestNextSection(currentProgression)
     }
+
+    /**
+     * Multi-option entry point for the SUGGEST NEXT dialog -- returns every ranked intent
+     * paired with its generated phrases, rather than collapsing to a single top pick.
+     * See SuggestionWorkflow.suggestNextOptionsWithPhrases().
+     */
+    suspend fun suggestNextOptions(): List<SuggestionWorkflow.SuggestionOption> {
+        val currentProgression = repository.getChordsForSessionOnce(sessionId)
+        return SuggestionWorkflow.suggestNextOptionsWithPhrases(currentProgression)
+    }
+
     // NEW:
     fun addPhrase(generatedProgression: GeneratedProgression) {
         viewModelScope.launch {

@@ -773,6 +773,16 @@ class ChordViewModel @Inject constructor(
      */
     fun suggestNextPhrases(): List<GeneratedProgression> =
         SuggestionWorkflow.suggestNextPhrases(progression.value)
+    // <<< INSERT THIS NEW FUNCTION HERE >>>
+
+    /**
+     * Multi-option entry point for the SUGGEST NEXT dialog -- returns every ranked intent
+     * paired with its generated phrases, rather than collapsing to a single top pick.
+     * See SuggestionWorkflow.suggestNextOptionsWithPhrases().
+     */
+    fun suggestNextOptions(): List<SuggestionWorkflow.SuggestionOption> =
+        SuggestionWorkflow.suggestNextOptionsWithPhrases(progression.value)
+
     /**
      * Adds a generated phrase to the progression.
      * Converts List<TheoryChord> to List<ChordEvent> and adds bars.

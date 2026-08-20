@@ -72,10 +72,8 @@ fun ManualWorkspace(
     var showSendDialog by remember { mutableStateOf(false) }
     var selectedPattern by remember { mutableStateOf<com.reasontouch.feature.chords.StepPattern?>(null) }
     var showSuggestDialog by remember { mutableStateOf(false) }
-    var currentSuggestion by remember { mutableStateOf<PairingDecision?>(null) }
-    var currentGeneratedPhrases by remember { mutableStateOf<List<GeneratedProgression>>(emptyList()) }
-    var currentOptions by remember {
-        mutableStateOf<List<String>>(emptyList())
+    var currentSuggestions by remember {
+        mutableStateOf<List<com.reasontouch.feature.chords.SuggestionWorkflow.SuggestionOption>>(emptyList())
     }
 
     // Auto-apply preset on first non-null pattern selection (handled in StrumPatternTray callback)
@@ -242,20 +240,7 @@ fun ManualWorkspace(
             onClear = viewModel::clearProgression,
             onSendToRoll = { showSendDialog = true },
             onSuggestNext = {
-                val suggestion = viewModel.suggestNextSection()
-                currentSuggestion = suggestion
-                currentGeneratedPhrases = viewModel.suggestNextPhrases()
-
-                currentOptions = if (currentGeneratedPhrases.isNotEmpty()) {
-                    currentGeneratedPhrases.map { it.explanation }
-                } else {
-                    listOf(
-                        "${suggestion.type.name} pathway not yet implemented — " +
-                                "this suggestion would use ${suggestion.type.name} " +
-                                "generation once available."
-                    )
-                }
-
+                currentSuggestions = viewModel.suggestNextOptions()
                 showSuggestDialog = true
             }
         )
@@ -295,26 +280,26 @@ fun ManualWorkspace(
                 showSendDialog = false
             }
         )
-        if (showSuggestDialog && currentSuggestion != null) {
-            SuggestNextDialog(
-                decision = currentSuggestion!!,
-                options = currentOptions,
-                onOptionSelected = { selected ->
+    }
 
-                    currentGeneratedPhrases.getOrNull(selected)?.let { phrase ->
-                        viewModel.addPhrase(phrase)
-                    }
+    if (showSuggestDialog && currentSuggestions.isNotEmpty()) {
+        SuggestNextDialog(
+            suggestions = currentSuggestions,
+            onOptionSelected = { intentType, phraseIndex ->
+                currentSuggestions
+                    .firstOrNull { it.option.type == intentType }
+                    ?.phrases
+                    ?.getOrNull(phraseIndex)
+                    ?.let { phrase -> viewModel.addPhrase(phrase) }
 
-                    showSuggestDialog = false
-                    currentSuggestion = null
-                    currentGeneratedPhrases = emptyList()
-                },
-                onDismiss = {
-                    showSuggestDialog = false
-                    currentSuggestion = null
-                }
-            )
-        }
+                showSuggestDialog = false
+                currentSuggestions = emptyList()
+            },
+            onDismiss = {
+                showSuggestDialog = false
+                currentSuggestions = emptyList()
+            }
+        )
     }
 }
 
