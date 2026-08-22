@@ -142,18 +142,26 @@ class Sequencer @Inject constructor(
     }
 
     private fun computeEndBeat(allNotes: Map<String, List<NoteEvent>>): Float {
-        val lastNoteEnd = allNotes.values.flatten()
-            .maxOfOrNull { it.beat + it.duration } ?: 0f
-        if (lastNoteEnd <= 0f) return 4f
+        // Deliberately uses note START time only, not beat + duration. A note's stored
+        // duration represents its intended ring/sustain -- e.g. a strummed chord meant to
+        // ring past its nominal bar, which matters for MIDI export fidelity and is a real
+        // musical feature, not a bug. Actual playback ring is computed independently by
+        // ringDur() above via note-onset clustering, so it's unaffected by this. Using
+        // beat + duration here previously let a wide/slow strum's ring length silently
+        // inflate the whole session's playback length by an extra bar whenever it bled
+        // past a bar boundary, even though nothing about where notes trigger had changed.
+        val lastNoteBeat = allNotes.values.flatten()
+            .maxOfOrNull { it.beat } ?: 0f
+        if (lastNoteBeat <= 0f) return 4f
 
         // Use epsilon-safe truncation instead of ceil
         val epsilon = 0.001f
-        val barNumber = if (kotlin.math.abs(lastNoteEnd % 4f) < epsilon) {
-            // Note ends exactly at a bar boundary
-            (lastNoteEnd / 4f).toInt()
+        val barNumber = if (kotlin.math.abs(lastNoteBeat % 4f) < epsilon) {
+            // Note starts exactly at a bar boundary
+            (lastNoteBeat / 4f).toInt()
         } else {
-            // Round up to include the bar this note ends within
-            (lastNoteEnd / 4f).toInt() + 1
+            // Round up to include the bar this note starts within
+            (lastNoteBeat / 4f).toInt() + 1
         }.coerceAtLeast(1)
 
         return (barNumber * 4f).toFloat()
