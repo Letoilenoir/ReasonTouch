@@ -111,26 +111,6 @@ class PianoRollState {
     var moveDragDeltaBeat: Float   by mutableStateOf(0f)
     var moveDragDeltaPitch: Int    by mutableStateOf(0)
 
-    // ── Velocity drag ─────────────────────────────────────────────────────
-    var velocityDragNoteId: String? = null
-    var velocityDragOrigVelocity: Int = 100
-
-    fun velocityBarHit(
-        x: Float,
-        notes: List<com.reasontouch.core.data.NoteEvent>
-    ): com.reasontouch.core.data.NoteEvent? {
-        val barW = maxOf(3f, pixelsPerBeat * 0.25f - 1f)
-        return notes.lastOrNull { note ->
-            val nx = beatToX(note.beat)
-            x >= nx - barW && x <= nx + barW
-        }
-    }
-
-    fun yToVelocity(y: Float, stripHeight: Float): Int {
-        val t = 1f - (y / stripHeight).coerceIn(0f, 1f)
-        return (t * 127f).toInt().coerceIn(1, 127)
-    }
-
     fun clampScroll(canvasWidth: Float, canvasHeight: Float) {
         val maxX = maxOf(0f, totalBeats * pixelsPerBeat - canvasWidth + 40f)
         val maxY = maxOf(0f, totalNotes * noteHeight - canvasHeight + headerHeight)

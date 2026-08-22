@@ -208,20 +208,7 @@ fun DrawScope.drawPianoKeys(state: PianoRollState, textMeasurer: TextMeasurer) {
     }
 }
 
-fun DrawScope.drawVelocityBars(state: PianoRollState, notes: List<NoteEvent>) {
-    drawRect(color = Color(0xFF1A1A22))
-    notes.forEach { note ->
-        val x    = state.beatToX(note.beat)
-        val barW = maxOf(3f, state.pixelsPerBeat * 0.25f - 1f)
-        if (x < -barW || x > size.width) return@forEach
-        val velH = (note.velocity / 127f) * (size.height - 14f)
-        val y    = size.height - velH
-        drawRect(color = Color(0xFFE84040), topLeft = Offset(x, y),
-            size = Size(minOf(barW, state.pixelsPerBeat - 1f), velH))
-        drawRect(color = Color.White.copy(alpha = 0.3f), topLeft = Offset(x, y),
-            size = Size(minOf(barW, state.pixelsPerBeat - 1f), 2f))
-    }
-}
+
 
 fun DrawScope.drawHorizontalScrollBar(state: PianoRollState) {
     val totalW = state.totalBeats * state.pixelsPerBeat

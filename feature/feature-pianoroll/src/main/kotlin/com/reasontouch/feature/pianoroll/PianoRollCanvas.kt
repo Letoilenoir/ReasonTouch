@@ -121,14 +121,3 @@ fun PianoRollCanvas(
     }
 }
 
-@Composable
-fun VelocityStripCanvas(
-    state: PianoRollState,
-    uiState: PianoRollUiState,
-    viewModel: PianoRollViewModel,
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier = modifier.velocityStripGestures(state, uiState, viewModel)) {
-        drawVelocityBars(state, uiState.activeNotes)
-    }
-}

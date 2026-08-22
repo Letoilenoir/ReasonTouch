@@ -214,6 +214,7 @@ fun Modifier.verticalScrollBarGestures(
         state.clampScroll(state.gridWidth, state.gridHeight)
     }
 }
+
 fun Modifier.gridScrollGestures(state: PianoRollState): Modifier =
     this.pointerInput(Unit) {
         detectDragGestures { change, dragAmount ->
@@ -232,30 +233,6 @@ fun Modifier.gridScrollGestures(state: PianoRollState): Modifier =
             state.clampScroll(state.gridWidth, state.gridHeight)
         }
     }
-fun Modifier.velocityStripGestures(
-    state: PianoRollState,
-    uiState: PianoRollUiState,
-    viewModel: PianoRollViewModel
-): Modifier = this.pointerInput(uiState.activeNotes) {
-    detectDragGestures(
-        onDragStart = { offset ->
-            val hit = state.velocityBarHit(offset.x, uiState.activeNotes)
-            if (hit != null) {
-                state.velocityDragNoteId      = hit.id
-                state.velocityDragOrigVelocity = hit.velocity
-            }
-        },
-        onDragEnd    = { state.velocityDragNoteId = null },
-        onDragCancel = { state.velocityDragNoteId = null },
-        onDrag = { change, _ ->
-            change.consume()
-            val noteId = state.velocityDragNoteId ?: return@detectDragGestures
-            val newVel = state.yToVelocity(change.position.y, size.height.toFloat())
-            viewModel.updateNoteVelocity(noteId, newVel)
-        }
-    )
-}
-
 fun Modifier.pianoRollZoomGestures(state: PianoRollState): Modifier = this
 fun Modifier.pianoRollTapGestures(state: PianoRollState, uiState: PianoRollUiState,
     viewModel: PianoRollViewModel): Modifier = this

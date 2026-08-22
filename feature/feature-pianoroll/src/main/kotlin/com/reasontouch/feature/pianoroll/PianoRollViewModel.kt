@@ -471,54 +471,7 @@ class PianoRollViewModel @Inject constructor(
         }
     }
 // ---------------------------------------------------------------------
-// NOTE VELOCITY
-// ---------------------------------------------------------------------
 
-    fun updateNoteVelocity(
-        noteId: String,
-        newVelocity: Int
-    ) {
-
-        val activeTrack =
-            tracks.value.getOrNull(_activeTrackIndex.value)
-                ?: return
-
-        val current =
-            _allNotes.value.toMutableMap()
-
-        val notes =
-            current[activeTrack.id]
-                ?: return
-
-        val updated = notes.map { note ->
-
-            if (note.id == noteId) {
-
-                note.copy(
-                    velocity = newVelocity.coerceIn(1, 127)
-                )
-
-            } else {
-                note
-            }
-        }
-
-        current[activeTrack.id] = updated
-        _allNotes.value = current
-
-        updateActiveNotes()
-
-        viewModelScope.launch {
-
-            val note =
-                updated.firstOrNull { it.id == noteId }
-                    ?: return@launch
-
-            repository.saveNote(note)
-        }
-    }
-    // ---------------------------------------------------------------------
-// NOTE DURATION
 // ---------------------------------------------------------------------
 
     fun updateNoteDuration(
@@ -916,14 +869,4 @@ class PianoRollViewModel @Inject constructor(
         }
     }
 
-    private fun PairingType.toCompositionIntent(): CompositionIntent = when (this) {
-        PairingType.CONTINUE  -> CompositionIntent.CONTINUE
-        PairingType.LIFT      -> CompositionIntent.LIFT
-        PairingType.CONTRAST  -> CompositionIntent.CONTRAST
-        PairingType.RESOLVE   -> CompositionIntent.RESOLVE
-        PairingType.EXPAND    -> CompositionIntent.EXPAND
-        PairingType.SURPRISE  -> CompositionIntent.SURPRISE
-        PairingType.SIMPLIFY  -> CompositionIntent.SIMPLIFY
-        PairingType.MODULATE  -> CompositionIntent.DEVELOP
-    }
 }
