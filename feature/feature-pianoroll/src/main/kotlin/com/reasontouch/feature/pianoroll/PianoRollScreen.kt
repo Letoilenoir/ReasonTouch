@@ -121,11 +121,12 @@ fun PianoRollScreen(
     val hasClipboard by viewModel.hasClipboard.collectAsState()
     val drawDuration by viewModel.drawDuration.collectAsState()
     var showInstrumentPanel by remember { mutableStateOf(false) }
-    var showSuggestDialog by remember { mutableStateOf(false) }
+    var trayExpanded by remember { mutableStateOf(false) }
+    var traySection by remember { mutableStateOf(TraySection.HOME) }
     var currentSuggestions by remember {
         mutableStateOf<List<com.reasontouch.feature.chords.SuggestionWorkflow.SuggestionOption>>(emptyList())
-
     }
+
     val session      by viewModel.session.collectAsState()
     val tracks       by viewModel.tracks.collectAsState()
     val activeIndex  by viewModel.activeTrackIndex.collectAsState()
@@ -183,31 +184,10 @@ fun PianoRollScreen(
             onLoopToggle      = viewModel::toggleLoop,
             onInstrumentClick = { showInstrumentPanel = !showInstrumentPanel },
             onSuggestNext     = {
-                scope.launch {
-                    currentSuggestions = viewModel.suggestNextOptions()
-                    showSuggestDialog = true
-                }
+                traySection = TraySection.SUGGEST_NEXT
+                trayExpanded = true
             }
         )
-        if (showSuggestDialog && currentSuggestions.isNotEmpty()) {
-            com.reasontouch.feature.chords.components.SuggestNextDialog(
-                suggestions = currentSuggestions,
-                onOptionSelected = { intentType, phraseIndex ->
-                    currentSuggestions
-                        .firstOrNull { it.option.type == intentType }
-                        ?.phrases
-                        ?.getOrNull(phraseIndex)
-                        ?.let { phrase -> viewModel.addPhrase(phrase) }
-
-                    showSuggestDialog = false
-                    currentSuggestions = emptyList()
-                },
-                onDismiss = {
-                    showSuggestDialog = false
-                    currentSuggestions = emptyList()
-                }
-            )
-        }
 
         if (uiState.hasSelection) {
             SelectionActionBar(
@@ -257,11 +237,27 @@ fun PianoRollScreen(
                 modifier  = Modifier.fillMaxSize()
             )
 
-            VelocityOverlayTray(
-                state     = state,
-                uiState   = uiState,
-                viewModel = viewModel,
-                modifier  = Modifier.align(Alignment.BottomCenter)
+            CompositionTray(
+                expanded             = trayExpanded,
+                onExpandedChange     = { trayExpanded = it },
+                section              = traySection,
+                onSectionChange      = { traySection = it },
+                suggestions          = currentSuggestions,
+                onRequestSuggestions = {
+                    scope.launch { currentSuggestions = viewModel.suggestNextOptions() }
+                },
+                onOptionSelected     = { intentType, phraseIndex ->
+                    currentSuggestions
+                        .firstOrNull { it.option.type == intentType }
+                        ?.phrases
+                        ?.getOrNull(phraseIndex)
+                        ?.let { phrase -> viewModel.addPhrase(phrase) }
+                    currentSuggestions = emptyList()
+                },
+                onBassRequested      = { /* stub -- Section 8 workflow, later work */ },
+                onDrumsRequested     = { /* stub -- Section 9 workflow, later work */ },
+                hasHarmony           = tracks.any { allNotes[it.id]?.isNotEmpty() == true },
+                modifier             = Modifier.align(Alignment.BottomCenter)
             )
         }
     }

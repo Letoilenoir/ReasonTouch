@@ -57,172 +57,28 @@ fun SuggestNextDialog(
 
     val current = suggestions.getOrNull(selectedTabIndex) ?: suggestions.first()
 
-    Dialog(onDismissRequest = onDismiss) {
+    @Composable
+    fun SuggestNextDialog(
+        suggestions: List<SuggestionOption>,
+        onOptionSelected: (intentType: PairingType, phraseIndex: Int) -> Unit,
+        onDismiss: () -> Unit
+    ) {
+        val skin = ReasonTouchTheme.skin
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .background(
-                    color = skin.panel,
-                    shape = RoundedCornerShape(skin.cornerRadiusMedium)
-                )
-                .padding(skin.paddingXLarge)
-        ) {
-
-            Text(
-                text = "SUGGEST NEXT",
-                color = skin.accent,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = skin.paddingXLarge)
+        Dialog(onDismissRequest = onDismiss) {
+            SuggestNextFlow(
+                suggestions = suggestions,
+                onOptionSelected = onOptionSelected,
+                onCancel = onDismiss,
+                cancelLabel = "CANCEL",
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .background(
+                        color = skin.panel,
+                        shape = RoundedCornerShape(skin.cornerRadiusMedium)
+                    )
+                    .padding(skin.paddingXLarge)
             )
-
-            if (suggestions.size > 1) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(bottom = skin.paddingLarge)
-                ) {
-                    suggestions.forEachIndexed { index, suggestion ->
-                        val isSelected = index == selectedTabIndex
-
-                        Box(
-                            modifier = Modifier
-                                .padding(end = skin.paddingSmall)
-                                .background(
-                                    color = if (isSelected) skin.accent else skin.panelAlt,
-                                    shape = RoundedCornerShape(skin.cornerRadiusSmall)
-                                )
-                                .clickable { selectedTabIndex = index }
-                                .padding(
-                                    horizontal = skin.paddingMedium,
-                                    vertical = skin.paddingSmall
-                                )
-                        ) {
-                            Text(
-                                text = suggestion.option.type.name,
-                                color = if (isSelected) Color.White else skin.textSecondary,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                            )
-                        }
-                    }
-                }
-            }
-
-            Text(
-                text = current.option.rationale,
-                color = skin.textSecondary,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(bottom = skin.paddingMedium)
-            )
-
-            Text(
-                text = "Suggested: ${current.option.suggestedBars} bars " +
-                        "(${(current.option.confidence * 100).toInt()}% confident)",
-                color = skin.textMuted,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(bottom = skin.paddingXLarge)
-            )
-
-            Text(
-                text = "Suggested continuations",
-                color = skin.textSecondary,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(bottom = skin.paddingMedium)
-            )
-
-            if (current.phrases.isEmpty()) {
-                Text(
-                    text = "${current.option.type.name} pathway not yet implemented for this context",
-                    color = skin.textMuted,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(bottom = skin.paddingMedium)
-                )
-            } else {
-                current.phrases.forEachIndexed { index, phrase ->
-                    val isSelected = index == selectedPhraseIndex
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = skin.paddingSmall)
-                            .background(
-                                color = if (isSelected) skin.accent.copy(alpha = 0.15f) else skin.panelAlt,
-                                shape = RoundedCornerShape(skin.cornerRadiusSmall)
-                            )
-                            .border(
-                                width = skin.borderWidth,
-                                color = if (isSelected) skin.accent else skin.border,
-                                shape = RoundedCornerShape(skin.cornerRadiusSmall)
-                            )
-                            .clickable { selectedPhraseIndex = index }
-                            .padding(
-                                horizontal = skin.paddingLarge,
-                                vertical = skin.paddingMedium
-                            )
-                    ) {
-                        Column {
-                            val lines = phrase.explanation.split("\n")
-
-                            Text(
-                                text = lines.first(),
-                                color = skin.textPrimary,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-
-                            if (lines.size > 1) {
-                                Spacer(modifier = Modifier.height(skin.paddingXSmall))
-                                Text(
-                                    text = lines[1],
-                                    color = skin.textSecondary,
-                                    fontSize = 13.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(skin.spacingMedium))
-
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Button(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(skin.buttonHeight)
-                        .padding(end = skin.paddingSmall),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = skin.panelAlt,
-                        contentColor = skin.textSecondary
-                    ),
-                    shape = RoundedCornerShape(skin.buttonCornerRadius)
-                ) {
-                    Text(text = "CANCEL", fontSize = 13.sp)
-                }
-
-                Button(
-                    onClick = {
-                        selectedPhraseIndex?.let { onOptionSelected(current.option.type, it) }
-                    },
-                    enabled = selectedPhraseIndex != null,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(skin.buttonHeight),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = skin.accent,
-                        contentColor = Color.White,
-                        disabledContainerColor = skin.panelAlt,
-                        disabledContentColor = skin.textMuted
-                    ),
-                    shape = RoundedCornerShape(skin.buttonCornerRadius)
-                ) {
-                    Text(text = "SELECT", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                }
-            }
         }
     }
 }
