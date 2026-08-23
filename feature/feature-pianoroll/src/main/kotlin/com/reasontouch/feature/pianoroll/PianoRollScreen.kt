@@ -129,6 +129,7 @@ fun PianoRollScreen(
 
     val session      by viewModel.session.collectAsState()
     val tracks       by viewModel.tracks.collectAsState()
+    val chords       by viewModel.chords.collectAsState()
     val activeIndex  by viewModel.activeTrackIndex.collectAsState()
     val activeNotes  by viewModel.activeNotes.collectAsState()
     val allNotes     by viewModel.allNotes.collectAsState()
@@ -256,7 +257,7 @@ fun PianoRollScreen(
                 },
                 onBassRequested      = { /* stub -- Section 8 workflow, later work */ },
                 onDrumsRequested     = { /* stub -- Section 9 workflow, later work */ },
-                hasHarmony           = tracks.any { allNotes[it.id]?.isNotEmpty() == true },
+                hasHarmony           = chords.isNotEmpty(),
                 modifier             = Modifier.align(Alignment.BottomCenter)
             )
         }

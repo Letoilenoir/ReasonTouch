@@ -154,15 +154,14 @@ class Sequencer @Inject constructor(
             .maxOfOrNull { it.beat } ?: 0f
         if (lastNoteBeat <= 0f) return 4f
 
-        // Use epsilon-safe truncation instead of ceil
-        val epsilon = 0.001f
-        val barNumber = if (kotlin.math.abs(lastNoteBeat % 4f) < epsilon) {
-            // Note starts exactly at a bar boundary
-            (lastNoteBeat / 4f).toInt()
-        } else {
-            // Round up to include the bar this note starts within
-            (lastNoteBeat / 4f).toInt() + 1
-        }.coerceAtLeast(1)
+        // Always round up: a note's start beat, even exactly on a bar boundary, means
+        // that bar is in use and must be counted. (The epsilon "already at boundary"
+        // special case below was correct when this used note END time -- a note ending
+        // exactly at a boundary really has finished -- but is invalid now that this is
+        // START time only. Removed rather than adjusted, since there's no remaining
+        // case where a start beat on a boundary should NOT round up.)
+        val barNumber = ((lastNoteBeat / 4f).toInt() + 1)
+            .coerceAtLeast(1)
 
         return (barNumber * 4f).toFloat()
     }
