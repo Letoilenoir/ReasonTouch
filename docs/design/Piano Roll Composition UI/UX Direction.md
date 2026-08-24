@@ -656,4 +656,10 @@ The intended result is a continuous creative workflow in which the user stays wi
 
 > **Make Piano Roll the home of composition, and make the Composition Tray the user's gateway to deciding what happens next.**
 
+
+## Addendum — hasHarmony signal and bass-first harmonisation (2026-08-23)
+
+When hasHarmony was changed from a note-presence heuristic (tracks.any { allNotes[it.id]?.isNotEmpty() == true }) to a chord-presence check (chords.isNotEmpty()), the impact on the still-unscoped bass-first concept (draw bassline → infer chord candidates) was considered explicitly rather than left implicit.
+
+Conclusion: chords.isNotEmpty() is more correct for bass-first, not less. The old heuristic would have falsely reported hasHarmony = true the moment any notes existed on any track — including a drawn bassline with no harmony inferred from it yet. The new signal correctly reads false until harmony actually exists, whether that harmony came from a chord/manual workspace or (eventually) from bass inference.
 This provides a coherent path from the initial creation of a session through harmonic development and onward into bass and drum arrangement, while reducing the prominence of technical terminology and eliminating legacy navigation that no longer reflects the product architecture.
