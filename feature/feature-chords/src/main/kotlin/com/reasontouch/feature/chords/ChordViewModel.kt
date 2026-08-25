@@ -184,7 +184,8 @@ class ChordViewModel @Inject constructor(
                 rootMidi = notes.firstOrNull { it != null } ?: 0,
                 midiNotes = notes.filterNotNull().joinToString(","),
                 voicing = pos,
-                strumPatternId = null
+                strumPatternId = StepPattern(_stepStates.value).toChordEventString(),
+                strumSpeedValue = ui.value.strumSpeed
             )
             repository.saveChord(chordEvent)
             val updatedSession = session.value?.copy(totalBars = progression.value.size + 1)
@@ -342,7 +343,8 @@ class ChordViewModel @Inject constructor(
                 rootMidi = suggestion.chord.midiNotes.firstOrNull() ?: 0,
                 midiNotes = suggestion.chord.midiNotes.joinToString(","),
                 voicing = "Open",
-                strumPatternId = null
+                strumPatternId = StepPattern(_stepStates.value).toChordEventString(),
+                strumSpeedValue = ui.value.strumSpeed
             )
             repository.saveChord(chordEvent)
         }
@@ -359,7 +361,8 @@ class ChordViewModel @Inject constructor(
                 rootMidi = borrowed.chord.midiNotes.firstOrNull() ?: 0,
                 midiNotes = borrowed.chord.midiNotes.joinToString(","),
                 voicing = "Open",
-                strumPatternId = null
+                strumPatternId = StepPattern(_stepStates.value).toChordEventString(),
+                strumSpeedValue = ui.value.strumSpeed
             )
             repository.saveChord(chordEvent)
         }
