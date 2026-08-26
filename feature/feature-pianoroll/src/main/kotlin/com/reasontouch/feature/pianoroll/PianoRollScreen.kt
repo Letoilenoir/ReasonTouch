@@ -33,6 +33,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import com.reasontouch.feature.chords.ChordViewModel
 // GmInstrument defined locally to avoid cross-module dependency
 data class TrackInstrument(val label: String, val program: Int)
 
@@ -131,6 +132,7 @@ fun PianoRollScreen(
     val tracks       by viewModel.tracks.collectAsState()
     val chords       by viewModel.chords.collectAsState()
     val activeIndex  by viewModel.activeTrackIndex.collectAsState()
+    val chordViewModel: ChordViewModel = hiltViewModel()
     val activeNotes  by viewModel.activeNotes.collectAsState()
     val allNotes     by viewModel.allNotes.collectAsState()
     val currentTool  by viewModel.currentTool.collectAsState()
@@ -252,7 +254,7 @@ fun PianoRollScreen(
                         .firstOrNull { it.option.type == intentType }
                         ?.phrases
                         ?.getOrNull(phraseIndex)
-                        ?.let { phrase -> viewModel.addPhrase(phrase) }
+                        ?.let { phrase -> chordViewModel.addPhrase(phrase) }
                     currentSuggestions = emptyList()
                 },
                 onBassRequested      = { /* stub -- Section 8 workflow, later work */ },

@@ -579,47 +579,18 @@ class ChordViewModel @Inject constructor(
 
                 android.util.Log.d("SendProgression", "Bar $barIndex: $chordName -> ${midiNotes.size} notes")
 
-                val activeSteps = strumPattern.steps.mapIndexedNotNull { i, s ->
-                    if (s != StepState.OFF) Pair(i, s) else null
-                }
-
-                if (activeSteps.isEmpty()) {
-                    // Block mode - no pattern steps
-                    midiNotes.forEach { midiNote ->
-                        notes.add(
-                            NoteEvent(
-                                id = UUID.randomUUID().toString(),
-                                trackId = targetTrack.id,
-                                pitch = 108 - midiNote,
-                                beat = beatStart,
-                                duration = beatsPerBar,
-                                velocity = 80
-                            )
-                        )
-                    }
-                } else {
-                    // Strum mode - use pattern steps
-                    val beatsPerStep = beatsPerBar / 16.0f
-                    activeSteps.forEach { (stepIdx, stepState) ->
-                        val stepBeat = beatStart + (stepIdx * beatsPerStep)
-                        val isDownstroke = stepState == StepState.DOWN
-                        val strOrder = if (isDownstroke) midiNotes else midiNotes.reversed()
-
-                        strOrder.forEachIndexed { noteIdx, midiNote ->
-                            val offset = (noteIdx * ui.value.strumSpeed).toFloat()
-                            notes.add(
-                                NoteEvent(
-                                    id = UUID.randomUUID().toString(),
-                                    trackId = targetTrack.id,
-                                    pitch = 108 - midiNote,
-                                    beat = stepBeat + offset,
-                                    duration = (beatsPerStep * 0.95f).coerceAtLeast(0.0625f),
-                                    velocity = 80
-                                )
-                            )
-                        }
-                    }
-                }
+                notes.addAll(
+                    generateStrumNotes(
+                        midiNotes = midiNotes,
+                        pattern = strumPattern,
+                        useStrum = true,
+                        strumSpeedSeconds = ui.value.strumSpeed,
+                        bpm = bpm.value,
+                        beatStart = beatStart,
+                        beatsPerBar = beatsPerBar,
+                        trackId = targetTrack.id
+                    )
+                )
             }
 
             android.util.Log.d("SendProgression", "Saving ${notes.size} notes to ${targetTrack.name}")
@@ -682,77 +653,18 @@ class ChordViewModel @Inject constructor(
                 val beatStart = (barIndex * beatsPerBar) + appendOffset
                 val midiNotes = chordEvent.midiNotes.split(",").mapNotNull { it.toIntOrNull() }
 
-                if (useStrum && strumPattern != null) {
-
-                    val activeSteps = strumPattern.steps.mapIndexedNotNull { index, state ->
-                        if (state != StepState.OFF) Pair(index, state) else null
-                    }
-
-                    if (activeSteps.isEmpty()) {
-
-                        midiNotes.forEach { midiNote ->
-                            notes.add(
-                                NoteEvent(
-                                    id = UUID.randomUUID().toString(),
-                                    trackId = targetTrack.id,
-                                    pitch = 108 - midiNote,
-                                    beat = beatStart,
-                                    duration = beatsPerBar,
-                                    velocity = 80
-                                )
-                            )
-                        }
-
-                    } else {
-
-                        val beatsPerStep = beatsPerBar / 16f
-
-                        activeSteps.forEach { (stepIndex, stepState) ->
-
-                            val stepBeat = beatStart + (stepIndex * beatsPerStep)
-
-                            val orderedNotes =
-                                if (stepState == StepState.DOWN)
-                                    midiNotes
-                                else
-                                    midiNotes.reversed()
-
-                            orderedNotes.forEachIndexed { noteIndex, midiNote ->
-
-                                val offset =
-                                    (noteIndex * ui.value.strumSpeed).toFloat()
-
-                                notes.add(
-                                    NoteEvent(
-                                        id = UUID.randomUUID().toString(),
-                                        trackId = targetTrack.id,
-                                        pitch = 108 - midiNote,
-                                        beat = stepBeat + offset,
-                                        duration = (beatsPerStep * 0.95f)
-                                            .coerceAtLeast(0.0625f),
-                                        velocity = 80
-                                    )
-                                )
-                            }
-                        }
-                    }
-
-                } else {
-
-                    midiNotes.forEach { midiNote ->
-                        notes.add(
-                            NoteEvent(
-                                id = UUID.randomUUID().toString(),
-                                trackId = targetTrack.id,
-                                pitch = 108 - midiNote,
-                                beat = beatStart,
-                                duration = beatsPerBar,
-                                velocity = 80
-                            )
-                        )
-                    }
-
-                }
+                notes.addAll(
+                    generateStrumNotes(
+                        midiNotes = midiNotes,
+                        pattern = strumPattern,
+                        useStrum = useStrum,
+                        strumSpeedSeconds = ui.value.strumSpeed,
+                        bpm = bpm.value,
+                        beatStart = beatStart,
+                        beatsPerBar = beatsPerBar,
+                        trackId = targetTrack.id
+                    )
+                )
             }
 
             android.util.Log.d("SendToPianoRoll", "Saving ${notes.size} notes to track ${targetTrack.id} (${targetTrack.name})")
@@ -791,27 +703,55 @@ class ChordViewModel @Inject constructor(
      * Converts List<TheoryChord> to List<ChordEvent> and adds bars.
      */
     fun addPhrase(generatedProgression: GeneratedProgression) {
-        val currentProgression = progression.value
-        if (currentProgression.isEmpty()) return
-
         viewModelScope.launch {
-            val startBarIndex = progression.value.size
+            val currentProgression = repository.getChordsForSessionOnce(sessionId)
+            if (currentProgression.isEmpty()) return@launch
+
+            val startBarIndex = currentProgression.size
+            val currentSession = repository.getSession(sessionId).first()
+            val beatsPerBar = ui.value.barDuration.toFloat()
+            val chordTrack = repository.getTracksForSession(sessionId).first()
+                .firstOrNull { it.name.uppercase() == "CHORD" }
+
+            val newNotes = mutableListOf<NoteEvent>()
 
             generatedProgression.chords.forEachIndexed { index, theoryChord ->
+                val barIndex = startBarIndex + index
                 val chordEvent = ChordEvent(
                     id = UUID.randomUUID().toString(),
                     sessionId = sessionId,
-                    barIndex = startBarIndex + index,
+                    barIndex = barIndex,
                     chordName = theoryChord.guitarLabel(),
                     rootMidi = 60,
                     midiNotes = theoryChord.midiNotes.joinToString(","),
                     voicing = "Open",
-                    strumPatternId = null
+                    strumPatternId = StepPattern(_stepStates.value).toChordEventString(),
+                    strumSpeedValue = ui.value.strumSpeed
                 )
                 repository.saveChord(chordEvent)
+
+                if (chordTrack != null) {
+                    val beatStart = barIndex * beatsPerBar
+                    newNotes.addAll(
+                        generateStrumNotes(
+                            midiNotes = theoryChord.midiNotes,
+                            pattern = StepPattern(_stepStates.value),
+                            useStrum = true,
+                            strumSpeedSeconds = ui.value.strumSpeed,
+                            bpm = currentSession?.bpm ?: 120,
+                            beatStart = beatStart,
+                            beatsPerBar = beatsPerBar,
+                            trackId = chordTrack.id
+                        )
+                    )
+                }
             }
 
-            val updatedSession = session.value?.copy(
+            if (newNotes.isNotEmpty()) {
+                repository.saveNotes(newNotes)
+            }
+
+            val updatedSession = currentSession?.copy(
                 totalBars = startBarIndex + generatedProgression.chords.size
             )
             if (updatedSession != null) {
