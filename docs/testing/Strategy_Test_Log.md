@@ -215,4 +215,28 @@ Sprint 3b unit-mismatch fix (strumSpeed seconds→beats conversion) verified via
   present and structurally sound in the exported file, not just in live playback
   Exit criteria (Sprint 0 Decision 2, Option A) met. Phase 3 complete.
 
+## Phase 4 — Continuation Inheritance (2026-08-27)
+addPhrase() now inherits strumPatternId/strumSpeedValue from the last existing
+ChordEvent in the progression, decoded via StrumEncoding.kt, rather than defaulting
+to whatever pattern is currently selected in the UI.
+
+Verified on-device: seed progression E (All Down) -> A (Motown, via append),
+SUGGEST continuation generated G D E A Dbm Gbm A Dbm. Playback confirmed first
+continuation bar audibly carried A's Motown pattern (the last seed bar), not E's
+All Down (the first) or a default -- correct inheritance behavior.
+
+Known gap surfaced during this test, NOT a Phase 4 defect: Piano Roll grid did not
+visually refresh to show the new continuation notes until navigating away and back.
+Root cause confirmed: PianoRollViewModel's _allNotes/_activeNotes are populated once
+in init{}, and only re-fetch when the track list itself changes -- not when notes are
+written via a separate ChordViewModel instance (the one addPhrase() now uses per
+Phase 3's Sprint 0 Decision 1 re-wiring). Playback was unaffected since
+PlaybackController reads notes independently of PianoRollViewModel's cache. This is
+a side effect of Phase 3's architecture, not a Phase 4 logic bug -- underlying data
+was correct throughout, only the visible grid was stale. Logged as its own follow-up,
+not blocking Phase 4 completion.
+
+Exit criteria (roadmap Phase 4, Section 4) met. Phase 4 complete. Strum Persistence
+& Continuation Inheritance roadmap (Phases 1-4) fully complete.
+
 - *Add new dated sections above this line as further matrices are run.*
