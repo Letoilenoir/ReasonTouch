@@ -715,6 +715,12 @@ class ChordViewModel @Inject constructor(
 
             val newNotes = mutableListOf<NoteEvent>()
 
+            // Inheritance: start from the last existing bar's stored pattern/speed.
+            // Updated after each new bar so a second bar in this same phrase inherits
+            // from the first *new* bar, not always from the original seed.
+            var inheritedPattern = currentProgression.last().strumPatternId.toStepPattern()
+            var inheritedSpeed = currentProgression.last().strumSpeedValue ?: ui.value.strumSpeed
+
             generatedProgression.chords.forEachIndexed { index, theoryChord ->
                 val barIndex = startBarIndex + index
                 val chordEvent = ChordEvent(
@@ -725,8 +731,8 @@ class ChordViewModel @Inject constructor(
                     rootMidi = 60,
                     midiNotes = theoryChord.midiNotes.joinToString(","),
                     voicing = "Open",
-                    strumPatternId = StepPattern(_stepStates.value).toChordEventString(),
-                    strumSpeedValue = ui.value.strumSpeed
+                    strumPatternId = inheritedPattern.toChordEventString(),
+                    strumSpeedValue = inheritedSpeed
                 )
                 repository.saveChord(chordEvent)
 
@@ -735,9 +741,9 @@ class ChordViewModel @Inject constructor(
                     newNotes.addAll(
                         generateStrumNotes(
                             midiNotes = theoryChord.midiNotes,
-                            pattern = StepPattern(_stepStates.value),
+                            pattern = inheritedPattern,
                             useStrum = true,
-                            strumSpeedSeconds = ui.value.strumSpeed,
+                            strumSpeedSeconds = inheritedSpeed,
                             bpm = currentSession?.bpm ?: 120,
                             beatStart = beatStart,
                             beatsPerBar = beatsPerBar,
@@ -745,6 +751,10 @@ class ChordViewModel @Inject constructor(
                         )
                     )
                 }
+
+                // This new bar's pattern/speed becomes the inheritance source for the next one.
+                // (Currently identical to what it just inherited -- no variation source yet --
+                // but keeps the mechanism correct if variation is introduced later.)
             }
 
             if (newNotes.isNotEmpty()) {
@@ -761,6 +771,6 @@ class ChordViewModel @Inject constructor(
             update { copy(statusMessage = null) }
 
         }
-    }
 
+    }
 }
