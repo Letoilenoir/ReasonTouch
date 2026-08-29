@@ -207,5 +207,12 @@ Seed 7 re-run at `preferredLength = 8` (matching the on-device 2026-08-02 result
 
 Root cause of repeated seed-prediction failures across this session (EXPAND and SURPRISE both): hand-*intuiting* which key `KeyDetector` would pick, rather than *computing* its actual weighted formula. `KeyDetector.kt`'s scoring is precise and mechanical:
 
+## Phase 3 — Strum Persistence Roadmap (2026-08-27)
+Sprint 3b unit-mismatch fix (strumSpeed seconds→beats conversion) verified via:
+- On-device listening check: strum audibly present, timing subjectively correct
+- MIDI export → import into Reason 14: staggered note onsets visible in piano roll,
+  consistent stagger pattern across multiple bars, confirming strum offsets are
+  present and structurally sound in the exported file, not just in live playback
+  Exit criteria (Sprint 0 Decision 2, Option A) met. Phase 3 complete.
 
-*Add new dated sections above this line as further matrices are run.*
+- *Add new dated sections above this line as further matrices are run.*
