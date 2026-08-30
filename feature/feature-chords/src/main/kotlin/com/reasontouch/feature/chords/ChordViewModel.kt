@@ -169,11 +169,6 @@ class ChordViewModel @Inject constructor(
         val pos = ui.value.selectedPosition
         val notes = GuitarVoicings.voicings[chord]?.get(pos) ?: return
 
-        if (_stepStates.value.all { it == StepState.OFF }) {
-            update { copy(statusMessage = "Set at least one step before adding a bar") }
-            return
-        }
-
         viewModelScope.launch {
             val barIndex = progression.value.size
             val chordEvent = ChordEvent(
