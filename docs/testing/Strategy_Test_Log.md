@@ -239,4 +239,20 @@ not blocking Phase 4 completion.
 Exit criteria (roadmap Phase 4, Section 4) met. Phase 4 complete. Strum Persistence
 & Continuation Inheritance roadmap (Phases 1-4) fully complete.
 
+## Piano Roll Grid Staleness Fix (2026-08-28)
+Fixed the bug logged 2026-08-27: grid did not visually refresh after SUGGEST
+continuations, because PianoRollViewModel's _allNotes only populated once in
+init{} and had no way to know notes had been written by a separate ChordViewModel
+instance.
+
+Fix: added PianoRollViewModel.refreshNotes() (public, forces a re-fetch via a new
+private fetchAllNotes() helper extracted from init{}). ChordViewModel.addPhrase()
+now takes an optional onComplete callback, invoked on both the early-return
+(empty progression) and normal completion paths. PianoRollScreen's onOptionSelected
+now calls viewModel.refreshNotes() from that callback.
+
+Verified on-device: SUGGEST continuation (8 bars) appeared in the Piano Roll grid
+immediately, no navigation required. Strum pattern correctly matched the seed
+across all 8 bars, consistent with Phase 4 inheritance behavior.
+
 - *Add new dated sections above this line as further matrices are run.*

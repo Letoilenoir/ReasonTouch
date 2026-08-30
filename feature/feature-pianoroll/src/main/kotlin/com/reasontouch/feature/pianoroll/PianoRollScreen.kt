@@ -254,7 +254,11 @@ fun PianoRollScreen(
                         .firstOrNull { it.option.type == intentType }
                         ?.phrases
                         ?.getOrNull(phraseIndex)
-                        ?.let { phrase -> chordViewModel.addPhrase(phrase) }
+                        ?.let { phrase ->
+                            chordViewModel.addPhrase(phrase) {
+                                viewModel.refreshNotes()
+                            }
+                        }
                     currentSuggestions = emptyList()
                 },
                 onBassRequested      = { /* stub -- Section 8 workflow, later work */ },

@@ -143,14 +143,32 @@ class PianoRollViewModel @Inject constructor(
 
         viewModelScope.launch {
             tracks.collect { trackList ->
-
-                val notes = trackList.associate { track ->
-                    track.id to repository.getNotesForTrackOnce(track.id)
-                }
-
-                _allNotes.value = notes
+                _allNotes.value = fetchAllNotes(trackList)
                 updateActiveNotes()
             }
+        }
+    }
+
+    private suspend fun fetchAllNotes(
+        trackList: List<MidiTrack>
+    ): Map<String, List<NoteEvent>> {
+        return trackList.associate { track ->
+            track.id to repository.getNotesForTrackOnce(track.id)
+        }
+    }
+
+    /**
+     * Force a re-fetch of all track notes from the repository. Needed because
+     * _allNotes only auto-updates when the track list itself changes (see init{}),
+     * not when notes are written by a separate ViewModel instance -- e.g. SUGGEST
+     * continuations via ChordViewModel.addPhrase() (Phase 3's addPhrase consolidation).
+     * Confirmed bug 2026-08-27: grid stayed stale after SUGGEST until navigating
+     * away and back, which recreated this ViewModel and re-ran init{}.
+     */
+    fun refreshNotes() {
+        viewModelScope.launch {
+            _allNotes.value = fetchAllNotes(tracks.value)
+            updateActiveNotes()
         }
     }
 

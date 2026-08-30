@@ -702,10 +702,13 @@ class ChordViewModel @Inject constructor(
      * Adds a generated phrase to the progression.
      * Converts List<TheoryChord> to List<ChordEvent> and adds bars.
      */
-    fun addPhrase(generatedProgression: GeneratedProgression) {
+    fun addPhrase(generatedProgression: GeneratedProgression, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             val currentProgression = repository.getChordsForSessionOnce(sessionId)
-            if (currentProgression.isEmpty()) return@launch
+            if (currentProgression.isEmpty()) {
+                onComplete()
+                return@launch
+            }
 
             val startBarIndex = currentProgression.size
             val currentSession = repository.getSession(sessionId).first()
@@ -770,7 +773,7 @@ class ChordViewModel @Inject constructor(
 
             update { copy(statusMessage = null) }
 
+            onComplete()
         }
-
     }
 }
