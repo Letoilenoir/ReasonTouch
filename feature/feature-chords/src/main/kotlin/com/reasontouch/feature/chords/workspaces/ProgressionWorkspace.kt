@@ -106,6 +106,7 @@ fun ProgressionWorkspace(
 
     var selectedProgression by remember { mutableStateOf<ProgressionTemplate?>(null) }
     var selectedStrumPattern by remember { mutableStateOf(StrumPatterns.groups["Core"]?.get("Clear")) }
+    var selectedStrumSpeed by remember { mutableStateOf(0.02) }
     var showSendDialog by remember { mutableStateOf(false) }
     var showProgressionDescriptor by remember { mutableStateOf(false) }
 
@@ -239,6 +240,11 @@ fun ProgressionWorkspace(
                     selectedPattern = selectedStrumPattern,
                     onPatternSelected = { selectedStrumPattern = it },
                     patterns = StrumPatterns.groups,
+                    selectedSpeed = selectedStrumSpeed,
+                    onSpeedSelected = { speed ->
+                        selectedStrumSpeed = speed
+                        viewModel.setStrumSpeed(speed)
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
             }

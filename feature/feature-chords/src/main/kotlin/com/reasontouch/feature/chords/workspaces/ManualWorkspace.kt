@@ -176,6 +176,8 @@ fun ManualWorkspace(
                         viewModel.applyPreset(pattern)  // Update viewModel stepStates
                     },
                     patterns = StrumPatterns.groups,
+                    selectedSpeed = ui.strumSpeed,
+                    onSpeedSelected = viewModel::setStrumSpeed,
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
                 Spacer(modifier = Modifier.height(8.dp))

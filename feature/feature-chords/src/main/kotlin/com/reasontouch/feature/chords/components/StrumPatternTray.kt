@@ -34,8 +34,16 @@ import androidx.compose.ui.unit.sp
 import com.reasontouch.core.midi.StepState
 import com.reasontouch.feature.chords.StepPattern
 import com.reasontouch.feature.chords.StrumPatterns
+import com.reasontouch.feature.chords.STRUM_SPEED_PRESETS
 import com.reasontouch.core.ui.components.StepSequencerEditor
 import com.reasontouch.core.ui.components.SequencerMode
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items as columnItems
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 
 // Theme colors
 private val PANEL = Color(0xFF2A2A32)
@@ -49,6 +57,8 @@ fun StrumPatternTray(
     selectedPattern: StepPattern?,
     onPatternSelected: (StepPattern) -> Unit,
     patterns: Map<String, Map<String, StepPattern>>,
+    selectedSpeed: Double,
+    onSpeedSelected: (Double) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isExpanded by remember { mutableStateOf(false) }
@@ -71,8 +81,10 @@ fun StrumPatternTray(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            val speedLabel = STRUM_SPEED_PRESETS.firstOrNull { it.beatsPerString == selectedSpeed }
+                ?.label ?: "Custom"
             Text(
-                text = "STRUM PATTERN${selectedPattern?.let { " — ${getPatternName(it)}" } ?: ""}",
+                text = "STRUM PATTERN${selectedPattern?.let { " — ${getPatternName(it)}" } ?: ""} · $speedLabel",
                 color = TEXT_DIM,
                 fontSize = 10.sp,
                 fontFamily = FontFamily.Monospace,
@@ -165,26 +177,74 @@ fun StrumPatternTray(
                 }
             }
         }
-        // PRESET MODE: Show pattern list
+        // PRESET MODE: pattern grid (left, 60%) + speed list (right, 40%), independently scrollable
         else if (isExpanded) {
-            patterns.forEach { (groupName, groupPatterns) ->
-                Text(
-                    text = groupName.uppercase(),
-                    color = ACCENT,
-                    fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
-                )
-
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
-                    modifier = Modifier.padding(bottom = 8.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // PATTERNS — 2-column grid
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier.weight(0.6f).fillMaxHeight(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    groupPatterns.forEach { (name, pattern) ->
-                        val isSelected = selectedPattern == pattern
-                        Box(
+                    patterns.forEach { (groupName, groupPatterns) ->
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                text = groupName.uppercase(),
+                                color = ACCENT,
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 1.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                            )
+                        }
+                        gridItems(groupPatterns.entries.toList()) { (name, pattern) ->
+                            val isSelected = selectedPattern == pattern
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(
+                                        if (isSelected) ACCENT.copy(alpha = 0.15f) else Color.Transparent
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) ACCENT else BORDER,
+                                        RoundedCornerShape(4.dp)
+                                    )
+                                    .clickable {
+                                        onPatternSelected(pattern)
+                                        isExpanded = false
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = name,
+                                    color = if (isSelected) ACCENT else TEXT_DIM,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    maxLines = 2
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // SPEED — single column list
+                LazyColumn(
+                    modifier = Modifier.weight(0.4f).fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    columnItems(STRUM_SPEED_PRESETS) { preset ->
+                        val isSelected = preset.beatsPerString == selectedSpeed
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(4.dp))
@@ -196,18 +256,22 @@ fun StrumPatternTray(
                                     if (isSelected) ACCENT else BORDER,
                                     RoundedCornerShape(4.dp)
                                 )
-                                .clickable {
-                                    onPatternSelected(pattern)
-                                    isExpanded = false
-                                }
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                .clickable { onSpeedSelected(preset.beatsPerString) }
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = name,
-                                color = if (isSelected) ACCENT else TEXT_DIM,
-                                fontSize = 11.sp,
+                                text = preset.label,
+                                color = if (isSelected) ACCENT else TEXT,
+                                fontSize = 10.sp,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                            Text(
+                                text = preset.description,
+                                color = TEXT_DIM,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 2
                             )
                         }
                     }

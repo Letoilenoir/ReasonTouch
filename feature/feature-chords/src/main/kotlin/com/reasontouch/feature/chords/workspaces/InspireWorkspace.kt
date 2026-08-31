@@ -55,6 +55,7 @@ fun InspireWorkspace(
     var isGenerating by remember { mutableStateOf(false) }
     var suggestedProgression by remember { mutableStateOf<List<String>?>(null) }
     var selectedStrumPattern by remember { mutableStateOf(StrumPatterns.groups["Core"]?.get("Clear")) }
+    var selectedStrumSpeed by remember { mutableStateOf(0.02) }
     var showSendDialog by remember { mutableStateOf(false) }
     var showInspireDescriptor by remember { mutableStateOf(false) }
 
@@ -222,6 +223,13 @@ fun InspireWorkspace(
                     selectedPattern = selectedStrumPattern,
                     onPatternSelected = { selectedStrumPattern = it },
                     patterns = StrumPatterns.groups,
+                    selectedSpeed = selectedStrumSpeed,
+                    onSpeedSelected = { speed ->
+                        selectedStrumSpeed = speed
+                        viewModel.setStrumSpeed(speed)  // keeps ui.value.strumSpeed in sync,
+                        // since sendProgressionToPianoRoll()
+                        // reads it internally, not as a param
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
             }

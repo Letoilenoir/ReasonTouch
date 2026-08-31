@@ -361,7 +361,7 @@ private fun SuggestedProgressionDisplay(
     val chords = viewModel.generateProgressionForMood(mood.name, harmonyBias)
     var isPlaying by remember { mutableStateOf(false) }
     var selectedStrumPattern by remember { mutableStateOf<StepPattern?>(null) }
-
+    var selectedStrumSpeed by remember { mutableStateOf(0.02) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -434,6 +434,11 @@ private fun SuggestedProgressionDisplay(
             selectedPattern = selectedStrumPattern,
             onPatternSelected = { selectedStrumPattern = it },
             patterns = StrumPatterns.groups,
+            selectedSpeed = selectedStrumSpeed,
+            onSpeedSelected = { speed ->
+                selectedStrumSpeed = speed
+                viewModel.setStrumSpeed(speed)
+            },
             modifier = Modifier.fillMaxWidth()
         )
 
