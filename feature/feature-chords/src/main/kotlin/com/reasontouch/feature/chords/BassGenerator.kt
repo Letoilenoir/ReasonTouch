@@ -22,8 +22,8 @@ import java.util.UUID
 object BassGenerator {
 
     // Bass register target — keep notes in E1-E3 range (MIDI 28-52)
-    private const val BASS_MIN_MIDI = 40
-    private const val BASS_MAX_MIDI = 64
+    private const val BASS_MIN_MIDI = 28
+    private const val BASS_MAX_MIDI = 52
 
     /**
      * Generate bass notes for a complete progression.
