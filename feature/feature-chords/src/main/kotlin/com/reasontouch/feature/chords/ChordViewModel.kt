@@ -713,11 +713,11 @@ class ChordViewModel @Inject constructor(
 
             val newNotes = mutableListOf<NoteEvent>()
 
-            // Inheritance: start from the last existing bar's stored pattern/speed.
-            // Updated after each new bar so a second bar in this same phrase inherits
-            // from the first *new* bar, not always from the original seed.
             var inheritedPattern = currentProgression.last().strumPatternId.toStepPattern()
             var inheritedSpeed = currentProgression.last().strumSpeedValue ?: ui.value.strumSpeed
+
+            val phraseId = UUID.randomUUID().toString()
+            val phraseLength = generatedProgression.chords.size
 
             generatedProgression.chords.forEachIndexed { index, theoryChord ->
                 val barIndex = startBarIndex + index
@@ -730,7 +730,9 @@ class ChordViewModel @Inject constructor(
                     midiNotes = theoryChord.midiNotes.joinToString(","),
                     voicing = "Open",
                     strumPatternId = inheritedPattern.toChordEventString(),
-                    strumSpeedValue = inheritedSpeed
+                    strumSpeedValue = inheritedSpeed,
+                    phraseId = phraseId,
+                    phraseLength = phraseLength
                 )
                 repository.saveChord(chordEvent)
 
