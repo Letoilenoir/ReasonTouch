@@ -109,4 +109,29 @@ object DrumPresets {
         "Reggae"    to REGGAE,
         "Bossa Nova" to BOSSA
     )
+
+    /**
+     * Phase 6c of the Bass/Drum Arrangement Roadmap: suggests a Drum
+     * preset by matching a chord strum pattern's name against known
+     * preset genre names, e.g. "Reggae Skank" -> "Reggae", "Bossa Nova"
+     * -> "Bossa Nova". Substring match, case-insensitive.
+     *
+     * "4/4 Basic" is deliberately excluded from matching -- it has no
+     * genre-name overlap with any chord pattern and would otherwise
+     * never realistically match anyway.
+     *
+     * Returns null if chordPatternName is null (no matched pattern --
+     * see CompositionContext.matchedPatternName) or if no preset's
+     * genre name appears in it. This is advisory only, per
+     * docs/design/Drum_Arrangement_Specification.md Section 9 -- the
+     * caller decides whether/how to surface it, this never forces a
+     * selection.
+     */
+    fun suggestForChordPatternName(chordPatternName: String?): String? {
+        if (chordPatternName == null) return null
+        return all.keys.firstOrNull { presetName ->
+            presetName != "4/4 Basic" &&
+                    chordPatternName.contains(presetName, ignoreCase = true)
+        }
+    }
 }

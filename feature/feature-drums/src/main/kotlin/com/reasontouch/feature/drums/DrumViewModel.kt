@@ -200,4 +200,77 @@ class DrumViewModel @Inject constructor(
             onComplete("Written ${barsToWrite} bars to ${drumTrack.name} (${notes.size} notes)")
         }
     }
+
+    // ── Segment-aware write (Phase 6b) ──────────────────────────────────
+
+    /**
+     * Phase 6b of the Bass/Drum Arrangement Roadmap: writes multiple drum
+     * patterns across different bar ranges in one call, instead of
+     * repeating a single pattern for the whole session (the gap confirmed
+     * in docs/design/Drum_Arrangement_Specification.md Section 7 -- the
+     * highest-impact finding of that spec).
+     *
+     * Segments should be contiguous and non-overlapping; this function
+     * does not validate that -- the caller (Phase 8's tray integration)
+     * is responsible for constructing a sane segment list. Overlapping
+     * segments will simply overwrite each other's notes in write order.
+     *
+     * The original single-pattern writeToPianoRoll() above is left
+     * unchanged and still used by DrumScreen's manual write flow -- this
+     * is a new, additive capability, not a replacement.
+     */
+    fun writeSegmentsToPianoRoll(
+        segments: List<DrumSegment>,
+        appendMode: Boolean,
+        onComplete: (String) -> Unit
+    ) {
+        stop()
+
+        viewModelScope.launch {
+            val drumTrack = getOrCreateDrumsTrack()
+            val stepDur   = 1f / 4f
+
+            val baseOffset = if (appendMode) {
+                repository.getNotesForTrackOnce(drumTrack.id)
+                    .maxOfOrNull { it.beat + it.duration } ?: 0f
+            } else {
+                repository.deleteNotesForTrack(drumTrack.id)
+                0f
+            }
+
+            val notes = mutableListOf<NoteEvent>()
+
+            segments.forEach { segment ->
+                val patternBeats = segment.pattern.steps * stepDur
+                (0 until segment.barCount).forEach { barOffsetIdx ->
+                    val barBeat = baseOffset +
+                            (segment.startBar + barOffsetIdx) * patternBeats
+                    DrumKit.lanes.forEachIndexed { li, lane ->
+                        (0 until segment.pattern.steps).forEach { si ->
+                            if (segment.pattern.isActive(li, si)) {
+                                notes.add(NoteEvent(
+                                    id       = UUID.randomUUID().toString(),
+                                    trackId  = drumTrack.id,
+                                    pitch    = lane.pitch,
+                                    beat     = barBeat + si * stepDur,
+                                    duration = stepDur * 0.9f,
+                                    velocity = segment.pattern.velocity(li, si)
+                                ))
+                            }
+                        }
+                    }
+                }
+            }
+
+            repository.saveNotes(notes)
+            val totalBars = segments.sumOf { it.barCount }
+            onComplete("Written $totalBars bars across ${segments.size} segment(s) to ${drumTrack.name} (${notes.size} notes)")
+        }
+    }
 }
+
+data class DrumSegment(
+    val pattern:   DrumPattern,
+    val startBar:  Int,
+    val barCount:  Int
+)
