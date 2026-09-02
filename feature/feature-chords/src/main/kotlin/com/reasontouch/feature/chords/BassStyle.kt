@@ -57,5 +57,26 @@ enum class BassStyle(val label: String, val description: String) {
             attackDensity < 0.5f  -> listOf(ROOT_FIFTH, OCTAVE)
             else                  -> listOf(ROOT, PEDAL)
         }
+        /**
+         * Phase 7c of the Bass/Drum Arrangement Roadmap: ranks Bass styles by
+         * phrase intent, per docs/design/Bass_Arrangement_Specification.md
+         * Section 6. Deliberately returned SEPARATELY from suggestForDensity(),
+         * not merged -- per the project's "choice, not imposition" principle,
+         * reconciling two disagreeing signals is left to the person composing,
+         * not decided in code (Bass spec Section 10, open question 2 -- resolved
+         * by not resolving it programmatically at all).
+         *
+         * Returns an empty list for intents with no established mapping yet
+         * (SURPRISE, MODULATE, EXPAND -- see spec Section 6), rather than
+         * guessing.
+         */
+        fun suggestForIntent(intent: PairingType): List<BassStyle> = when (intent) {
+            PairingType.CONTINUE -> emptyList() // caller should preserve existing style; no new suggestion
+            PairingType.LIFT     -> listOf(GROOVE, WALKING)
+            PairingType.CONTRAST -> emptyList() // signals "consider changing," not a specific target
+            PairingType.RESOLVE  -> listOf(PEDAL, ROOT)
+            PairingType.SIMPLIFY -> listOf(ROOT, PEDAL)
+            else                 -> emptyList()
+        }
     }
 }

@@ -134,4 +134,49 @@ object DrumPresets {
                     chordPatternName.contains(presetName, ignoreCase = true)
         }
     }
+
+    /**
+     * Phase 7b of the Bass/Drum Arrangement Roadmap: ranks Drum presets by
+     * fit against a chord's rhythmic attack density, per
+     * docs/design/Drum_Arrangement_Specification.md Section 5. Mirrors
+     * BassStyle.suggestForDensity()'s shape exactly -- a ranked list, never
+     * a single forced winner, for the same "choice, not imposition" reason.
+     *
+     * Bucket choices are grounded directly in Section 3's confirmed density
+     * ordering (Bossa Nova/Reggae sparsest -> 4/4 Basic -> Rock -> Funk
+     * busiest), not independently judged -- so this stays consistent with
+     * what the Drum audit already established, rather than introducing a
+     * second, potentially-conflicting density ranking.
+     *
+     * attackDensity of exactly 0f returns every preset in declared order,
+     * with "4/4 Basic" leading as the documented safe default (Section 4),
+     * mirroring BassStyle's ROOT-first block-chord case.
+     */
+    fun suggestForDensity(attackDensity: Float): List<String> = when {
+        attackDensity <= 0f   -> all.keys.toList()
+        attackDensity < 0.25f -> listOf("Funk")
+        attackDensity < 0.5f  -> listOf("Rock", "4/4 Basic")
+        else                  -> listOf("4/4 Basic", "Reggae", "Bossa Nova")
+    }
+
+    /**
+     * Phase 7c of the Bass/Drum Arrangement Roadmap: ranks Drum presets by
+     * phrase intent, per docs/design/Drum_Arrangement_Specification.md
+     * Section 8. Mirrors BassStyle.suggestForIntent()'s shape exactly --
+     * returned SEPARATELY from suggestForDensity(), never merged, for the
+     * same reason (Drum spec Section 11, open question 1 -- resolved by
+     * not resolving it programmatically).
+     *
+     * Returns an empty list for intents with no established mapping yet
+     * (SURPRISE, MODULATE, EXPAND -- see spec Section 8), rather than
+     * guessing.
+     */
+    fun suggestForIntent(intent: com.reasontouch.feature.chords.PairingType): List<String> = when (intent) {
+        com.reasontouch.feature.chords.PairingType.CONTINUE -> emptyList()
+        com.reasontouch.feature.chords.PairingType.LIFT     -> listOf("Funk", "Rock")
+        com.reasontouch.feature.chords.PairingType.CONTRAST -> emptyList()
+        com.reasontouch.feature.chords.PairingType.RESOLVE  -> listOf("4/4 Basic")
+        com.reasontouch.feature.chords.PairingType.SIMPLIFY -> listOf("4/4 Basic")
+        else -> emptyList()
+    }
 }
