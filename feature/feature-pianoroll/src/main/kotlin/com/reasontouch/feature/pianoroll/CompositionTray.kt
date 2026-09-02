@@ -29,8 +29,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reasontouch.core.ui.theme.ReasonTouchTheme
 import com.reasontouch.feature.chords.PairingType
+import com.reasontouch.feature.chords.BassStyle
 import com.reasontouch.feature.chords.SuggestionWorkflow.SuggestionOption
 import com.reasontouch.feature.chords.components.SuggestNextFlow
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Spacer
 
 private val OVERLAY_BG   = Color(0xEE1E1E24)
 private val OVERLAY_EDGE = Color(0xFF3A3A45)
@@ -60,6 +70,10 @@ fun CompositionTray(
     onOptionSelected: (intentType: PairingType, phraseIndex: Int) -> Unit,
     onBassRequested: () -> Unit,
     onDrumsRequested: () -> Unit,
+    bassSuggestions: List<BassStyle> = emptyList(),
+    drumSuggestions: List<String> = emptyList(),
+    onApplyBass: (BassStyle, appendMode: Boolean) -> Unit,
+    onApplyDrums: (presetName: String, appendMode: Boolean) -> Unit,
     hasHarmony: Boolean = false,
     hasBass: Boolean = false,
     hasDrums: Boolean = false,
@@ -160,19 +174,132 @@ fun CompositionTray(
                             )
                         }
                     }
-                    TraySection.BASS -> Column(
-                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                    ) {
-                        TrayStubPanel(title = "BASS", onBack = { onSectionChange(TraySection.HOME) })
-                    }
-                    TraySection.DRUMS -> Column(
-                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                    ) {
-                        TrayStubPanel(title = "DRUMS", onBack = { onSectionChange(TraySection.HOME) })
-                    }
+                    TraySection.BASS -> BassPanel(
+                        suggestions = bassSuggestions,
+                        onApply = onApplyBass,
+                        onBack = { onSectionChange(TraySection.HOME) }
+                    )
+                    TraySection.DRUMS -> DrumsPanel(
+                        suggestions = drumSuggestions,
+                        onApply = onApplyDrums,
+                        onBack = { onSectionChange(TraySection.HOME) }
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun BassPanel(
+    suggestions: List<BassStyle>,
+    onApply: (BassStyle, Boolean) -> Unit,
+    onBack: () -> Unit
+) {
+    val skin = ReasonTouchTheme.skin
+    var appendMode by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text(text = "BASS", color = skin.accent, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(skin.paddingMedium))
+
+        LazyColumn(modifier = Modifier.weight(1f)) {
+            items(BassStyle.values().toList()) { style ->
+                SuggestableRow(
+                    label = style.label,
+                    description = style.description,
+                    isSuggested = style in suggestions,
+                    onClick = { onApply(style, appendMode) }
+                )
+            }
+        }
+
+        AppendModeRow(appendMode = appendMode, onToggle = { appendMode = it })
+        Spacer(Modifier.height(skin.paddingMedium))
+        TrayActionRow(label = "BACK", onClick = onBack)
+    }
+}
+
+@Composable
+private fun DrumsPanel(
+    suggestions: List<String>,
+    onApply: (String, Boolean) -> Unit,
+    onBack: () -> Unit
+) {
+    val skin = ReasonTouchTheme.skin
+    var appendMode by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text(text = "DRUMS", color = skin.accent, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(skin.paddingMedium))
+
+        LazyColumn(modifier = Modifier.weight(1f)) {
+            items(com.reasontouch.feature.drums.DrumPresets.all.keys.toList()) { presetName ->
+                SuggestableRow(
+                    label = presetName,
+                    description = null,
+                    isSuggested = presetName in suggestions,
+                    onClick = { onApply(presetName, appendMode) }
+                )
+            }
+        }
+
+        AppendModeRow(appendMode = appendMode, onToggle = { appendMode = it })
+        Spacer(Modifier.height(skin.paddingMedium))
+        TrayActionRow(label = "BACK", onClick = onBack)
+    }
+}
+
+@Composable
+private fun SuggestableRow(
+    label: String,
+    description: String?,
+    isSuggested: Boolean,
+    onClick: () -> Unit
+) {
+    val skin = ReasonTouchTheme.skin
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = skin.paddingMedium)
+            .background(
+                if (isSuggested) skin.accent.copy(alpha = 0.12f) else skin.panelAlt,
+                RoundedCornerShape(skin.cornerRadiusSmall)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = skin.paddingLarge, vertical = skin.paddingMedium)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = label, color = skin.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                if (isSuggested) {
+                    Text(text = "SUGGESTED", color = skin.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            if (description != null) {
+                Text(text = description, color = skin.textMuted, fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppendModeRow(appendMode: Boolean, onToggle: (Boolean) -> Unit) {
+    val skin = ReasonTouchTheme.skin
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = if (appendMode) "APPEND TO EXISTING" else "REPLACE EXISTING",
+            color = skin.textSecondary,
+            fontSize = 11.sp
+        )
+        Switch(checked = appendMode, onCheckedChange = onToggle)
     }
 }
 

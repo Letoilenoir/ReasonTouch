@@ -471,18 +471,19 @@ class ChordViewModel @Inject constructor(
     // BASS GENERATION
     // ------------------------------------------------------------
 
-    fun generateBass(style: BassStyle, appendMode: Boolean) {
+    fun generateBass(style: BassStyle, appendMode: Boolean, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
-            val bars = progression.value
+            val bars = repository.getChordsForSessionOnce(sessionId)
             if (bars.isEmpty()) {
                 update { copy(statusMessage = "Add bars to the progression first") }
+                onComplete()
                 return@launch
             }
 
-            val trackList = tracks.value
+            val trackList = repository.getTracksForSession(sessionId).first()
             val bassTrack = trackList.firstOrNull { it.name.uppercase() == "BASS" }
                 ?: trackList.firstOrNull()
-                ?: return@launch
+                ?: run { onComplete(); return@launch }
 
             update { copy(bassGenerating = true) }
 
@@ -515,6 +516,8 @@ class ChordViewModel @Inject constructor(
                     statusMessage = "Bass generated: ${style.label} (${notes.size} notes)"
                 )
             }
+
+            onComplete()
         }
     }
 

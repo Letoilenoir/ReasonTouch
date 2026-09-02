@@ -34,6 +34,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import com.reasontouch.feature.chords.ChordViewModel
+import com.reasontouch.feature.chords.BassStyle
+import com.reasontouch.feature.chords.CompositionContextBuilder
+import com.reasontouch.feature.drums.DrumViewModel
+import com.reasontouch.feature.drums.DrumPresets
 // GmInstrument defined locally to avoid cross-module dependency
 data class TrackInstrument(val label: String, val program: Int)
 
@@ -133,6 +137,9 @@ fun PianoRollScreen(
     val chords       by viewModel.chords.collectAsState()
     val activeIndex  by viewModel.activeTrackIndex.collectAsState()
     val chordViewModel: ChordViewModel = hiltViewModel()
+    val drumViewModel: DrumViewModel = hiltViewModel()
+    var bassSuggestions by remember { mutableStateOf<List<BassStyle>>(emptyList()) }
+    var drumSuggestions by remember { mutableStateOf<List<String>>(emptyList()) }
     val activeNotes  by viewModel.activeNotes.collectAsState()
     val allNotes     by viewModel.allNotes.collectAsState()
     val currentTool  by viewModel.currentTool.collectAsState()
@@ -261,9 +268,34 @@ fun PianoRollScreen(
                         }
                     currentSuggestions = emptyList()
                 },
-                onBassRequested      = { /* stub -- Section 8 workflow, later work */ },
-                onDrumsRequested     = { /* stub -- Section 9 workflow, later work */ },
+                onBassRequested      = {
+                    val context = CompositionContextBuilder.buildContext(session, chords)
+                    val density = context.bars.lastOrNull()?.attackDensity ?: 0f
+                    bassSuggestions = BassStyle.suggestForDensity(density)
+                },
+                onDrumsRequested     = {
+                    val context = CompositionContextBuilder.buildContext(session, chords)
+                    val density = context.bars.lastOrNull()?.attackDensity ?: 0f
+                    drumSuggestions = DrumPresets.suggestForDensity(density)
+                },
+                bassSuggestions      = bassSuggestions,
+                drumSuggestions      = drumSuggestions,
+                onApplyBass          = { style, append ->
+                    chordViewModel.generateBass(style, append) {
+                        viewModel.refreshNotes()
+                    }
+                    trayExpanded = false
+                },
+                onApplyDrums         = { presetName, append ->
+                    DrumPresets.all[presetName]?.let { drumViewModel.applyPreset(it) }
+                    drumViewModel.writeToPianoRoll(append) { viewModel.refreshNotes() }
+                    trayExpanded = false
+                },
                 hasHarmony           = chords.isNotEmpty(),
+                hasBass              = tracks.firstOrNull { it.name.uppercase() == "BASS" }
+                    ?.let { track -> allNotes[track.id]?.isNotEmpty() } ?: false,
+                hasDrums             = tracks.firstOrNull { it.name.uppercase() == "DRUMS" }
+                    ?.let { track -> allNotes[track.id]?.isNotEmpty() } ?: false,
                 modifier             = Modifier.align(Alignment.BottomCenter)
             )
         }
