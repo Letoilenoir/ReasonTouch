@@ -729,7 +729,7 @@ class ChordViewModel @Inject constructor(
                     sessionId = sessionId,
                     barIndex = barIndex,
                     chordName = theoryChord.guitarLabel(),
-                    rootMidi = 60,
+                    rootMidi = theoryChord.midiNotes.firstOrNull() ?: 60,
                     midiNotes = theoryChord.midiNotes.joinToString(","),
                     voicing = "Open",
                     strumPatternId = inheritedPattern.toChordEventString(),

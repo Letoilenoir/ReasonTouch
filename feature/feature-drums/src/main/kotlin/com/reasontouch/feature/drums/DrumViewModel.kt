@@ -152,7 +152,7 @@ class DrumViewModel @Inject constructor(
 
         viewModelScope.launch {
             val drumTrack  = getOrCreateDrumsTrack()
-            val totalBars  = session.value?.totalBars ?: 4
+            val totalBars  = repository.getSession(sessionId).first()?.totalBars ?: 4
             val pat        = _pattern.value
             val stepDur    = 1f / 4f                    // 16th note = 0.25 beats
             val patternBeats = pat.steps * stepDur      // 16 steps = 4 beats = 1 bar
