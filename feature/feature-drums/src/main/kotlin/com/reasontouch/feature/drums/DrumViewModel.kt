@@ -228,7 +228,6 @@ class DrumViewModel @Inject constructor(
 
         viewModelScope.launch {
             val drumTrack = getOrCreateDrumsTrack()
-            val stepDur   = 1f / 4f
 
             val baseOffset = if (appendMode) {
                 repository.getNotesForTrackOnce(drumTrack.id)
@@ -241,25 +240,15 @@ class DrumViewModel @Inject constructor(
             val notes = mutableListOf<NoteEvent>()
 
             segments.forEach { segment ->
-                val patternBeats = segment.pattern.steps * stepDur
-                (0 until segment.barCount).forEach { barOffsetIdx ->
-                    val barBeat = baseOffset +
-                            (segment.startBar + barOffsetIdx) * patternBeats
-                    DrumKit.lanes.forEachIndexed { li, lane ->
-                        (0 until segment.pattern.steps).forEach { si ->
-                            if (segment.pattern.isActive(li, si)) {
-                                notes.add(NoteEvent(
-                                    id       = UUID.randomUUID().toString(),
-                                    trackId  = drumTrack.id,
-                                    pitch    = lane.pitch,
-                                    beat     = barBeat + si * stepDur,
-                                    duration = stepDur * 0.9f,
-                                    velocity = segment.pattern.velocity(li, si)
-                                ))
-                            }
-                        }
-                    }
-                }
+                val patternBeats = segment.pattern.steps * (1f / 4f)
+                notes.addAll(
+                    generateDrumNotes(
+                        pattern = segment.pattern,
+                        barCount = segment.barCount,
+                        trackId = drumTrack.id,
+                        baseOffset = baseOffset + segment.startBar * patternBeats
+                    )
+                )
             }
 
             repository.saveNotes(notes)

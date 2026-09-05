@@ -1,5 +1,8 @@
 package com.reasontouch.feature.drums
 
+import com.reasontouch.core.data.NoteEvent
+import java.util.UUID
+
 /**
  * Represents a drum pattern — 6 lanes x N steps.
  * Each cell is active (true) or inactive (false).
@@ -179,4 +182,41 @@ object DrumPresets {
         com.reasontouch.feature.chords.PairingType.SIMPLIFY -> listOf("4/4 Basic")
         else -> emptyList()
     }
+}
+
+/**
+ * Pure note generation for a drum pattern -- no repository access, no
+ * side effects. Extracted from DrumViewModel.writeToPianoRoll()'s inline
+ * loop (Phase 8b of the Bass/Drum Arrangement Roadmap) so that function,
+ * writeSegmentsToPianoRoll() (Phase 6b), and the Full Groove preview flow
+ * can all share one implementation instead of duplicating it.
+ */
+fun generateDrumNotes(
+    pattern: DrumPattern,
+    barCount: Int,
+    trackId: String,
+    baseOffset: Float = 0f
+): List<NoteEvent> {
+    val stepDur = 1f / 4f
+    val patternBeats = pattern.steps * stepDur
+    val notes = mutableListOf<NoteEvent>()
+
+    (0 until barCount).forEach { barIdx ->
+        val barOffset = baseOffset + barIdx * patternBeats
+        DrumKit.lanes.forEachIndexed { li, lane ->
+            (0 until pattern.steps).forEach { si ->
+                if (pattern.isActive(li, si)) {
+                    notes.add(NoteEvent(
+                        id = UUID.randomUUID().toString(),
+                        trackId = trackId,
+                        pitch = lane.pitch,
+                        beat = barOffset + si * stepDur,
+                        duration = stepDur * 0.9f,
+                        velocity = pattern.velocity(li, si)
+                    ))
+                }
+            }
+        }
+    }
+    return notes
 }
