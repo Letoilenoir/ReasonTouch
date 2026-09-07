@@ -47,7 +47,14 @@ private val OVERLAY_EDGE = Color(0xFF3A3A45)
 private val ACCENT_RED   = Color(0xFFE84040)
 private val TEXT_DIM     = Color(0xFF88889A)
 
-enum class TraySection { HOME, SUGGEST_NEXT, BASS, DRUMS }
+enum class TraySection { HOME, SUGGEST_NEXT, BASS, DRUMS, FULL_GROOVE }
+
+data class GroovePreview(
+    val bassStyle: BassStyle,
+    val bassNotes: List<com.reasontouch.core.data.NoteEvent>,
+    val drumPresetName: String,
+    val drumNotes: List<com.reasontouch.core.data.NoteEvent>
+)
 
 /**
  * Persistent Composition Tray handle -- replaces VelocityOverlayTray at the same anchor point,
@@ -59,6 +66,7 @@ enum class TraySection { HOME, SUGGEST_NEXT, BASS, DRUMS }
  * toolbar. Collapsing and re-expanding always resets to HOME, matching the "tray reflects
  * current composition state" principle in UX_Direction Section 12.
  */
+
 @Composable
 fun CompositionTray(
     expanded: Boolean,
@@ -70,10 +78,15 @@ fun CompositionTray(
     onOptionSelected: (intentType: PairingType, phraseIndex: Int) -> Unit,
     onBassRequested: () -> Unit,
     onDrumsRequested: () -> Unit,
+    onFullGrooveRequested: () -> Unit,
     bassSuggestions: List<BassStyle> = emptyList(),
     drumSuggestions: List<String> = emptyList(),
     onApplyBass: (BassStyle, appendMode: Boolean) -> Unit,
     onApplyDrums: (presetName: String, appendMode: Boolean) -> Unit,
+    groovePreview: GroovePreview? = null,
+    onApplyGroove: () -> Unit,
+    onDiscardGroove: () -> Unit,
+    onRegenerateGroove: () -> Unit,
     hasHarmony: Boolean = false,
     hasBass: Boolean = false,
     hasDrums: Boolean = false,
@@ -150,7 +163,8 @@ fun CompositionTray(
                             hasDrums = hasDrums,
                             onSuggestNext = { onSectionChange(TraySection.SUGGEST_NEXT) },
                             onBass = { onSectionChange(TraySection.BASS); onBassRequested() },
-                            onDrums = { onSectionChange(TraySection.DRUMS); onDrumsRequested() }
+                            onDrums = { onSectionChange(TraySection.DRUMS); onDrumsRequested() },
+                            onFullGroove = { onSectionChange(TraySection.FULL_GROOVE); onFullGrooveRequested() }
                         )
                     }
                     TraySection.SUGGEST_NEXT -> {
@@ -183,6 +197,13 @@ fun CompositionTray(
                         suggestions = drumSuggestions,
                         onApply = onApplyDrums,
                         onBack = { onSectionChange(TraySection.HOME) }
+                    )
+                    TraySection.FULL_GROOVE -> FullGroovePanel(
+                        preview = groovePreview,
+                        onApply = onApplyGroove,
+                        onDiscard = { onDiscardGroove(); onSectionChange(TraySection.HOME) },
+                        onRegenerate = onRegenerateGroove,
+                        onBack = { onDiscardGroove(); onSectionChange(TraySection.HOME) }
                     )
                 }
             }
@@ -310,7 +331,8 @@ private fun TrayHome(
     hasDrums: Boolean,
     onSuggestNext: () -> Unit,
     onBass: () -> Unit,
-    onDrums: () -> Unit
+    onDrums: () -> Unit,
+    onFullGroove: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
 
@@ -336,6 +358,10 @@ private fun TrayHome(
             TrayActionRow(label = if (hasBass) "BASS \u2713" else "BASS", onClick = onBass, modifier = Modifier.weight(1f))
             TrayActionRow(label = if (hasDrums) "DRUMS \u2713" else "DRUMS", onClick = onDrums, modifier = Modifier.weight(1f))
         }
+
+        androidx.compose.foundation.layout.Spacer(Modifier.padding(top = skin.paddingMedium))
+
+        TrayActionRow(label = "FULL GROOVE", onClick = onFullGroove)
     }
 }
 
@@ -363,6 +389,59 @@ private fun TrayActionRow(label: String, onClick: () -> Unit, modifier: Modifier
             .padding(horizontal = skin.paddingLarge, vertical = skin.paddingMedium)
     ) {
         Text(text = label, color = skin.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+    }
+}
+@Composable
+private fun FullGroovePanel(
+    preview: GroovePreview?,
+    onApply: () -> Unit,
+    onDiscard: () -> Unit,
+    onRegenerate: () -> Unit,
+    onBack: () -> Unit
+) {
+    val skin = ReasonTouchTheme.skin
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text(text = "FULL GROOVE", color = skin.accent, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(skin.paddingMedium))
+
+        if (preview == null) {
+            Text(text = "Generating...", color = skin.textMuted, fontSize = 13.sp)
+        } else {
+            Text(
+                text = "Bass: ${preview.bassStyle.label} \u00b7 ${preview.bassNotes.size} notes",
+                color = skin.textPrimary,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(bottom = skin.paddingSmall)
+            )
+            Text(
+                text = "Drums: ${preview.drumPresetName} \u00b7 ${preview.drumNotes.size} notes",
+                color = skin.textPrimary,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(bottom = skin.paddingLarge)
+            )
+            Text(
+                text = "Not yet saved. Apply to write both to the Piano Roll, or Discard to cancel.",
+                color = skin.textMuted,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(bottom = skin.paddingLarge)
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = skin.paddingMedium)
+                    .background(skin.accent, RoundedCornerShape(skin.cornerRadiusSmall))
+                    .clickable(onClick = onApply)
+                    .padding(horizontal = skin.paddingLarge, vertical = skin.paddingMedium)
+            ) {
+                Text(text = "APPLY", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+
+            TrayActionRow(label = "REGENERATE", onClick = onRegenerate)
+        }
+
+        TrayActionRow(label = if (preview == null) "CANCEL" else "DISCARD", onClick = onDiscard)
     }
 }
 

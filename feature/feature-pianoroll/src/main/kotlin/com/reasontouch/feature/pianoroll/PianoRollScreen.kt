@@ -38,6 +38,8 @@ import com.reasontouch.feature.chords.BassStyle
 import com.reasontouch.feature.chords.CompositionContextBuilder
 import com.reasontouch.feature.drums.DrumViewModel
 import com.reasontouch.feature.drums.DrumPresets
+import com.reasontouch.feature.drums.generateDrumNotes
+import com.reasontouch.feature.chords.BassGenerator
 // GmInstrument defined locally to avoid cross-module dependency
 data class TrackInstrument(val label: String, val program: Int)
 
@@ -137,9 +139,11 @@ fun PianoRollScreen(
     val chords       by viewModel.chords.collectAsState()
     val activeIndex  by viewModel.activeTrackIndex.collectAsState()
     val chordViewModel: ChordViewModel = hiltViewModel()
+    val chordUiState by chordViewModel.ui.collectAsState()
     val drumViewModel: DrumViewModel = hiltViewModel()
     var bassSuggestions by remember { mutableStateOf<List<BassStyle>>(emptyList()) }
     var drumSuggestions by remember { mutableStateOf<List<String>>(emptyList()) }
+    var groovePreview by remember { mutableStateOf<GroovePreview?>(null) }
     val activeNotes  by viewModel.activeNotes.collectAsState()
     val allNotes     by viewModel.allNotes.collectAsState()
     val currentTool  by viewModel.currentTool.collectAsState()
@@ -185,6 +189,35 @@ fun PianoRollScreen(
     }
 
     val scope = rememberCoroutineScope()
+
+    suspend fun generateGroovePreview(): GroovePreview? {
+        val context = CompositionContextBuilder.buildContext(session, chords, chordUiState.barDuration.toFloat())
+        val density = context.bars.lastOrNull()?.attackDensity ?: 0f
+
+        val bassStyle = BassStyle.suggestForDensity(density).firstOrNull() ?: BassStyle.ROOT
+        val drumPresetName = DrumPresets.suggestForDensity(density).firstOrNull() ?: "4/4 Basic"
+        val drumPattern = DrumPresets.all[drumPresetName] ?: return null
+
+        val bassTrack = tracks.firstOrNull { it.name.uppercase() == "BASS" } ?: return null
+        val drumTrack = tracks.firstOrNull { it.name.uppercase() == "DRUMS" } ?: return null
+
+        val bassNotes = BassGenerator.generate(
+            chords = chords,
+            style = bassStyle,
+            targetTrackId = bassTrack.id,
+            beatsPerBar = chordUiState.barDuration.toFloat(),
+            appendOffset = 0f,
+            snapValue = 0.25f
+        )
+        val drumNotes = generateDrumNotes(
+            pattern = drumPattern,
+            barCount = totalBars,
+            trackId = drumTrack.id,
+            baseOffset = 0f
+        )
+
+        return GroovePreview(bassStyle, bassNotes, drumPresetName, drumNotes)
+    }
     Column(modifier = Modifier.fillMaxSize().background(BG)) {
 
         PianoRollToolbar(
@@ -269,12 +302,12 @@ fun PianoRollScreen(
                     currentSuggestions = emptyList()
                 },
                 onBassRequested      = {
-                    val context = CompositionContextBuilder.buildContext(session, chords)
+                    val context = CompositionContextBuilder.buildContext(session, chords, chordUiState.barDuration.toFloat())
                     val density = context.bars.lastOrNull()?.attackDensity ?: 0f
                     bassSuggestions = BassStyle.suggestForDensity(density)
                 },
                 onDrumsRequested     = {
-                    val context = CompositionContextBuilder.buildContext(session, chords)
+                    val context = CompositionContextBuilder.buildContext(session, chords, chordUiState.barDuration.toFloat())
                     val density = context.bars.lastOrNull()?.attackDensity ?: 0f
                     drumSuggestions = DrumPresets.suggestForDensity(density)
                 },
@@ -291,6 +324,20 @@ fun PianoRollScreen(
                     drumViewModel.writeToPianoRoll(append) { viewModel.refreshNotes() }
                     trayExpanded = false
                 },
+                onFullGrooveRequested = {
+                    groovePreview = null
+                    scope.launch { groovePreview = generateGroovePreview() }
+                },
+                groovePreview        = groovePreview,
+                onApplyGroove        = {
+                    groovePreview?.let { preview ->
+                        viewModel.saveGeneratedNotes(preview.bassNotes + preview.drumNotes)
+                    }
+                    groovePreview = null
+                    trayExpanded = false
+                },
+                onDiscardGroove      = { groovePreview = null },
+                onRegenerateGroove   = { scope.launch { groovePreview = generateGroovePreview() } },
                 hasHarmony           = chords.isNotEmpty(),
                 hasBass              = tracks.firstOrNull { it.name.uppercase() == "BASS" }
                     ?.let { track -> allNotes[track.id]?.isNotEmpty() } ?: false,

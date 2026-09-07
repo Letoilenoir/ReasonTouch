@@ -39,9 +39,9 @@ object CompositionContextBuilder {
      * PianoRollViewModel today -- this performs no repository access
      * itself, keeping it a pure function over data the caller already has.
      */
-    fun buildContext(session: Session?, chords: List<ChordEvent>): CompositionContext {
+    fun buildContext(session: Session?, chords: List<ChordEvent>, barDuration: Float = 4f): CompositionContext {
         val bpm = session?.bpm ?: 120
-        val beatsPerBar = (session?.timeSignatureNumerator ?: 4).toFloat()
+        val beatsPerBar = barDuration
 
         // Group bars sharing a phraseId to determine first/last-in-phrase,
         // per Phase 6a's Option A decision (phrase membership is persisted

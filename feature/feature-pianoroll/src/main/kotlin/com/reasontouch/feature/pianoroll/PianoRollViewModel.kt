@@ -290,15 +290,37 @@ class PianoRollViewModel @Inject constructor(
             velocity = velocity
         )
 
-        viewModelScope.launch {
+          viewModelScope.launch {
 
-            repository.saveNote(note)
+              repository.saveNote(note)
+
+              val current = _allNotes.value.toMutableMap()
+
+              current[activeTrack.id] =
+                  (current[activeTrack.id] ?: emptyList()) + note
+
+              _allNotes.value = current
+
+              updateActiveNotes()
+          }
+      }
+
+    /**
+     * Saves a batch of already-generated notes (potentially across multiple
+     * tracks) directly, without going through the draw-tool/snap logic
+     * addNote() uses. Added for Phase 8b's Full Groove preview -- Apply
+     * writes both the previewed Bass and Drum notes in one call.
+     */
+    fun saveGeneratedNotes(notes: List<NoteEvent>) {
+        if (notes.isEmpty()) return
+
+        viewModelScope.launch {
+            repository.saveNotes(notes)
 
             val current = _allNotes.value.toMutableMap()
-
-            current[activeTrack.id] =
-                (current[activeTrack.id] ?: emptyList()) + note
-
+            notes.groupBy { it.trackId }.forEach { (trackId, trackNotes) ->
+                current[trackId] = (current[trackId] ?: emptyList()) + trackNotes
+            }
             _allNotes.value = current
 
             updateActiveNotes()
@@ -307,7 +329,7 @@ class PianoRollViewModel @Inject constructor(
 
     // ---------------------------------------------------------------------
     // DURATION STEPPER
-    // ---------------------------------------------------------------------
+    // --------------------------------------------------------------------------------------------------------------------------------------
 
     fun stepDurationStepper(direction: Int) {
 
