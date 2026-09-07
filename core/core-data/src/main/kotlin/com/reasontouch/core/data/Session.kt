@@ -18,6 +18,7 @@ data class Session(
     val defaultStrumSpeed: String = "NATURAL",
     val strumSimulationEnabled: Boolean = true,
     val gmProgram: Int = 26,        // Acoustic Steel default
+    val compositionMode: String = "ASSISTED",  // MANUAL, ASSISTED, or GUIDED -- see CompositionMode enum in feature-chords
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

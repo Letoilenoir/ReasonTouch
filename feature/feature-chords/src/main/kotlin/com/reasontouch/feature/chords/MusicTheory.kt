@@ -37,6 +37,13 @@ enum class CompositionMode {
     ASSISTED,
     GUIDED
 }
+
+fun CompositionMode.toSessionValue(): String = this.name
+
+fun String?.toCompositionMode(): CompositionMode =
+    this?.let { raw -> CompositionMode.entries.firstOrNull { it.name == raw } }
+        ?: CompositionMode.ASSISTED
+
 enum class CompositionIntent(val label: String) {
     CONTINUE("Continue"),
     LIFT("Lift"),
