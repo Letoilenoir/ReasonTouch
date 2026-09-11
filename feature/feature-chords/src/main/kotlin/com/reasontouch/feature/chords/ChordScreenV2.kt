@@ -40,8 +40,15 @@ fun ChordScreenV2(
     onSetBackAction: (((() -> Unit)?) -> Unit)? = null
 ) {
     val ui by viewModel.ui.collectAsState()
+    val session by viewModel.session.collectAsState()
 
     val compositionMode = remember { mutableStateOf(CompositionMode.ASSISTED) }
+
+    LaunchedEffect(session?.compositionMode) {
+        session?.compositionMode?.toCompositionMode()?.let {
+            compositionMode.value = it
+        }
+    }
     val selectedStartingPoint = remember { mutableStateOf<StartingPoint?>(null) }
     var showAssistedDescriptor by remember { mutableStateOf(true) }  // ← ADD
     LaunchedEffect(selectedStartingPoint.value) {
@@ -66,6 +73,7 @@ fun ChordScreenV2(
             onModeSelected = { newMode ->
                 compositionMode.value = newMode
                 selectedStartingPoint.value = null
+                viewModel.setCompositionMode(newMode)
             }
         )
 

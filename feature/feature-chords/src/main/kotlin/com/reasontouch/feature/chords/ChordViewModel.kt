@@ -96,8 +96,14 @@ class ChordViewModel @Inject constructor(
     // USER ACTIONS -> UI STATE
     // ------------------------------------------------------------
 
-    fun setCompositionMode(mode: CompositionMode) =
+    fun setCompositionMode(mode: CompositionMode) {
         update { copy(compositionMode = mode) }
+        viewModelScope.launch {
+            val currentSession = repository.getSession(sessionId).first() ?: return@launch
+            val updated = currentSession.copy(compositionMode = mode.toSessionValue())
+            repository.updateSession(updated)
+        }
+    }
 
     fun selectCategory(cat: String) =
         update { copy(selectedCategory = cat) }
@@ -695,6 +701,8 @@ class ChordViewModel @Inject constructor(
      */
     fun suggestNextOptions(): List<SuggestionWorkflow.SuggestionOption> =
         SuggestionWorkflow.suggestNextOptionsWithPhrases(progression.value)
+
+
 
     /**
      * Adds a generated phrase to the progression.
