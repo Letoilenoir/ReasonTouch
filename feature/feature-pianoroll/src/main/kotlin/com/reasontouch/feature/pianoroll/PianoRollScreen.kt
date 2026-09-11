@@ -35,6 +35,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import com.reasontouch.feature.chords.ChordViewModel
 import com.reasontouch.feature.chords.BassStyle
+import com.reasontouch.feature.chords.CompositionMode
+import com.reasontouch.feature.chords.toCompositionMode
 import com.reasontouch.feature.chords.CompositionContextBuilder
 import com.reasontouch.feature.drums.DrumViewModel
 import com.reasontouch.feature.drums.DrumPresets
@@ -135,6 +137,7 @@ fun PianoRollScreen(
     }
 
     val session      by viewModel.session.collectAsState()
+    val compositionMode = session?.compositionMode.toCompositionMode()
     val tracks       by viewModel.tracks.collectAsState()
     val chords       by viewModel.chords.collectAsState()
     val activeIndex  by viewModel.activeTrackIndex.collectAsState()
