@@ -163,6 +163,25 @@ object DrumPresets {
     }
 
     /**
+     * Same ranking as suggestForDensity(), with a one-line rationale
+     * attached per item -- added 2026-09-07 for Assisted mode's Full
+     * Groove panel (GUIDED does not get its own branch; see memory
+     * note 2026-09-07). Thin wrapper: does not re-rank anything, so it
+     * can never drift from suggestForDensity()'s ordering.
+     */
+    fun suggestForDensityWithRationale(attackDensity: Float): List<com.reasontouch.feature.chords.RankedSuggestion<String>> =
+        suggestForDensity(attackDensity).map { presetName ->
+            com.reasontouch.feature.chords.RankedSuggestion(presetName, rationaleFor(presetName, attackDensity))
+        }
+
+    private fun rationaleFor(presetName: String, attackDensity: Float): String = when {
+        attackDensity <= 0f   -> "No strum pattern set — $presetName works well as a starting point."
+        attackDensity < 0.25f -> "The chord rhythm is sparse, so $presetName fills the space."
+        attackDensity < 0.5f  -> "Moderate chord activity suits $presetName's balance."
+        else                  -> "The chord rhythm is busy, so $presetName keeps things clear."
+    }
+
+    /**
      * Phase 7c of the Bass/Drum Arrangement Roadmap: ranks Drum presets by
      * phrase intent, per docs/design/Drum_Arrangement_Specification.md
      * Section 8. Mirrors BassStyle.suggestForIntent()'s shape exactly --

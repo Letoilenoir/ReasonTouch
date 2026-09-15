@@ -35,21 +35,7 @@ enum class BassStyle(val label: String, val description: String) {
          * Phase 7a of the Bass/Drum Arrangement Roadmap: ranks Bass styles
          * by fit against a chord's rhythmic attack density, per
          * docs/design/Bass_Arrangement_Specification.md Section 4.
-         *
-         * Returns a RANKED LIST, not a single style -- per the spec's own
-         * table, each density bucket maps to multiple viable styles, and
-         * per the project's "choice, not imposition" principle, this
-         * function suggests, it never decides. The caller (Phase 8's
-         * Bass sheet UI) is responsible for how it surfaces the ranking
-         * (e.g. a "Suggested" badge on the top 1-2 entries) -- all 7
-         * styles always remain independently selectable regardless of
-         * this ranking.
-         *
-         * attackDensity of exactly 0f (block chord / empty pattern)
-         * returns every style in their declared order, since the spec's
-         * table treats this case as "any style viable" -- ROOT leads
-         * that list as the documented safe default (Section 3), not
-         * because 0f density specifically favors it.
+         * ...
          */
         fun suggestForDensity(attackDensity: Float): List<BassStyle> = when {
             attackDensity <= 0f   -> values().toList()
@@ -57,6 +43,31 @@ enum class BassStyle(val label: String, val description: String) {
             attackDensity < 0.5f  -> listOf(ROOT_FIFTH, OCTAVE)
             else                  -> listOf(ROOT, PEDAL)
         }
+
+        /**
+         * Same ranking as suggestForDensity(), with a one-line rationale
+         * attached per item -- added 2026-09-07 for Assisted mode's Full
+         * Groove panel (GUIDED does not get its own branch; see memory
+         * note 2026-09-07 -- explaining suggestions is not Guided-exclusive).
+         * Thin wrapper: does not re-rank anything, so it can never drift
+         * from suggestForDensity()'s ordering.
+         */
+        fun suggestForDensityWithRationale(attackDensity: Float): List<RankedSuggestion<BassStyle>> =
+            suggestForDensity(attackDensity).map { style ->
+                RankedSuggestion(style, rationaleFor(style, attackDensity))
+            }
+
+        private fun rationaleFor(style: BassStyle, attackDensity: Float): String = when {
+            attackDensity <= 0f ->
+                "No strum pattern set — ${style.label} works well as a starting point."
+            attackDensity < 0.25f ->
+                "The chord rhythm is sparse, leaving room for ${style.label}'s movement."
+            attackDensity < 0.5f ->
+                "Moderate chord activity suits ${style.label}'s balance of interest and space."
+            else ->
+                "The chord rhythm is busy, so ${style.label} keeps the arrangement clear."
+        }
+
         /**
          * Phase 7c of the Bass/Drum Arrangement Roadmap: ranks Bass styles by
          * phrase intent, per docs/design/Bass_Arrangement_Specification.md
