@@ -539,7 +539,6 @@ class ChordViewModel @Inject constructor(
         appendMode: Boolean,
         onComplete: () -> Unit
     ) {
-        android.util.Log.d("SendProgression", "ENTRY: chords=$chordNames, trackIndex=$trackIndex, nonOffSteps=${strumPattern.steps.count { it != StepState.OFF }}")
         viewModelScope.launch {
             if (chordNames.isEmpty()) {
                 update { copy(statusMessage = "No chords to send") }
@@ -547,7 +546,7 @@ class ChordViewModel @Inject constructor(
                 return@launch
             }
 
-            val trackList = tracks.value
+            val trackList = repository.getTracksForSession(sessionId).first()
             if (trackIndex !in trackList.indices) {
                 update { copy(statusMessage = "Invalid track selected") }
                 onComplete()
@@ -561,19 +560,30 @@ class ChordViewModel @Inject constructor(
                 repository.deleteNotesForTrack(targetTrack.id)
             }
 
+            // Fixed 2026-09-XX: Mood/Inspire/Progression workspaces call this
+            // function as their ONLY write path -- it previously only ever
+            // rendered NoteEvents, never persisted ChordEvents, silently
+            // leaving chord_events empty for any session seeded that way.
+            // Manual pre-populates chord_events via addBar() before calling
+            // this purely to render notes -- existingBarIndices distinguishes
+            // the two cases so Manual's already-correct bars are never
+            // duplicated, while Mood/Inspire/Progression's bars now get
+            // persisted for the first time.
+            val currentProgression = repository.getChordsForSessionOnce(sessionId)
+            val existingBarIndices = currentProgression.map { it.barIndex }.toSet()
+            val startBarIndex = if (appendMode) currentProgression.size else 0
+
             val appendOffset = if (appendMode) {
-                // Append starts at the beginning of the next bar after the current progression
-                // Use progression bar count, not note positions (which may bleed into next bar)
-                val currentProgressionBars = progression.value.size
-                (currentProgressionBars * beatsPerBar).toFloat()
+                (currentProgression.size * beatsPerBar)
             } else {
                 0f
             }
 
             val notes = mutableListOf<NoteEvent>()
 
-            chordNames.forEachIndexed { barIndex, chordName ->
-                val beatStart = (barIndex * beatsPerBar) + appendOffset
+            chordNames.forEachIndexed { index, chordName ->
+                val barIndex = startBarIndex + index
+                val beatStart = (index * beatsPerBar) + appendOffset
 
                 // Try "Open" first, fallback to first available voicing
                 val voicing = GuitarVoicings.voicings[chordName]?.get("Open")
@@ -581,7 +591,20 @@ class ChordViewModel @Inject constructor(
 
                 val midiNotes = voicing?.filterNotNull() ?: emptyList()
 
-                android.util.Log.d("SendProgression", "Bar $barIndex: $chordName -> ${midiNotes.size} notes")
+                if (barIndex !in existingBarIndices) {
+                    val chordEvent = ChordEvent(
+                        id = UUID.randomUUID().toString(),
+                        sessionId = sessionId,
+                        barIndex = barIndex,
+                        chordName = chordName,
+                        rootMidi = midiNotes.firstOrNull() ?: 0,
+                        midiNotes = midiNotes.joinToString(","),
+                        voicing = "Open",
+                        strumPatternId = strumPattern.toChordEventString(),
+                        strumSpeedValue = ui.value.strumSpeed
+                    )
+                    repository.saveChord(chordEvent)
+                }
 
                 notes.addAll(
                     generateStrumNotes(
@@ -597,13 +620,19 @@ class ChordViewModel @Inject constructor(
                 )
             }
 
-            android.util.Log.d("SendProgression", "Saving ${notes.size} notes to ${targetTrack.name}")
             repository.saveNotes(notes)
             update { copy(statusMessage = "Sent ${notes.size} notes to ${targetTrack.name}") }
+
+            val updatedSession = repository.getSession(sessionId).first()?.copy(
+                totalBars = maxOf(startBarIndex + chordNames.size, currentProgression.size)
+            )
+            if (updatedSession != null) {
+                repository.updateSession(updatedSession)
+            }
+
             onComplete()
         }
     }
-
 
     // ------------------------------------------------------------
     // SEND TO PIANO ROLL

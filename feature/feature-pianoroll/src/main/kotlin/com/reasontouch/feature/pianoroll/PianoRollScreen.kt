@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import com.reasontouch.feature.chords.ChordViewModel
 import com.reasontouch.feature.chords.BassStyle
+import com.reasontouch.feature.chords.RankedSuggestion
 import com.reasontouch.feature.chords.CompositionMode
 import com.reasontouch.feature.chords.toCompositionMode
 import com.reasontouch.feature.chords.CompositionContextBuilder
@@ -147,6 +148,8 @@ fun PianoRollScreen(
     var bassSuggestions by remember { mutableStateOf<List<BassStyle>>(emptyList()) }
     var drumSuggestions by remember { mutableStateOf<List<String>>(emptyList()) }
     var groovePreview by remember { mutableStateOf<GroovePreview?>(null) }
+    var grooveBassSuggestions by remember { mutableStateOf<List<RankedSuggestion<BassStyle>>>(emptyList()) }
+    var grooveDrumSuggestions by remember { mutableStateOf<List<RankedSuggestion<String>>>(emptyList()) }
     val activeNotes  by viewModel.activeNotes.collectAsState()
     val allNotes     by viewModel.allNotes.collectAsState()
     val currentTool  by viewModel.currentTool.collectAsState()
@@ -193,12 +196,7 @@ fun PianoRollScreen(
 
     val scope = rememberCoroutineScope()
 
-    suspend fun generateGroovePreview(): GroovePreview? {
-        val context = CompositionContextBuilder.buildContext(session, chords, chordUiState.barDuration.toFloat())
-        val density = context.bars.lastOrNull()?.attackDensity ?: 0f
-
-        val bassStyle = BassStyle.suggestForDensity(density).firstOrNull() ?: BassStyle.ROOT
-        val drumPresetName = DrumPresets.suggestForDensity(density).firstOrNull() ?: "4/4 Basic"
+    suspend fun generateGroovePreview(bassStyle: BassStyle, drumPresetName: String): GroovePreview? {
         val drumPattern = DrumPresets.all[drumPresetName] ?: return null
 
         val bassTrack = tracks.firstOrNull { it.name.uppercase() == "BASS" } ?: return null
@@ -329,18 +327,28 @@ fun PianoRollScreen(
                 },
                 onFullGrooveRequested = {
                     groovePreview = null
-                    scope.launch { groovePreview = generateGroovePreview() }
+                    val context = CompositionContextBuilder.buildContext(session, chords, chordUiState.barDuration.toFloat())
+                    val density = context.bars.lastOrNull()?.attackDensity ?: 0f
+                    grooveBassSuggestions = BassStyle.suggestForDensityWithRationale(density)
+                    grooveDrumSuggestions = DrumPresets.suggestForDensityWithRationale(density)
                 },
-                groovePreview        = groovePreview,
-                onApplyGroove        = {
+                compositionMode       = compositionMode,
+                grooveBassSuggestions = grooveBassSuggestions,
+                grooveDrumSuggestions = grooveDrumSuggestions,
+                groovePreview         = groovePreview,
+                onGenerateGroove      = { bassStyle, drumPresetName ->
+                    scope.launch {
+                        groovePreview = generateGroovePreview(bassStyle, drumPresetName)
+                    }
+                },
+                onApplyGroove         = {
                     groovePreview?.let { preview ->
                         viewModel.saveGeneratedNotes(preview.bassNotes + preview.drumNotes)
                     }
                     groovePreview = null
                     trayExpanded = false
                 },
-                onDiscardGroove      = { groovePreview = null },
-                onRegenerateGroove   = { scope.launch { groovePreview = generateGroovePreview() } },
+                onDiscardGroove       = { groovePreview = null },
                 hasHarmony           = chords.isNotEmpty(),
                 hasBass              = tracks.firstOrNull { it.name.uppercase() == "BASS" }
                     ?.let { track -> allNotes[track.id]?.isNotEmpty() } ?: false,
