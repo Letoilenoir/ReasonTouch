@@ -2,6 +2,7 @@ package com.reasontouch.feature.pianoroll
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +33,7 @@ import com.reasontouch.feature.chords.PairingType
 import com.reasontouch.feature.chords.BassStyle
 import com.reasontouch.feature.chords.SuggestionWorkflow.SuggestionOption
 import com.reasontouch.feature.chords.components.SuggestNextFlow
+import com.reasontouch.feature.drums.DrumPresets
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.getValue
@@ -41,6 +43,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Spacer
+import com.reasontouch.feature.chords.CompositionMode
+import com.reasontouch.feature.chords.RankedSuggestion
 
 private val OVERLAY_BG   = Color(0xEE1E1E24)
 private val OVERLAY_EDGE = Color(0xFF3A3A45)
@@ -83,10 +87,13 @@ fun CompositionTray(
     drumSuggestions: List<String> = emptyList(),
     onApplyBass: (BassStyle, appendMode: Boolean) -> Unit,
     onApplyDrums: (presetName: String, appendMode: Boolean) -> Unit,
+    compositionMode: CompositionMode = CompositionMode.ASSISTED,
+    grooveBassSuggestions: List<RankedSuggestion<BassStyle>> = emptyList(),
+    grooveDrumSuggestions: List<RankedSuggestion<String>> = emptyList(),
     groovePreview: GroovePreview? = null,
+    onGenerateGroove: (BassStyle, String) -> Unit,
     onApplyGroove: () -> Unit,
     onDiscardGroove: () -> Unit,
-    onRegenerateGroove: () -> Unit,
     hasHarmony: Boolean = false,
     hasBass: Boolean = false,
     hasDrums: Boolean = false,
@@ -199,10 +206,13 @@ fun CompositionTray(
                         onBack = { onSectionChange(TraySection.HOME) }
                     )
                     TraySection.FULL_GROOVE -> FullGroovePanel(
+                        compositionMode = compositionMode,
+                        bassSuggestions = grooveBassSuggestions,
+                        drumSuggestions = grooveDrumSuggestions,
                         preview = groovePreview,
+                        onGenerate = onGenerateGroove,
                         onApply = onApplyGroove,
                         onDiscard = { onDiscardGroove(); onSectionChange(TraySection.HOME) },
-                        onRegenerate = onRegenerateGroove,
                         onBack = { onDiscardGroove(); onSectionChange(TraySection.HOME) }
                     )
                 }
@@ -276,6 +286,7 @@ private fun SuggestableRow(
     label: String,
     description: String?,
     isSuggested: Boolean,
+    isSelected: Boolean = false,
     onClick: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
@@ -286,6 +297,11 @@ private fun SuggestableRow(
             .background(
                 if (isSuggested) skin.accent.copy(alpha = 0.12f) else skin.panelAlt,
                 RoundedCornerShape(skin.cornerRadiusSmall)
+            )
+            .border(
+                width = if (isSelected) 2.dp else 0.dp,
+                color = if (isSelected) skin.accent else Color.Transparent,
+                shape = RoundedCornerShape(skin.cornerRadiusSmall)
             )
             .clickable(onClick = onClick)
             .padding(horizontal = skin.paddingLarge, vertical = skin.paddingMedium)
@@ -393,21 +409,31 @@ private fun TrayActionRow(label: String, onClick: () -> Unit, modifier: Modifier
 }
 @Composable
 private fun FullGroovePanel(
+    compositionMode: CompositionMode,
+    bassSuggestions: List<RankedSuggestion<BassStyle>>,
+    drumSuggestions: List<RankedSuggestion<String>>,
     preview: GroovePreview?,
+    onGenerate: (BassStyle, String) -> Unit,
     onApply: () -> Unit,
     onDiscard: () -> Unit,
-    onRegenerate: () -> Unit,
     onBack: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
+    val isAssisted = compositionMode != CompositionMode.MANUAL
+
+    var selectedBass by remember(bassSuggestions) {
+        mutableStateOf(if (isAssisted) bassSuggestions.firstOrNull()?.value else null)
+    }
+    var selectedDrum by remember(drumSuggestions) {
+        mutableStateOf(if (isAssisted) drumSuggestions.firstOrNull()?.value else null)
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Text(text = "FULL GROOVE", color = skin.accent, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(skin.paddingMedium))
 
-        if (preview == null) {
-            Text(text = "Generating...", color = skin.textMuted, fontSize = 13.sp)
-        } else {
+        if (preview != null) {
+            // PREVIEW STATE
             Text(
                 text = "Bass: ${preview.bassStyle.label} \u00b7 ${preview.bassNotes.size} notes",
                 color = skin.textPrimary,
@@ -438,10 +464,73 @@ private fun FullGroovePanel(
                 Text(text = "APPLY", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
 
-            TrayActionRow(label = "REGENERATE", onClick = onRegenerate)
+            TrayActionRow(label = "DISCARD", onClick = onDiscard)
+        } else {
+            // PICKER STATE -- both lists visible, Generate at the bottom
+            Text(
+                text = if (isAssisted) "Suggestions shown below -- pick any to change."
+                else "Choose a Bass style and a Drum pattern.",
+                color = skin.textMuted,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(bottom = skin.paddingMedium)
+            )
+
+            Text(text = "BASS", color = skin.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = skin.paddingSmall))
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(BassStyle.values().toList()) { style ->
+                    val suggestion = bassSuggestions.find { it.value == style }
+                    SuggestableRow(
+                        label = style.label,
+                        description = suggestion?.rationale ?: style.description,
+                        isSuggested = isAssisted && style == bassSuggestions.firstOrNull()?.value,
+                        isSelected = style == selectedBass,
+                        onClick = { selectedBass = style }
+                    )
+                }
+            }
+
+            Text(text = "DRUMS", color = skin.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = skin.paddingMedium, bottom = skin.paddingSmall))
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(DrumPresets.all.keys.toList()) { presetName ->
+                    val suggestion = drumSuggestions.find { it.value == presetName }
+                    SuggestableRow(
+                        label = presetName,
+                        description = suggestion?.rationale,
+                        isSuggested = isAssisted && presetName == drumSuggestions.firstOrNull()?.value,
+                        isSelected = presetName == selectedDrum,
+                        onClick = { selectedDrum = presetName }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(skin.paddingMedium))
+
+            val canGenerate = selectedBass != null && selectedDrum != null
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = skin.paddingMedium)
+                    .background(
+                        if (canGenerate) skin.accent else skin.panelAlt,
+                        RoundedCornerShape(skin.cornerRadiusSmall)
+                    )
+                    .clickable(enabled = canGenerate) {
+                        onGenerate(selectedBass!!, selectedDrum!!)
+                    }
+                    .padding(horizontal = skin.paddingLarge, vertical = skin.paddingMedium)
+            ) {
+                Text(
+                    text = "GENERATE",
+                    color = if (canGenerate) Color.Black else skin.textMuted,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
-        TrayActionRow(label = if (preview == null) "CANCEL" else "DISCARD", onClick = onDiscard)
+        TrayActionRow(label = "BACK", onClick = onBack)
     }
 }
 
