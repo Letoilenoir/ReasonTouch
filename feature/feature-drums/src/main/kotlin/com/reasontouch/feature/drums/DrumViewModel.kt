@@ -1,5 +1,7 @@
 package com.reasontouch.feature.drums
 
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -254,6 +256,53 @@ class DrumViewModel @Inject constructor(
             repository.saveNotes(notes)
             val totalBars = segments.sumOf { it.barCount }
             onComplete("Written $totalBars bars across ${segments.size} segment(s) to ${drumTrack.name} (${notes.size} notes)")
+        }
+    }
+
+    private val _transitionFill = mutableStateOf(true)
+    val transitionFill: State<Boolean> = _transitionFill
+
+    private val _endFill = mutableStateOf(true)
+    val endFill: State<Boolean> = _endFill
+
+    fun setTransitionFill(enabled: Boolean) {
+        _transitionFill.value = enabled
+    }
+
+    fun setEndFill(enabled: Boolean) {
+        _endFill.value = enabled
+    }
+
+    /**
+     * Phase 6b/6f: Generates family-aware drum segments from a CompositionContext
+     * and a chosen base preset name, automatically applying verse, chorus, and fill
+     * variants across phrases.
+     */
+    fun generateSegmentsFromContext(
+        context: com.reasontouch.feature.chords.CompositionContext,
+        presetName: String
+    ): List<DrumSegment> {
+        val phraseIds = context.bars.map { it.chordEvent.phraseId }.distinct()
+        val totalBars = context.bars.size
+
+        return context.bars.mapIndexed { index, barContext ->
+            val phraseIdx = phraseIds.indexOf(barContext.chordEvent.phraseId).coerceAtLeast(0)
+            val isAbsoluteLastBar = index == totalBars - 1
+
+            val pattern = DrumPresets.getPatternForPosition(
+                basePresetName = presetName,
+                isFirstInPhrase = barContext.isFirstInPhrase,
+                isLastInPhrase = barContext.isLastInPhrase,
+                phraseIndex = phraseIdx,
+                isAbsoluteLastBar = isAbsoluteLastBar,
+                transitionFill = _transitionFill.value,
+                endFill = _endFill.value
+            )
+            DrumSegment(
+                pattern = pattern,
+                startBar = barContext.chordEvent.barIndex,
+                barCount = 1
+            )
         }
     }
 }

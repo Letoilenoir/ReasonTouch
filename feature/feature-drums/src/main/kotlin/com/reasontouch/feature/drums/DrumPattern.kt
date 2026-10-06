@@ -105,6 +105,38 @@ object DrumPresets {
         result
     }
 
+    val ROCK_CHORUS = DrumPattern().let { p ->
+        var result = p
+        listOf(0, 6, 8, 10, 14).forEach { result = result.toggle(0, it) }  // Kick
+        listOf(4, 12).forEach         { result = result.toggle(1, it) }  // Snare
+        (0 until 16 step 2).forEach   { result = result.toggle(4, it) }  // Open HH
+        result
+    }
+
+    val ROCK_FILL = DrumPattern().let { p ->
+        var result = p
+        listOf(0, 8).forEach          { result = result.toggle(0, it) }  // Kick
+        listOf(4, 12, 14, 15).forEach { result = result.toggle(1, it) }  // Snare fill
+        (0 until 16 step 4).forEach   { result = result.toggle(3, it) }  // HH accents
+        result
+    }
+
+    val FOUR_FOUR_CHORUS = DrumPattern().let { p ->
+        var result = p
+        listOf(0, 8, 10).forEach      { result = result.toggle(0, it) }  // Kick
+        listOf(4, 12).forEach         { result = result.toggle(1, it) }  // Snare
+        (0 until 16 step 2).forEach   { result = result.toggle(4, it) }  // Open HH
+        result
+    }
+
+    val FUNK_FILL = DrumPattern().let { p ->
+        var result = p
+        listOf(0, 3, 8, 11).forEach   { result = result.toggle(0, it) }  // Kick
+        listOf(4, 12, 13, 14, 15).forEach { result = result.toggle(1, it) } // Snare roll
+        (0 until 16).forEach          { result = result.toggle(3, it) }  // HH 16ths
+        result
+    }
+
     val all = mapOf(
         "4/4 Basic" to FOUR_FOUR,
         "Rock"      to ROCK,
@@ -112,6 +144,42 @@ object DrumPresets {
         "Reggae"    to REGGAE,
         "Bossa Nova" to BOSSA
     )
+
+    /**
+     * Phase 6b/6f: Family-aware pattern resolver for multi-phrase arrangement.
+     * Maintains a stable groove throughout a phrase, applying a fill ONLY on the final bar (isLastInPhrase).
+     * Subsequent phrases (phraseIndex > 0) use chorus variants.
+     */
+    fun getPatternForPosition(
+        basePresetName: String,
+        isFirstInPhrase: Boolean,
+        isLastInPhrase: Boolean,
+        phraseIndex: Int = 0,
+        isAbsoluteLastBar: Boolean = false,
+        transitionFill: Boolean = true,
+        endFill: Boolean = true
+    ): DrumPattern {
+        val base = all[basePresetName] ?: FOUR_FOUR
+        if (isLastInPhrase) {
+            val shouldFill = if (isAbsoluteLastBar) endFill else transitionFill
+            if (shouldFill) {
+                return when (basePresetName) {
+                    "Rock" -> ROCK_FILL
+                    "Funk" -> FUNK_FILL
+                    else -> ROCK_FILL
+                }
+            }
+        }
+        return if (phraseIndex > 0) {
+            when (basePresetName) {
+                "Rock" -> ROCK_CHORUS
+                "4/4 Basic" -> FOUR_FOUR_CHORUS
+                else -> base
+            }
+        } else {
+            base
+        }
+    }
 
     /**
      * Phase 6c of the Bass/Drum Arrangement Roadmap: suggests a Drum

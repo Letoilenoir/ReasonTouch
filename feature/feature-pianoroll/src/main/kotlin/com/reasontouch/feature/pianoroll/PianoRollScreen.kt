@@ -197,8 +197,6 @@ fun PianoRollScreen(
     val scope = rememberCoroutineScope()
 
     suspend fun generateGroovePreview(bassStyle: BassStyle, drumPresetName: String): GroovePreview? {
-        val drumPattern = DrumPresets.all[drumPresetName] ?: return null
-
         val bassTrack = tracks.firstOrNull { it.name.uppercase() == "BASS" } ?: return null
         val drumTrack = tracks.firstOrNull { it.name.uppercase() == "DRUMS" } ?: return null
 
@@ -210,12 +208,21 @@ fun PianoRollScreen(
             appendOffset = 0f,
             snapValue = 0.25f
         )
-        val drumNotes = generateDrumNotes(
-            pattern = drumPattern,
-            barCount = totalBars,
-            trackId = drumTrack.id,
-            baseOffset = 0f
-        )
+
+        val context = com.reasontouch.feature.chords.CompositionContextBuilder.buildContext(session, chords, chordUiState.barDuration.toFloat())
+        val segments = drumViewModel.generateSegmentsFromContext(context, drumPresetName)
+        val drumNotes = mutableListOf<com.reasontouch.core.data.NoteEvent>()
+        segments.forEach { segment ->
+            val patternBeats = segment.pattern.steps * (1f / 4f)
+            drumNotes.addAll(
+                generateDrumNotes(
+                    pattern = segment.pattern,
+                    barCount = segment.barCount,
+                    trackId = drumTrack.id,
+                    baseOffset = segment.startBar * patternBeats
+                )
+            )
+        }
 
         return GroovePreview(bassStyle, bassNotes, drumPresetName, drumNotes)
     }
@@ -314,6 +321,10 @@ fun PianoRollScreen(
                 },
                 bassSuggestions      = bassSuggestions,
                 drumSuggestions      = drumSuggestions,
+                transitionFill       = drumViewModel.transitionFill.value,
+                onTransitionFillChange = drumViewModel::setTransitionFill,
+                endFill              = drumViewModel.endFill.value,
+                onEndFillChange      = drumViewModel::setEndFill,
                 onApplyBass          = { style, append ->
                     chordViewModel.generateBass(style, append) {
                         viewModel.refreshNotes()

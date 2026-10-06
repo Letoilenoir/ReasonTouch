@@ -94,6 +94,10 @@ fun CompositionTray(
     onGenerateGroove: (BassStyle, String) -> Unit,
     onApplyGroove: () -> Unit,
     onDiscardGroove: () -> Unit,
+    transitionFill: Boolean = true,
+    onTransitionFillChange: (Boolean) -> Unit = {},
+    endFill: Boolean = true,
+    onEndFillChange: (Boolean) -> Unit = {},
     hasHarmony: Boolean = false,
     hasBass: Boolean = false,
     hasDrums: Boolean = false,
@@ -203,6 +207,10 @@ fun CompositionTray(
                     TraySection.DRUMS -> DrumsPanel(
                         suggestions = drumSuggestions,
                         onApply = onApplyDrums,
+                        transitionFill = transitionFill,
+                        onTransitionFillChange = onTransitionFillChange,
+                        endFill = endFill,
+                        onEndFillChange = onEndFillChange,
                         onBack = { onSectionChange(TraySection.HOME) }
                     )
                     TraySection.FULL_GROOVE -> FullGroovePanel(
@@ -210,6 +218,10 @@ fun CompositionTray(
                         bassSuggestions = grooveBassSuggestions,
                         drumSuggestions = grooveDrumSuggestions,
                         preview = groovePreview,
+                        transitionFill = transitionFill,
+                        onTransitionFillChange = onTransitionFillChange,
+                        endFill = endFill,
+                        onEndFillChange = onEndFillChange,
                         onGenerate = onGenerateGroove,
                         onApply = onApplyGroove,
                         onDiscard = { onDiscardGroove(); onSectionChange(TraySection.HOME) },
@@ -255,6 +267,10 @@ private fun BassPanel(
 private fun DrumsPanel(
     suggestions: List<String>,
     onApply: (String, Boolean) -> Unit,
+    transitionFill: Boolean,
+    onTransitionFillChange: (Boolean) -> Unit,
+    endFill: Boolean,
+    onEndFillChange: (Boolean) -> Unit,
     onBack: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
@@ -275,6 +291,12 @@ private fun DrumsPanel(
             }
         }
 
+        FillToggles(
+            transitionFill = transitionFill,
+            onTransitionChange = onTransitionFillChange,
+            endFill = endFill,
+            onEndChange = onEndFillChange
+        )
         AppendModeRow(appendMode = appendMode, onToggle = { appendMode = it })
         Spacer(Modifier.height(skin.paddingMedium))
         TrayActionRow(label = "BACK", onClick = onBack)
@@ -318,6 +340,43 @@ private fun SuggestableRow(
             }
             if (description != null) {
                 Text(text = description, color = skin.textMuted, fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactSuggestableRow(
+    label: String,
+    isSuggested: Boolean,
+    isSelected: Boolean = false,
+    onClick: () -> Unit
+) {
+    val skin = ReasonTouchTheme.skin
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp)
+            .background(
+                if (isSelected) skin.accent.copy(alpha = 0.2f) else if (isSuggested) skin.accent.copy(alpha = 0.1f) else skin.panelAlt,
+                RoundedCornerShape(skin.cornerRadiusSmall)
+            )
+            .border(
+                width = if (isSelected) 1.5.dp else 0.dp,
+                color = if (isSelected) skin.accent else Color.Transparent,
+                shape = RoundedCornerShape(skin.cornerRadiusSmall)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = skin.paddingMedium, vertical = 6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = label, color = skin.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            if (isSuggested) {
+                Text(text = "SUGGESTED", color = skin.accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -413,6 +472,10 @@ private fun FullGroovePanel(
     bassSuggestions: List<RankedSuggestion<BassStyle>>,
     drumSuggestions: List<RankedSuggestion<String>>,
     preview: GroovePreview?,
+    transitionFill: Boolean,
+    onTransitionFillChange: (Boolean) -> Unit,
+    endFill: Boolean,
+    onEndFillChange: (Boolean) -> Unit,
     onGenerate: (BassStyle, String) -> Unit,
     onApply: () -> Unit,
     onDiscard: () -> Unit,
@@ -466,7 +529,7 @@ private fun FullGroovePanel(
 
             TrayActionRow(label = "DISCARD", onClick = onDiscard)
         } else {
-            // PICKER STATE -- both lists visible, Generate at the bottom
+            // PICKER STATE -- two columns side-by-side (Bass left, Drums + Fills right)
             Text(
                 text = if (isAssisted) "Suggestions shown below -- pick any to change."
                 else "Choose a Bass style and a Drum pattern.",
@@ -475,62 +538,93 @@ private fun FullGroovePanel(
                 modifier = Modifier.padding(bottom = skin.paddingMedium)
             )
 
-            Text(text = "BASS", color = skin.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = skin.paddingSmall))
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(BassStyle.values().toList()) { style ->
-                    val suggestion = bassSuggestions.find { it.value == style }
-                    SuggestableRow(
-                        label = style.label,
-                        description = suggestion?.rationale ?: style.description,
-                        isSuggested = isAssisted && style == bassSuggestions.firstOrNull()?.value,
-                        isSelected = style == selectedBass,
-                        onClick = { selectedBass = style }
-                    )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(skin.paddingMedium)
+                ) {
+                    // Left Column: Bass
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "BASS", color = skin.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = skin.paddingSmall))
+                        BassStyle.values().forEach { style ->
+                            CompactSuggestableRow(
+                                label = style.label,
+                                isSuggested = isAssisted && style == bassSuggestions.firstOrNull()?.value,
+                                isSelected = style == selectedBass,
+                                onClick = { selectedBass = style }
+                            )
+                        }
+                    }
+
+                    // Right Column: Drums + Fill Toggles
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "DRUMS", color = skin.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = skin.paddingSmall))
+                        DrumPresets.all.keys.forEach { presetName ->
+                            CompactSuggestableRow(
+                                label = presetName,
+                                isSuggested = isAssisted && presetName == drumSuggestions.firstOrNull()?.value,
+                                isSelected = selectedDrum == presetName,
+                                onClick = { selectedDrum = presetName }
+                            )
+                        }
+
+                        Spacer(Modifier.height(4.dp))
+                        FillToggles(
+                            transitionFill = transitionFill,
+                            onTransitionChange = onTransitionFillChange,
+                            endFill = endFill,
+                            onEndChange = onEndFillChange
+                        )
+                    }
                 }
             }
 
-            Text(text = "DRUMS", color = skin.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(top = skin.paddingMedium, bottom = skin.paddingSmall))
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(DrumPresets.all.keys.toList()) { presetName ->
-                    val suggestion = drumSuggestions.find { it.value == presetName }
-                    SuggestableRow(
-                        label = presetName,
-                        description = suggestion?.rationale,
-                        isSuggested = isAssisted && presetName == drumSuggestions.firstOrNull()?.value,
-                        isSelected = presetName == selectedDrum,
-                        onClick = { selectedDrum = presetName }
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(skin.paddingMedium))
+            Spacer(Modifier.height(skin.paddingSmall))
 
             val canGenerate = selectedBass != null && selectedDrum != null
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = skin.paddingMedium)
-                    .background(
-                        if (canGenerate) skin.accent else skin.panelAlt,
-                        RoundedCornerShape(skin.cornerRadiusSmall)
-                    )
-                    .clickable(enabled = canGenerate) {
-                        onGenerate(selectedBass!!, selectedDrum!!)
-                    }
-                    .padding(horizontal = skin.paddingLarge, vertical = skin.paddingMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = skin.paddingMedium),
+                horizontalArrangement = Arrangement.spacedBy(skin.paddingMedium)
             ) {
-                Text(
-                    text = "GENERATE",
-                    color = if (canGenerate) Color.Black else skin.textMuted,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(skin.panelAlt, RoundedCornerShape(skin.cornerRadiusSmall))
+                        .clickable(onClick = onBack)
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "BACK", color = skin.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(
+                            if (canGenerate) skin.accent else skin.panelAlt,
+                            RoundedCornerShape(skin.cornerRadiusSmall)
+                        )
+                        .clickable(enabled = canGenerate) {
+                            onGenerate(selectedBass!!, selectedDrum!!)
+                        }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "GENERATE",
+                        color = if (canGenerate) Color.Black else skin.textMuted,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
-
-        TrayActionRow(label = "BACK", onClick = onBack)
     }
 }
 
@@ -546,5 +640,83 @@ private fun TrayStubPanel(title: String, onBack: () -> Unit) {
             modifier = Modifier.padding(top = skin.paddingSmall, bottom = skin.paddingLarge)
         )
         TrayActionRow(label = "BACK", onClick = onBack)
+    }
+}
+
+@Composable
+private fun CompactToggleCard(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    val skin = ReasonTouchTheme.skin
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp)
+            .background(
+                if (checked) skin.accent.copy(alpha = 0.2f) else skin.panelAlt,
+                RoundedCornerShape(skin.cornerRadiusSmall)
+            )
+            .border(
+                width = if (checked) 1.5.dp else 0.dp,
+                color = if (checked) skin.accent else Color.Transparent,
+                shape = RoundedCornerShape(skin.cornerRadiusSmall)
+            )
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = skin.paddingMedium, vertical = 6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = label, color = skin.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Box(
+                modifier = Modifier
+                    .width(16.dp)
+                    .height(16.dp)
+                    .background(
+                        if (checked) skin.accent else Color.Transparent,
+                        RoundedCornerShape(8.dp)
+                    )
+                    .border(
+                        width = 1.5.dp,
+                        color = if (checked) skin.accent else skin.textMuted,
+                        shape = RoundedCornerShape(8.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (checked) {
+                    Box(
+                        modifier = Modifier
+                            .width(6.dp)
+                            .height(6.dp)
+                            .background(Color.Black, RoundedCornerShape(3.dp))
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FillToggles(
+    transitionFill: Boolean,
+    onTransitionChange: (Boolean) -> Unit,
+    endFill: Boolean,
+    onEndChange: (Boolean) -> Unit
+) {
+    Column {
+        CompactToggleCard(
+            label = "Transition Fills",
+            checked = transitionFill,
+            onCheckedChange = onTransitionChange
+        )
+        CompactToggleCard(
+            label = "End Fill",
+            checked = endFill,
+            onCheckedChange = onEndChange
+        )
     }
 }
