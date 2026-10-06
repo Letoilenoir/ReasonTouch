@@ -2,7 +2,7 @@
 
 Update this file directly as tasks are completed, added, or reprioritized -- this is the single source of truth for "what's next," rather than reconstructing it from conversation history each session.
 
-**Last updated:** 2026-08-03
+**Last updated:** 2026-10-06
 
 ---
 ## RESOLVED -- exhaustion-rotation bug (was: URGENT, affecting all 4 strategies at preferredLength=8)
@@ -115,3 +115,4 @@ Confirmed 2026-08-02 via full-project search: `PairingEngine` can and does retur
 - [x] Same-continuation chord exclusion fix across Continue/Contrast/Resolve (`6ace490`)
 - [x] `ChordSuggestionEngine` candidate-cap fix -- `FULL_DIATONIC_POOL` (7) passed by all 3 phrase-generation strategies, `ChordViewModel`'s manual suggestion UI untouched (default `MAX_SUGGESTIONS` = 4 preserved) -- 2026-08-02, not yet retested on-device
 - [x] `docs/handoffs/`, `docs/testing/`, `docs/design/` folder structure established, full project history consolidated
+- [x] **Phase 6: Context-Aware Drum Arrangement & Grouped Preset Families** -- Implemented grouped drum preset families (verse, chorus, fill variants) in `DrumPattern.kt`, phrase-boundary stability in `DrumViewModel.generateSegmentsFromContext()`, and balanced two-column `FullGroovePanel` UI layout with compact toggle cards (`CompactToggleCard`) for Transition Fills and End Fill. Committed and pushed (`a385cfc`).
