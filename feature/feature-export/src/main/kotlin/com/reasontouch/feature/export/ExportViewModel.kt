@@ -9,7 +9,6 @@ import androidx.lifecycle.viewModelScope
 import com.reasontouch.core.data.SessionRepository
 import com.reasontouch.core.midi.MidiProgressionBar
 import com.reasontouch.core.midi.MultiTrackMidiWriter
-import com.reasontouch.core.midi.StepState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -71,21 +70,9 @@ class ExportViewModel(
     private suspend fun buildMidiBytes(): ByteArray {
         val sessionVal = repository.getSession(sessionId).first()
         val tracksVal  = repository.getTracksForSession(sessionId).first()
-        val chordsVal  = repository.getChordsForSession(sessionId).first()
         val bpm        = sessionVal?.bpm ?: 120
 
-        val chordBars = chordsVal.map { chord ->
-            val notes = chord.midiNotes.split(",").mapNotNull { it.trim().toIntOrNull() }
-            MidiProgressionBar(
-                chordName     = chord.chordName,
-                notes         = Array<Int?>(6) { i -> notes.getOrNull(i) },
-                steps         = List(16) { if (it == 0) StepState.DOWN else StepState.OFF },
-                durationBeats = 4.0,
-                tempoBpm      = bpm,
-                strumSpeed    = 0.0,
-                gmProgram     = sessionVal?.gmProgram ?: 25
-            )
-        }
+        val chordBars = emptyList<MidiProgressionBar>()
 
         val pianoTracks = tracksVal.mapIndexed { i, track ->
             val notes = repository.getNotesForTrackOnce(track.id)
