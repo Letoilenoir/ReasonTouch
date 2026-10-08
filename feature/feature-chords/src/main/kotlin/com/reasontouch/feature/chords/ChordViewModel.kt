@@ -737,7 +737,13 @@ class ChordViewModel @Inject constructor(
      * Adds a generated phrase to the progression.
      * Converts List<TheoryChord> to List<ChordEvent> and adds bars.
      */
-    fun addPhrase(generatedProgression: GeneratedProgression, onComplete: () -> Unit = {}) {
+    fun addPhrase(
+        generatedProgression: GeneratedProgression,
+        pairingType: PairingType? = null,
+        customStrumPattern: StepPattern? = null,
+        customStrumSpeed: Double? = null,
+        onComplete: () -> Unit = {}
+    ) {
         viewModelScope.launch {
             val currentProgression = repository.getChordsForSessionOnce(sessionId)
             if (currentProgression.isEmpty()) {
@@ -753,8 +759,18 @@ class ChordViewModel @Inject constructor(
 
             val newNotes = mutableListOf<NoteEvent>()
 
-            var inheritedPattern = currentProgression.last().strumPatternId.toStepPattern()
-            var inheritedSpeed = currentProgression.last().strumSpeedValue ?: ui.value.strumSpeed
+            var inheritedPattern = customStrumPattern
+                ?: currentProgression.last().strumPatternId.toStepPattern()
+            var inheritedSpeed = customStrumSpeed
+                ?: currentProgression.last().strumSpeedValue
+                ?: ui.value.strumSpeed
+
+            // Intent-driven strum variation (applied only if no custom override specified):
+            if (customStrumSpeed == null && pairingType == PairingType.LIFT) {
+                inheritedSpeed = (inheritedSpeed * 0.85).coerceAtLeast(0.005)
+            } else if (customStrumSpeed == null && pairingType == PairingType.RESOLVE) {
+                inheritedSpeed = (inheritedSpeed * 1.2).coerceAtMost(0.05)
+            }
 
             val phraseId = UUID.randomUUID().toString()
             val phraseLength = generatedProgression.chords.size

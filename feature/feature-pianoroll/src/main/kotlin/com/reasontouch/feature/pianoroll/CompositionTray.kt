@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reasontouch.core.ui.theme.ReasonTouchTheme
 import com.reasontouch.feature.chords.PairingType
+import com.reasontouch.feature.chords.StepPattern
 import com.reasontouch.feature.chords.BassStyle
 import com.reasontouch.feature.chords.SuggestionWorkflow.SuggestionOption
 import com.reasontouch.feature.chords.components.SuggestNextFlow
@@ -79,7 +80,7 @@ fun CompositionTray(
     onSectionChange: (TraySection) -> Unit,
     suggestions: List<SuggestionOption>,
     onRequestSuggestions: () -> Unit,
-    onOptionSelected: (intentType: PairingType, phraseIndex: Int) -> Unit,
+    onOptionSelected: (intentType: PairingType, phraseIndex: Int, customPattern: StepPattern?, customSpeed: Double?) -> Unit,
     onBassRequested: () -> Unit,
     onDrumsRequested: () -> Unit,
     onFullGrooveRequested: () -> Unit,
@@ -182,8 +183,8 @@ fun CompositionTray(
                         if (suggestions.isNotEmpty()) {
                             SuggestNextFlow(
                                 suggestions = suggestions,
-                                onOptionSelected = { type, phraseIndex ->
-                                    onOptionSelected(type, phraseIndex)
+                                onOptionSelected = { type, phraseIndex, pat, speed ->
+                                    onOptionSelected(type, phraseIndex, pat, speed)
                                     onSectionChange(TraySection.HOME)
                                 },
                                 onCancel = { onSectionChange(TraySection.HOME) },

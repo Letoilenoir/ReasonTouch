@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import com.reasontouch.feature.chords.ChordViewModel
+import com.reasontouch.feature.chords.PairingType
 import com.reasontouch.feature.chords.BassStyle
 import com.reasontouch.feature.chords.RankedSuggestion
 import com.reasontouch.feature.chords.CompositionMode
@@ -297,13 +298,18 @@ fun PianoRollScreen(
                 onRequestSuggestions = {
                     scope.launch { currentSuggestions = viewModel.suggestNextOptions() }
                 },
-                onOptionSelected     = { intentType, phraseIndex ->
+                onOptionSelected     = { intentType, phraseIndex, customPattern, customSpeed ->
                     currentSuggestions
                         .firstOrNull { it.option.type == intentType }
                         ?.phrases
                         ?.getOrNull(phraseIndex)
                         ?.let { phrase ->
-                            chordViewModel.addPhrase(phrase) {
+                            chordViewModel.addPhrase(
+                                generatedProgression = phrase,
+                                pairingType = intentType,
+                                customStrumPattern = customPattern,
+                                customStrumSpeed = customSpeed
+                            ) {
                                 viewModel.refreshNotes()
                             }
                         }

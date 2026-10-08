@@ -36,6 +36,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reasontouch.core.ui.theme.ReasonTouchTheme
 import com.reasontouch.feature.chords.PairingType
+import com.reasontouch.feature.chords.StepPattern
+import com.reasontouch.feature.chords.StrumPatterns
+import com.reasontouch.feature.chords.STRUM_SPEED_PRESETS
 import com.reasontouch.feature.chords.SuggestionWorkflow.SuggestionOption
 
 private val SELECT_GREEN = Color(0xFF3DDC84)
@@ -54,7 +57,7 @@ private val SELECT_GREEN = Color(0xFF3DDC84)
 @Composable
 fun SuggestNextFlow(
     suggestions: List<SuggestionOption>,
-    onOptionSelected: (intentType: PairingType, phraseIndex: Int) -> Unit,
+    onOptionSelected: (intentType: PairingType, phraseIndex: Int, customPattern: StepPattern?, customSpeed: Double?) -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
     cancelLabel: String = "CANCEL",
@@ -64,9 +67,15 @@ fun SuggestNextFlow(
 
     var selectedIndex by remember { mutableStateOf<Int?>(null) }
     var selectedPhraseIndex by remember { mutableStateOf<Int?>(null) }
+    var customPattern by remember { mutableStateOf<StepPattern?>(null) }
+    var customSpeed by remember { mutableStateOf<Double?>(null) }
+    var showStrumPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(selectedIndex) {
         selectedPhraseIndex = null
+        customPattern = null
+        customSpeed = null
+        showStrumPicker = false
     }
 
     if (suggestions.isEmpty()) return
@@ -100,7 +109,7 @@ fun SuggestNextFlow(
                     IconButtonSquare(
                         symbol = "\u2713",
                         onClick = {
-                            selectedPhraseIndex?.let { onOptionSelected(current.option.type, it) }
+                            selectedPhraseIndex?.let { onOptionSelected(current.option.type, it, customPattern, customSpeed) }
                         },
                         enabled = selectedPhraseIndex != null,
                         containerColor = SELECT_GREEN,
@@ -186,8 +195,92 @@ fun SuggestNextFlow(
                         "(${(current.option.confidence * 100).toInt()}% confident)",
                 color = skin.textMuted,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(bottom = skin.paddingLarge)
+                modifier = Modifier.padding(bottom = skin.paddingMedium)
             )
+
+            // Strum inspection / override bar
+            val patternName = customPattern?.let { p -> StrumPatterns.all.entries.find { it.value == p }?.key } ?: "Inherited (Auto)"
+            val speedLabel = customSpeed?.let { s -> STRUM_SPEED_PRESETS.firstOrNull { it.beatsPerString == s }?.label } ?: "Inherited Speed"
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = skin.paddingMedium)
+                    .background(skin.panelAlt, RoundedCornerShape(skin.cornerRadiusSmall))
+                    .clickable { showStrumPicker = !showStrumPicker }
+                    .padding(horizontal = skin.paddingLarge, vertical = skin.paddingMedium)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(text = "STRUM PERFORMANCE", color = skin.textSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(text = "$patternName · $speedLabel", color = skin.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    }
+                    Text(text = if (showStrumPicker) "HIDE \u25B4" else "CHANGE \u25BE", color = skin.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            if (showStrumPicker) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = skin.paddingMedium)
+                        .background(Color(0xFF222228), RoundedCornerShape(skin.cornerRadiusSmall))
+                        .padding(skin.paddingMedium)
+                ) {
+                    Text(text = "Select Strum Pattern", color = skin.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { customPattern = null; showStrumPicker = false }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Text(text = "Auto (Inherited)", color = if (customPattern == null) skin.accent else skin.textPrimary, fontSize = 12.sp)
+                    }
+                    StrumPatterns.groups.forEach { (group, pats) ->
+                        Text(text = group, color = skin.textMuted, fontSize = 9.sp, modifier = Modifier.padding(top = 4.dp))
+                        pats.entries.forEach { (name, pat) ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { customPattern = pat; showStrumPicker = false }
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Text(text = name, color = if (customPattern == pat) skin.accent else skin.textSecondary, fontSize = 12.sp)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(text = "Select Strum Speed", color = skin.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { customSpeed = null; showStrumPicker = false }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Text(text = "Auto (Inherited)", color = if (customSpeed == null) skin.accent else skin.textPrimary, fontSize = 12.sp)
+                    }
+                    STRUM_SPEED_PRESETS.forEach { preset ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { customSpeed = preset.beatsPerString; showStrumPicker = false }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Text(text = preset.label, color = if (customSpeed == preset.beatsPerString) skin.accent else skin.textSecondary, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(skin.paddingSmall))
 
             if (current.phrases.isEmpty()) {
                 Text(
