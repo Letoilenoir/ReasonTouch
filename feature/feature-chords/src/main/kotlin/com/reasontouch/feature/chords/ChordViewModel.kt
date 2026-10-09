@@ -505,13 +505,15 @@ class ChordViewModel @Inject constructor(
                 0f
             }
 
+            val context = CompositionContextBuilder.buildContext(session.value, bars, ui.value.barDuration.toFloat())
             val notes = BassGenerator.generate(
                 chords = bars,
                 style = style,
                 targetTrackId = bassTrack.id,
                 beatsPerBar = ui.value.barDuration.toFloat(),
                 appendOffset = appendOffset,
-                snapValue = 0.25f
+                snapValue = 0.25f,
+                context = context
             )
 
             repository.saveNotes(notes)

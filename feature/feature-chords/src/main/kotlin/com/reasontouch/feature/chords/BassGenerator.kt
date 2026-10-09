@@ -41,7 +41,8 @@ object BassGenerator {
         targetTrackId: String,
         beatsPerBar:   Float = 4f,
         appendOffset:  Float = 0f,
-        snapValue:     Float = 0.25f
+        snapValue:     Float = 0.25f,
+        context:       CompositionContext? = null
     ): List<NoteEvent> {
         if (chords.isEmpty()) return emptyList()
 
@@ -63,7 +64,14 @@ object BassGenerator {
             val nextRootMidi = chords.getOrNull(barIdx + 1)?.rootMidi
                 ?.let { bassRegister(it) }
 
-            val barNotes = when (style) {
+            val isLastInPhrase = context?.bars?.getOrNull(barIdx)?.isLastInPhrase == true
+            val effectiveStyle = if (isLastInPhrase && style in listOf(BassStyle.WALKING, BassStyle.GROOVE, BassStyle.ARPEGGIO)) {
+                BassStyle.ROOT
+            } else {
+                style
+            }
+
+            val barNotes = when (effectiveStyle) {
                 BassStyle.ROOT       -> generateRoot(rootMidi, barStart, beatsPerBar, targetTrackId)
                 BassStyle.ROOT_FIFTH -> generateRootFifth(rootMidi, barStart, beatsPerBar, targetTrackId)
                 BassStyle.OCTAVE     -> generateOctave(rootMidi, barStart, beatsPerBar, targetTrackId)
