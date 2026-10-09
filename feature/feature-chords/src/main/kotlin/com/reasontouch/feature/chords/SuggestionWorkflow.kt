@@ -76,7 +76,7 @@ object SuggestionWorkflow {
     }
 
     private fun PairingType.toCompositionIntent(): CompositionIntent = when (this) {
-        PairingType.CONTINUE  -> CompositionIntent.CONTINUE
+        PairingType.CONTINUE, PairingType.REPEAT -> CompositionIntent.CONTINUE
         PairingType.LIFT      -> CompositionIntent.LIFT
         PairingType.CONTRAST  -> CompositionIntent.CONTRAST
         PairingType.RESOLVE   -> CompositionIntent.RESOLVE
@@ -134,16 +134,38 @@ fun suggestNextOptionsWithPhrases(progression: List<ChordEvent>): List<Suggestio
     val analysis = ProgressionAnalyzer.analyze(progression, detectedKey)
     val decisionSet = PairingEngine.suggestNextMulti(analysis)
 
+    val lastPhraseLength = progression.lastOrNull()?.phraseLength ?: 4
+
     return decisionSet.options.map { option ->
-        val request = ProgressionGenerationRequest(
-            sourceAnalysis = analysis,
-            sourceProgression = progression,
-            primaryIntent = option.type.toCompositionIntent(),
-            targetSection = null,
-            targetEnergy = null,
-            preferredLength = option.suggestedBars
-        )
-        SuggestionOption(option = option, phrases = ProgressionGenerator.generate(request))
+        val effectiveBars = if (option.type == PairingType.REPEAT) lastPhraseLength else option.suggestedBars
+        val phrases = if (option.type == PairingType.REPEAT) {
+            val suggestedBars = minOf(effectiveBars, progression.size)
+            if (progression.size >= 2 && suggestedBars > 0) {
+                val sourceBars = progression.takeLast(suggestedBars)
+                val theoryChords = sourceBars.mapNotNull { MusicTheory.parseChordName(it.chordName) }
+                val labels = sourceBars.map { it.chordName }
+                if (theoryChords.isNotEmpty()) {
+                    listOf(
+                        GeneratedProgression(
+                            chords = theoryChords,
+                            confidence = 0.90f,
+                            explanation = "Repeat sequence: ${labels.joinToString(" – ")}"
+                        )
+                    )
+                } else emptyList()
+            } else emptyList()
+        } else {
+            val request = ProgressionGenerationRequest(
+                sourceAnalysis = analysis,
+                sourceProgression = progression,
+                primaryIntent = option.type.toCompositionIntent(),
+                targetSection = null,
+                targetEnergy = null,
+                preferredLength = effectiveBars
+            )
+            ProgressionGenerator.generate(request)
+        }
+        SuggestionOption(option = option.copy(suggestedBars = effectiveBars), phrases = phrases)
     }
 }
 }

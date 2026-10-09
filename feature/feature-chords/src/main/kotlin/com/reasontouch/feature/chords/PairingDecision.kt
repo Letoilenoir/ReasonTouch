@@ -11,7 +11,8 @@ enum class PairingType {
     EXPAND,      // Extend range (medium stability → harmonic exploration)
     MODULATE,    // Change key (deceptive cadence → surprise)
     SURPRISE,    // Break expectation (deceptive cadence → unexpected turn)
-    SIMPLIFY     // Reduce complexity (high energy → pull back)
+    SIMPLIFY,    // Reduce complexity (high energy → pull back)
+    REPEAT       // Reuse an existing sequence (form / structure)
 }
 
 /**

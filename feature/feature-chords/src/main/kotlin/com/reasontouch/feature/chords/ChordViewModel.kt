@@ -759,58 +759,116 @@ class ChordViewModel @Inject constructor(
 
             val newNotes = mutableListOf<NoteEvent>()
 
-            var inheritedPattern = customStrumPattern
-                ?: currentProgression.last().strumPatternId.toStepPattern()
-            var inheritedSpeed = customStrumSpeed
-                ?: currentProgression.last().strumSpeedValue
-                ?: ui.value.strumSpeed
-
-            // Intent-driven strum variation (applied only if no custom override specified):
-            if (customStrumSpeed == null && pairingType == PairingType.LIFT) {
-                inheritedSpeed = (inheritedSpeed * 0.85).coerceAtLeast(0.005)
-            } else if (customStrumSpeed == null && pairingType == PairingType.RESOLVE) {
-                inheritedSpeed = (inheritedSpeed * 1.2).coerceAtMost(0.05)
-            }
-
             val phraseId = UUID.randomUUID().toString()
             val phraseLength = generatedProgression.chords.size
 
-            generatedProgression.chords.forEachIndexed { index, theoryChord ->
-                val barIndex = startBarIndex + index
-                val chordEvent = ChordEvent(
-                    id = UUID.randomUUID().toString(),
-                    sessionId = sessionId,
-                    barIndex = barIndex,
-                    chordName = theoryChord.guitarLabel(),
-                    rootMidi = theoryChord.midiNotes.firstOrNull() ?: 60,
-                    midiNotes = theoryChord.midiNotes.joinToString(","),
-                    voicing = "Open",
-                    strumPatternId = inheritedPattern.toChordEventString(),
-                    strumSpeedValue = inheritedSpeed,
-                    phraseId = phraseId,
-                    phraseLength = phraseLength
-                )
-                repository.saveChord(chordEvent)
+            if (pairingType == PairingType.REPEAT) {
+                val sourceBars = currentProgression.takeLast(generatedProgression.chords.size)
+                if (sourceBars.isNotEmpty()) {
+                    val phraseId = UUID.randomUUID().toString()
+                    val phraseLength = generatedProgression.chords.size
 
-                if (chordTrack != null) {
-                    val beatStart = barIndex * beatsPerBar
-                    newNotes.addAll(
-                        generateStrumNotes(
-                            midiNotes = theoryChord.midiNotes,
-                            pattern = inheritedPattern,
-                            useStrum = true,
-                            strumSpeedSeconds = inheritedSpeed,
-                            bpm = currentSession?.bpm ?: 120,
-                            beatStart = beatStart,
-                            beatsPerBar = beatsPerBar,
-                            trackId = chordTrack.id
+                    sourceBars.forEachIndexed { index, sourceChord ->
+                        val barIndex = startBarIndex + index
+                        val effectivePattern = customStrumPattern ?: sourceChord.strumPatternId.toStepPattern()
+                        val effectiveSpeed = customStrumSpeed ?: sourceChord.strumSpeedValue ?: ui.value.strumSpeed
+
+                        val chordEvent = sourceChord.copy(
+                            id = UUID.randomUUID().toString(),
+                            barIndex = barIndex,
+                            strumPatternId = effectivePattern.toChordEventString(),
+                            strumSpeedValue = effectiveSpeed,
+                            phraseId = phraseId,
+                            phraseLength = phraseLength
                         )
-                    )
+                        repository.saveChord(chordEvent)
+
+                        if (chordTrack != null) {
+                            val beatStart = barIndex * beatsPerBar
+                            val notesList = sourceChord.midiNotes.split(",").mapNotNull { it.trim().toIntOrNull() }
+                            newNotes.addAll(
+                                generateStrumNotes(
+                                    midiNotes = notesList,
+                                    pattern = effectivePattern,
+                                    useStrum = true,
+                                    strumSpeedSeconds = effectiveSpeed,
+                                    bpm = currentSession?.bpm ?: 120,
+                                    beatStart = beatStart,
+                                    beatsPerBar = beatsPerBar,
+                                    trackId = chordTrack.id
+                                )
+                            )
+                        }
+                    }
+
+                    if (customStrumPattern == null && customStrumSpeed == null) {
+                        val sourceStartBeat = sourceBars.first().barIndex * beatsPerBar
+                        val destStartBeat = startBarIndex * beatsPerBar
+                        val beatOffset = destStartBeat - sourceStartBeat
+                        val allTracks = repository.getTracksForSession(sessionId).first()
+                        allTracks.filter { it.id != chordTrack?.id }.forEach { track ->
+                            val trackNotes = repository.getNotesForTrackOnce(track.id)
+                            val sourceNotes = trackNotes.filter { n ->
+                                n.beat >= sourceStartBeat && n.beat < sourceStartBeat + (sourceBars.size * beatsPerBar)
+                            }
+                            sourceNotes.forEach { note ->
+                                newNotes.add(
+                                    note.copy(
+                                        id = UUID.randomUUID().toString(),
+                                        beat = note.beat + beatOffset
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                var inheritedPattern = customStrumPattern
+                    ?: currentProgression.last().strumPatternId.toStepPattern()
+                var inheritedSpeed = customStrumSpeed
+                    ?: currentProgression.last().strumSpeedValue
+                    ?: ui.value.strumSpeed
+
+                // Intent-driven strum variation (applied only if no custom override specified):
+                if (customStrumSpeed == null && pairingType == PairingType.LIFT) {
+                    inheritedSpeed = (inheritedSpeed * 0.85).coerceAtLeast(0.005)
+                } else if (customStrumSpeed == null && pairingType == PairingType.RESOLVE) {
+                    inheritedSpeed = (inheritedSpeed * 1.2).coerceAtMost(0.05)
                 }
 
-                // This new bar's pattern/speed becomes the inheritance source for the next one.
-                // (Currently identical to what it just inherited -- no variation source yet --
-                // but keeps the mechanism correct if variation is introduced later.)
+                generatedProgression.chords.forEachIndexed { index, theoryChord ->
+                    val barIndex = startBarIndex + index
+                    val chordEvent = ChordEvent(
+                        id = UUID.randomUUID().toString(),
+                        sessionId = sessionId,
+                        barIndex = barIndex,
+                        chordName = theoryChord.guitarLabel(),
+                        rootMidi = theoryChord.midiNotes.firstOrNull() ?: 60,
+                        midiNotes = theoryChord.midiNotes.joinToString(","),
+                        voicing = "Open",
+                        strumPatternId = inheritedPattern.toChordEventString(),
+                        strumSpeedValue = inheritedSpeed,
+                        phraseId = phraseId,
+                        phraseLength = phraseLength
+                    )
+                    repository.saveChord(chordEvent)
+
+                    if (chordTrack != null) {
+                        val beatStart = barIndex * beatsPerBar
+                        newNotes.addAll(
+                            generateStrumNotes(
+                                midiNotes = theoryChord.midiNotes,
+                                pattern = inheritedPattern,
+                                useStrum = true,
+                                strumSpeedSeconds = inheritedSpeed,
+                                bpm = currentSession?.bpm ?: 120,
+                                beatStart = beatStart,
+                                beatsPerBar = beatsPerBar,
+                                trackId = chordTrack.id
+                            )
+                        )
+                    }
+                }
             }
 
             if (newNotes.isNotEmpty()) {

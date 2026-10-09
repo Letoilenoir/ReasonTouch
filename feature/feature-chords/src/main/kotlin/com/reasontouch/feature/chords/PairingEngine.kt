@@ -33,7 +33,8 @@ object PairingEngine {
         PairingType.CONTRAST,
         PairingType.CONTINUE,
         PairingType.LIFT,
-        PairingType.SURPRISE
+        PairingType.SURPRISE,
+        PairingType.REPEAT
     )
 
     /**
@@ -95,6 +96,8 @@ object PairingEngine {
                     else -> 0.40f
                 }
 
+            PairingType.REPEAT -> 0.80f
+
             PairingType.EXPAND, PairingType.SIMPLIFY, PairingType.MODULATE -> 0.0f
         }
     }
@@ -148,6 +151,9 @@ object PairingEngine {
                     s >= 0.4f -> "Medium stability → lift is plausible"
                     else -> "Low stability → lift is less typical here"
                 }
+
+            PairingType.REPEAT ->
+                "Reuse an existing sequence to establish structure and familiarity"
 
             PairingType.EXPAND, PairingType.SIMPLIFY, PairingType.MODULATE ->
                 "No live strategy implementation yet"
