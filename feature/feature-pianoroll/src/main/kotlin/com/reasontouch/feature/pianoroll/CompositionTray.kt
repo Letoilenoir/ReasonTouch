@@ -52,7 +52,7 @@ private val OVERLAY_EDGE = Color(0xFF3A3A45)
 private val ACCENT_RED   = Color(0xFFE84040)
 private val TEXT_DIM     = Color(0xFF88889A)
 
-enum class TraySection { HOME, SUGGEST_NEXT, BASS, DRUMS, LEAD, FULL_GROOVE }
+enum class TraySection { HOME, SUGGEST_NEXT, BASS, DRUMS, LEAD, PAD, FULL_GROOVE }
 
 data class GroovePreview(
     val bassStyle: BassStyle,
@@ -105,6 +105,9 @@ fun CompositionTray(
     hasLead: Boolean = false,
     onLead: () -> Unit = {},
     onApplyLead: (String, Boolean) -> Unit = { _, _ -> },
+    hasPad: Boolean = false,
+    onPad: () -> Unit = {},
+    onApplyPad: (Boolean) -> Unit = { _ -> },
     modifier: Modifier = Modifier
 ) {
     val skin = ReasonTouchTheme.skin
@@ -177,10 +180,12 @@ fun CompositionTray(
                             hasBass = hasBass,
                             hasDrums = hasDrums,
                             hasLead = hasLead,
+                            hasPad = hasPad,
                             onSuggestNext = { onSectionChange(TraySection.SUGGEST_NEXT) },
                             onBass = { onSectionChange(TraySection.BASS); onBassRequested() },
                             onDrums = { onSectionChange(TraySection.DRUMS); onDrumsRequested() },
                             onLead = { onSectionChange(TraySection.LEAD) },
+                            onPad = { onSectionChange(TraySection.PAD) },
                             onFullGroove = { onSectionChange(TraySection.FULL_GROOVE); onFullGrooveRequested() }
                         )
                     }
@@ -235,6 +240,10 @@ fun CompositionTray(
                     )
                     TraySection.LEAD -> LeadPanel(
                         onApply = onApplyLead,
+                        onBack = { onSectionChange(TraySection.HOME) }
+                    )
+                    TraySection.PAD -> PadPanel(
+                        onApply = onApplyPad,
                         onBack = { onSectionChange(TraySection.HOME) }
                     )
                 }
@@ -415,10 +424,12 @@ private fun TrayHome(
     hasBass: Boolean,
     hasDrums: Boolean,
     hasLead: Boolean,
+    hasPad: Boolean,
     onSuggestNext: () -> Unit,
     onBass: () -> Unit,
     onDrums: () -> Unit,
     onLead: () -> Unit,
+    onPad: () -> Unit,
     onFullGroove: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
@@ -437,14 +448,21 @@ private fun TrayHome(
 
         androidx.compose.foundation.layout.Spacer(Modifier.padding(top = skin.paddingLarge))
 
-        TraySectionLabel("ARRANGEMENT", complete = hasBass && hasDrums && hasLead)
+        TraySectionLabel("ARRANGEMENT", complete = hasBass && hasDrums && hasLead && hasPad)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(skin.paddingMedium)
         ) {
             TrayActionRow(label = if (hasBass) "BASS \u2713" else "BASS", onClick = onBass, modifier = Modifier.weight(1f))
             TrayActionRow(label = if (hasDrums) "DRUMS \u2713" else "DRUMS", onClick = onDrums, modifier = Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(skin.paddingMedium))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(skin.paddingMedium)
+        ) {
             TrayActionRow(label = if (hasLead) "LEAD \u2713" else "LEAD", onClick = onLead, modifier = Modifier.weight(1f))
+            TrayActionRow(label = if (hasPad) "PAD \u2713" else "PAD", onClick = onPad, modifier = Modifier.weight(1f))
         }
 
         androidx.compose.foundation.layout.Spacer(Modifier.padding(top = skin.paddingMedium))
@@ -758,6 +776,43 @@ private fun LeadPanel(
             }
         }
 
+        AppendModeRow(appendMode = appendMode, onToggle = { appendMode = it })
+        Spacer(Modifier.height(skin.paddingMedium))
+        TrayActionRow(label = "BACK", onClick = onBack)
+    }
+}
+
+@Composable
+private fun PadPanel(
+    onApply: (Boolean) -> Unit,
+    onBack: () -> Unit
+) {
+    val skin = ReasonTouchTheme.skin
+    var appendMode by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text(text = "HARMONY / PAD", color = skin.accent, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(skin.paddingMedium))
+
+        Text(
+            text = "Generates sustaining atmospheric chord voicings (C3–C5) on the PAD track, keeping the CHORD track inviolate.",
+            color = skin.textSecondary,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(bottom = skin.paddingLarge)
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(skin.accent, RoundedCornerShape(skin.cornerRadiusSmall))
+                .clickable { onApply(appendMode) }
+                .padding(horizontal = skin.paddingLarge, vertical = skin.paddingMedium),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = "GENERATE PAD", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(Modifier.height(skin.paddingMedium))
         AppendModeRow(appendMode = appendMode, onToggle = { appendMode = it })
         Spacer(Modifier.height(skin.paddingMedium))
         TrayActionRow(label = "BACK", onClick = onBack)

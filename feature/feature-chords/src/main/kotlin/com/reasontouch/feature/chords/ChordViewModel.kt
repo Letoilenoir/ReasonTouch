@@ -573,6 +573,44 @@ class ChordViewModel @Inject constructor(
         }
     }
 
+    fun generatePad(appendMode: Boolean, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            val bars = repository.getChordsForSessionOnce(sessionId)
+            if (bars.isEmpty()) {
+                update { copy(statusMessage = "Add bars to the progression first") }
+                onComplete()
+                return@launch
+            }
+
+            val trackList = repository.getTracksForSession(sessionId).first()
+            val padTrack = trackList.firstOrNull { it.name.uppercase() == "PAD" }
+                ?: trackList.firstOrNull()
+                ?: run { onComplete(); return@launch }
+
+            val appendOffset = if (appendMode) {
+                val lastBeat = getLastBeatOnTrack(padTrack.id)
+                val beatsPerBar = ui.value.barDuration.toFloat()
+                if (lastBeat <= 0f) 0f else {
+                    val barsUsed = kotlin.math.ceil(lastBeat / beatsPerBar).toInt()
+                    barsUsed * beatsPerBar
+                }
+            } else {
+                repository.deleteNotesForTrack(padTrack.id)
+                0f
+            }
+
+            val notes = PadGenerator.generate(
+                chords = bars,
+                targetTrackId = padTrack.id,
+                beatsPerBar = ui.value.barDuration.toFloat(),
+                appendOffset = appendOffset
+            )
+
+            repository.saveNotes(notes)
+            onComplete()
+        }
+    }
+
     suspend fun getLastBeatOnTrack(trackId: String): Float {
         val notes = repository.getNotesForTrackOnce(trackId)
         return notes.maxOfOrNull { it.beat + it.duration } ?: 0f
