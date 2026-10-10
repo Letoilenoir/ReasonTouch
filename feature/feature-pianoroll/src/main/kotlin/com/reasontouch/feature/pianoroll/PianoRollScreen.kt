@@ -349,6 +349,15 @@ fun PianoRollScreen(
                 },
                 hasPad               = tracks.firstOrNull { it.name.uppercase() == "PAD" }
                     ?.let { track -> allNotes[track.id]?.isNotEmpty() } ?: false,
+                onFills              = { traySection = TraySection.FILLS },
+                onApplyFill          = { fillType, barIndex, append ->
+                    drumViewModel.writeFillToPianoRoll(fillType, barIndex, append) {
+                        viewModel.refreshNotes()
+                    }
+                    trayExpanded = false
+                },
+                hasFills             = tracks.firstOrNull { it.name.uppercase() == "DRUMS" }
+                    ?.let { track -> allNotes[track.id]?.any { note -> note.duration == 0.25f && note.velocity >= 95 } } ?: false,
                 onApplyBass          = { style, append ->
                     chordViewModel.generateBass(style, append) {
                         viewModel.refreshNotes()

@@ -91,7 +91,7 @@ fun DrumScreen(
         // ── Step grid ─────────────────────────────────────────────────────
         Column(
             modifier = Modifier
-                .weight(1f).fillMaxWidth()
+                .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -104,6 +104,62 @@ fun DrumScreen(
                     onToggle    = { stepIdx -> viewModel.toggleStep(laneIdx, stepIdx) },
                     onPadTap    = { viewModel.auditionLane(laneIdx) }
                 )
+            }
+        }
+
+        // ── Drum Fills Grid (utilizing lower estate) ──────────────────────
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text(
+                "DRUM FILLS (Tap to insert)", color = TEXT_DIM, fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace, letterSpacing = 2.sp,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+            androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val keys = DrumFillPatterns.FILLS.keys.toList()
+                items(count = keys.size) { index ->
+                    val key = keys[index]
+                    val fill = DrumFillPatterns.FILLS[key]!!
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(PANEL)
+                            .border(1.dp, BORDER, RoundedCornerShape(4.dp))
+                            .clickable {
+                                viewModel.writeFillToPianoRoll(key, targetBarIndex = 0, appendMode = true) { msg ->
+                                    statusMsg = msg
+                                }
+                            }
+                            .padding(horizontal = 8.dp, vertical = 8.dp)
+                    ) {
+                        Column {
+                            Text(
+                                text = fill.name,
+                                color = TEXT,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = fill.description,
+                                color = TEXT_DIM,
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
             }
         }
 

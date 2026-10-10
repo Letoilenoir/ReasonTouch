@@ -52,7 +52,7 @@ private val OVERLAY_EDGE = Color(0xFF3A3A45)
 private val ACCENT_RED   = Color(0xFFE84040)
 private val TEXT_DIM     = Color(0xFF88889A)
 
-enum class TraySection { HOME, SUGGEST_NEXT, BASS, DRUMS, LEAD, PAD, FULL_GROOVE }
+enum class TraySection { HOME, SUGGEST_NEXT, BASS, DRUMS, LEAD, PAD, FILLS, FULL_GROOVE }
 
 data class GroovePreview(
     val bassStyle: BassStyle,
@@ -108,6 +108,9 @@ fun CompositionTray(
     hasPad: Boolean = false,
     onPad: () -> Unit = {},
     onApplyPad: (Boolean) -> Unit = { _ -> },
+    hasFills: Boolean = false,
+    onFills: () -> Unit = {},
+    onApplyFill: (String, Int, Boolean) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val skin = ReasonTouchTheme.skin
@@ -181,11 +184,13 @@ fun CompositionTray(
                             hasDrums = hasDrums,
                             hasLead = hasLead,
                             hasPad = hasPad,
+                            hasFills = hasFills,
                             onSuggestNext = { onSectionChange(TraySection.SUGGEST_NEXT) },
                             onBass = { onSectionChange(TraySection.BASS); onBassRequested() },
                             onDrums = { onSectionChange(TraySection.DRUMS); onDrumsRequested() },
                             onLead = { onSectionChange(TraySection.LEAD) },
                             onPad = { onSectionChange(TraySection.PAD) },
+                            onFills = { onSectionChange(TraySection.FILLS) },
                             onFullGroove = { onSectionChange(TraySection.FULL_GROOVE); onFullGrooveRequested() }
                         )
                     }
@@ -244,6 +249,10 @@ fun CompositionTray(
                     )
                     TraySection.PAD -> PadPanel(
                         onApply = onApplyPad,
+                        onBack = { onSectionChange(TraySection.HOME) }
+                    )
+                    TraySection.FILLS -> FillsPanel(
+                        onApply = onApplyFill,
                         onBack = { onSectionChange(TraySection.HOME) }
                     )
                 }
@@ -425,11 +434,13 @@ private fun TrayHome(
     hasDrums: Boolean,
     hasLead: Boolean,
     hasPad: Boolean,
+    hasFills: Boolean,
     onSuggestNext: () -> Unit,
     onBass: () -> Unit,
     onDrums: () -> Unit,
     onLead: () -> Unit,
     onPad: () -> Unit,
+    onFills: () -> Unit,
     onFullGroove: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
@@ -464,6 +475,8 @@ private fun TrayHome(
             TrayActionRow(label = if (hasLead) "LEAD \u2713" else "LEAD", onClick = onLead, modifier = Modifier.weight(1f))
             TrayActionRow(label = if (hasPad) "PAD \u2713" else "PAD", onClick = onPad, modifier = Modifier.weight(1f))
         }
+        Spacer(Modifier.height(skin.paddingMedium))
+        TrayActionRow(label = if (hasFills) "DRUM FILLS \u2713" else "DRUM FILLS", onClick = onFills)
 
         androidx.compose.foundation.layout.Spacer(Modifier.padding(top = skin.paddingMedium))
 
@@ -810,6 +823,99 @@ private fun PadPanel(
             contentAlignment = Alignment.Center
         ) {
             Text(text = "GENERATE PAD", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(Modifier.height(skin.paddingMedium))
+        AppendModeRow(appendMode = appendMode, onToggle = { appendMode = it })
+        Spacer(Modifier.height(skin.paddingMedium))
+        TrayActionRow(label = "BACK", onClick = onBack)
+    }
+}
+
+@Composable
+private fun FillsPanel(
+    onApply: (String, Int, Boolean) -> Unit,
+    onBack: () -> Unit
+) {
+    val skin = ReasonTouchTheme.skin
+    var selectedFill by remember { mutableStateOf(com.reasontouch.feature.drums.DrumFillPatterns.FILLS.keys.first()) }
+    var targetBarIndex by remember { mutableStateOf(3) } // 0-indexed (Bar 4)
+    var appendMode by remember { mutableStateOf(true) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+    ) {
+        Text(text = "DRUM FILLS", color = skin.accent, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(skin.paddingMedium))
+
+        Text(text = "SELECT FILL STYLE", color = skin.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(4.dp))
+        LazyColumn(modifier = Modifier.height(140.dp)) {
+            items(com.reasontouch.feature.drums.DrumFillPatterns.FILLS.entries.toList()) { (key, fill) ->
+                CompactSuggestableRow(
+                    label = fill.name,
+                    isSuggested = false,
+                    isSelected = selectedFill == key,
+                    onClick = { selectedFill = key }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(skin.paddingMedium))
+        Text(text = "TARGET BAR", color = skin.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(4.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(skin.panelAlt, RoundedCornerShape(skin.cornerRadiusSmall))
+                .padding(horizontal = skin.paddingMedium, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(36.dp)
+                    .height(36.dp)
+                    .background(skin.border, RoundedCornerShape(4.dp))
+                    .clickable { targetBarIndex = (targetBarIndex - 1).coerceAtLeast(0) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "-", color = skin.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Text(
+                text = "Bar ${targetBarIndex + 1}",
+                color = skin.textPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Box(
+                modifier = Modifier
+                    .width(36.dp)
+                    .height(36.dp)
+                    .background(skin.border, RoundedCornerShape(4.dp))
+                    .clickable { targetBarIndex++ },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "+", color = skin.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(Modifier.height(skin.paddingMedium))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(skin.accent, RoundedCornerShape(skin.cornerRadiusSmall))
+                .clickable {
+                    onApply(selectedFill, targetBarIndex, appendMode)
+                }
+                .padding(horizontal = skin.paddingLarge, vertical = skin.paddingMedium),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = "GENERATE FILL", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         }
 
         Spacer(Modifier.height(skin.paddingMedium))

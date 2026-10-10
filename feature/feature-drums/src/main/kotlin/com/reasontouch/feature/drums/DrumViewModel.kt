@@ -149,12 +149,25 @@ class DrumViewModel @Inject constructor(
      * appendMode = true  → adds after existing content
      * appendMode = false → clears track then writes from beat 0
      */
-    fun writeToPianoRoll(appendMode: Boolean, onComplete: (String) -> Unit) {
+    fun writeToPianoRoll(
+        appendMode: Boolean,
+        duration: WritingDuration = WritingDuration.SESSION_LENGTH,
+        onComplete: (String) -> Unit
+    ) {
         stop()  // always stop playback before writing
 
         viewModelScope.launch {
             val drumTrack  = getOrCreateDrumsTrack()
-            val totalBars  = repository.getSession(sessionId).first()?.totalBars ?: 4
+            val session = repository.getSession(sessionId).first()
+            val totalBars  = session?.totalBars ?: 4
+            val barsToWrite = when (duration) {
+                WritingDuration.ONE_BAR -> 1
+                WritingDuration.TWO_BARS -> 2
+                WritingDuration.FOUR_BARS -> 4
+                WritingDuration.PHRASE_LENGTH -> minOf(4, totalBars)
+                WritingDuration.SESSION_LENGTH -> totalBars
+            }.coerceAtMost(totalBars)
+
             val pat        = _pattern.value
             val stepDur    = 1f / 4f                    // 16th note = 0.25 beats
             val patternBeats = pat.steps * stepDur      // 16 steps = 4 beats = 1 bar
@@ -171,14 +184,6 @@ class DrumViewModel @Inject constructor(
             }
 
             val notes = mutableListOf<NoteEvent>()
-
-            // Repeat the pattern for every bar in the session
-            val barsToWrite = if (appendMode) {
-                // In append mode write totalBars worth from the offset
-                totalBars
-            } else {
-                totalBars
-            }
 
             (0 until barsToWrite).forEach { barIdx ->
                 val barOffset = appendOffset + barIdx * patternBeats
@@ -199,7 +204,39 @@ class DrumViewModel @Inject constructor(
             }
 
             repository.saveNotes(notes)
-            onComplete("Written ${barsToWrite} bars to ${drumTrack.name} (${notes.size} notes)")
+            onComplete("Written $barsToWrite bars to ${drumTrack.name} (${notes.size} notes)")
+        }
+    }
+
+    fun writeFillToPianoRoll(
+        fillTypeName: String,
+        targetBarIndex: Int,
+        appendMode: Boolean,
+        onComplete: (String) -> Unit
+    ) {
+        stop()
+
+        viewModelScope.launch {
+            val drumTrack = getOrCreateDrumsTrack()
+            val beatsPerBar = 4f
+            val barStart = targetBarIndex * beatsPerBar
+
+            val notes = DrumFillGenerator.generate(
+                fillTypeName = fillTypeName,
+                trackId = drumTrack.id,
+                barStart = barStart,
+                beatsPerBar = beatsPerBar
+            )
+
+            if (appendMode) {
+                val existingNotes = repository.getNotesForTrackOnce(drumTrack.id)
+                repository.saveNotes(existingNotes + notes)
+            } else {
+                repository.deleteNotesForTrack(drumTrack.id)
+                repository.saveNotes(notes)
+            }
+
+            onComplete("Written $fillTypeName fill to bar $targetBarIndex on ${drumTrack.name} (${notes.size} notes)")
         }
     }
 
