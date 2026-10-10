@@ -331,6 +331,15 @@ fun PianoRollScreen(
                 onTransitionFillChange = drumViewModel::setTransitionFill,
                 endFill              = drumViewModel.endFill.value,
                 onEndFillChange      = drumViewModel::setEndFill,
+                onLead               = { traySection = TraySection.LEAD },
+                onApplyLead          = { presetName, append ->
+                    chordViewModel.generateLead(presetName, append) {
+                        viewModel.refreshNotes()
+                    }
+                    trayExpanded = false
+                },
+                hasLead              = tracks.firstOrNull { it.name.uppercase() == "LEAD" }
+                    ?.let { track -> allNotes[track.id]?.isNotEmpty() } ?: false,
                 onApplyBass          = { style, append ->
                     chordViewModel.generateBass(style, append) {
                         viewModel.refreshNotes()

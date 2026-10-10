@@ -52,7 +52,7 @@ private val OVERLAY_EDGE = Color(0xFF3A3A45)
 private val ACCENT_RED   = Color(0xFFE84040)
 private val TEXT_DIM     = Color(0xFF88889A)
 
-enum class TraySection { HOME, SUGGEST_NEXT, BASS, DRUMS, FULL_GROOVE }
+enum class TraySection { HOME, SUGGEST_NEXT, BASS, DRUMS, LEAD, FULL_GROOVE }
 
 data class GroovePreview(
     val bassStyle: BassStyle,
@@ -102,6 +102,9 @@ fun CompositionTray(
     hasHarmony: Boolean = false,
     hasBass: Boolean = false,
     hasDrums: Boolean = false,
+    hasLead: Boolean = false,
+    onLead: () -> Unit = {},
+    onApplyLead: (String, Boolean) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val skin = ReasonTouchTheme.skin
@@ -173,9 +176,11 @@ fun CompositionTray(
                             hasHarmony = hasHarmony,
                             hasBass = hasBass,
                             hasDrums = hasDrums,
+                            hasLead = hasLead,
                             onSuggestNext = { onSectionChange(TraySection.SUGGEST_NEXT) },
                             onBass = { onSectionChange(TraySection.BASS); onBassRequested() },
                             onDrums = { onSectionChange(TraySection.DRUMS); onDrumsRequested() },
+                            onLead = { onSectionChange(TraySection.LEAD) },
                             onFullGroove = { onSectionChange(TraySection.FULL_GROOVE); onFullGrooveRequested() }
                         )
                     }
@@ -227,6 +232,10 @@ fun CompositionTray(
                         onApply = onApplyGroove,
                         onDiscard = { onDiscardGroove(); onSectionChange(TraySection.HOME) },
                         onBack = { onDiscardGroove(); onSectionChange(TraySection.HOME) }
+                    )
+                    TraySection.LEAD -> LeadPanel(
+                        onApply = onApplyLead,
+                        onBack = { onSectionChange(TraySection.HOME) }
                     )
                 }
             }
@@ -405,9 +414,11 @@ private fun TrayHome(
     hasHarmony: Boolean,
     hasBass: Boolean,
     hasDrums: Boolean,
+    hasLead: Boolean,
     onSuggestNext: () -> Unit,
     onBass: () -> Unit,
     onDrums: () -> Unit,
+    onLead: () -> Unit,
     onFullGroove: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
@@ -426,13 +437,14 @@ private fun TrayHome(
 
         androidx.compose.foundation.layout.Spacer(Modifier.padding(top = skin.paddingLarge))
 
-        TraySectionLabel("ARRANGEMENT", complete = hasBass && hasDrums)
+        TraySectionLabel("ARRANGEMENT", complete = hasBass && hasDrums && hasLead)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(skin.paddingMedium)
         ) {
             TrayActionRow(label = if (hasBass) "BASS \u2713" else "BASS", onClick = onBass, modifier = Modifier.weight(1f))
             TrayActionRow(label = if (hasDrums) "DRUMS \u2713" else "DRUMS", onClick = onDrums, modifier = Modifier.weight(1f))
+            TrayActionRow(label = if (hasLead) "LEAD \u2713" else "LEAD", onClick = onLead, modifier = Modifier.weight(1f))
         }
 
         androidx.compose.foundation.layout.Spacer(Modifier.padding(top = skin.paddingMedium))
@@ -719,5 +731,35 @@ private fun FillToggles(
             checked = endFill,
             onCheckedChange = onEndChange
         )
+    }
+}
+
+@Composable
+private fun LeadPanel(
+    onApply: (String, Boolean) -> Unit,
+    onBack: () -> Unit
+) {
+    val skin = ReasonTouchTheme.skin
+    var appendMode by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text(text = "LEAD / MELODY", color = skin.accent, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(skin.paddingMedium))
+
+        LazyColumn(modifier = Modifier.weight(1f)) {
+            items(com.reasontouch.feature.chords.LeadPresets.all.keys.toList()) { presetName ->
+                val preset = com.reasontouch.feature.chords.LeadPresets.all[presetName]
+                SuggestableRow(
+                    label = presetName,
+                    description = preset?.description,
+                    isSuggested = false,
+                    onClick = { onApply(presetName, appendMode) }
+                )
+            }
+        }
+
+        AppendModeRow(appendMode = appendMode, onToggle = { appendMode = it })
+        Spacer(Modifier.height(skin.paddingMedium))
+        TrayActionRow(label = "BACK", onClick = onBack)
     }
 }

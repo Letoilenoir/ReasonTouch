@@ -529,6 +529,50 @@ class ChordViewModel @Inject constructor(
         }
     }
 
+    fun generateLead(patternName: String, appendMode: Boolean, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            val bars = repository.getChordsForSessionOnce(sessionId)
+            if (bars.isEmpty()) {
+                update { copy(statusMessage = "Add bars to the progression first") }
+                onComplete()
+                return@launch
+            }
+
+            val trackList = repository.getTracksForSession(sessionId).first()
+            val leadTrack = trackList.firstOrNull { it.name.uppercase() == "LEAD" }
+                ?: trackList.firstOrNull()
+                ?: run { onComplete(); return@launch }
+
+            val appendOffset = if (appendMode) {
+                val lastBeat = getLastBeatOnTrack(leadTrack.id)
+                val beatsPerBar = ui.value.barDuration.toFloat()
+                if (lastBeat <= 0f) 0f else {
+                    val barsUsed = kotlin.math.ceil(lastBeat / beatsPerBar).toInt()
+                    barsUsed * beatsPerBar
+                }
+            } else {
+                repository.deleteNotesForTrack(leadTrack.id)
+                0f
+            }
+
+            val pattern = LeadPresets.all[patternName] ?: LeadPresets.ANTHEM
+            val chordNames = bars.map { it.chordName.substringBefore(" ") }
+            val key = KeyDetector.detect(chordNames).firstOrNull()
+
+            val notes = LeadGenerator.generate(
+                chords = bars,
+                key = key,
+                pattern = pattern,
+                targetTrackId = leadTrack.id,
+                beatsPerBar = ui.value.barDuration.toFloat(),
+                appendOffset = appendOffset
+            )
+
+            repository.saveNotes(notes)
+            onComplete()
+        }
+    }
+
     suspend fun getLastBeatOnTrack(trackId: String): Float {
         val notes = repository.getNotesForTrackOnce(trackId)
         return notes.maxOfOrNull { it.beat + it.duration } ?: 0f
