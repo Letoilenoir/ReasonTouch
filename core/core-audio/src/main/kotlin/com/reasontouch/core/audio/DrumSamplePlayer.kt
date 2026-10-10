@@ -62,7 +62,13 @@ class DrumSamplePlayer(private val assetManager: AssetManager) {
      * Fires immediately — no allocation during playback.
      */
     fun play(gmNote: Int, velocity: Int = 100) {
-        val pcm = buffers[gmNote] ?: run {
+        val resolvedNote = when {
+            buffers.containsKey(gmNote) -> gmNote
+            gmNote in listOf(41, 43, 45, 47, 48, 50) -> 38 // Toms fallback to Snare
+            gmNote == 49 -> 51 // Crash fallback to Ride
+            else -> 38
+        }
+        val pcm = buffers[resolvedNote] ?: run {
             android.util.Log.w("DrumPlayer", "No buffer for GM note $gmNote")
             return
         }

@@ -115,10 +115,43 @@ fun DrumScreen(
                 .padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
             Text(
-                "DRUM FILLS (Tap to insert)", color = TEXT_DIM, fontSize = 9.sp,
+                "DRUM FILLS", color = TEXT_DIM, fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace, letterSpacing = 2.sp,
                 modifier = Modifier.padding(bottom = 4.dp)
             )
+            var targetBarIndex by remember { mutableStateOf(3) } // Default Bar 4
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Target: Bar ${targetBarIndex + 1}", color = TEXT, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .width(24.dp).height(20.dp)
+                            .background(PANEL, RoundedCornerShape(3.dp))
+                            .border(1.dp, BORDER, RoundedCornerShape(3.dp))
+                            .clickable { targetBarIndex = (targetBarIndex - 1).coerceAtLeast(0) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("-", color = TEXT, fontSize = 12.sp)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .width(24.dp).height(20.dp)
+                            .background(PANEL, RoundedCornerShape(3.dp))
+                            .border(1.dp, BORDER, RoundedCornerShape(3.dp))
+                            .clickable { targetBarIndex++ },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("+", color = TEXT, fontSize = 12.sp)
+                    }
+                }
+            }
+
             androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
                 columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
                 modifier = Modifier.fillMaxSize(),
@@ -136,7 +169,7 @@ fun DrumScreen(
                             .background(PANEL)
                             .border(1.dp, BORDER, RoundedCornerShape(4.dp))
                             .clickable {
-                                viewModel.writeFillToPianoRoll(key, targetBarIndex = 0, appendMode = true) { msg ->
+                                viewModel.writeFillToPianoRoll(key, targetBarIndex = targetBarIndex, appendMode = true) { msg ->
                                     statusMsg = msg
                                 }
                             }
