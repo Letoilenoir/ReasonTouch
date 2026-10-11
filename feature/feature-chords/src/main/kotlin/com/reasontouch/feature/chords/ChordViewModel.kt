@@ -971,4 +971,52 @@ class ChordViewModel @Inject constructor(
             onComplete()
         }
     }
+
+    fun substituteChord(barIndex: Int, newTheoryChord: TheoryChord, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            val bars = repository.getChordsForSessionOnce(sessionId)
+            val targetBar = bars.getOrNull(barIndex) ?: return@launch
+
+            val beatsPerBar = ui.value.barDuration.toFloat()
+            val barStart = barIndex * beatsPerBar
+            val barEnd = barStart + beatsPerBar
+
+            // 1. Update ChordEvent
+            val updatedChord = targetBar.copy(
+                chordName = newTheoryChord.guitarLabel(),
+                rootMidi = newTheoryChord.midiNotes.firstOrNull() ?: 60,
+                midiNotes = newTheoryChord.midiNotes.joinToString(",")
+            )
+            repository.saveChord(updatedChord)
+
+            // 2. Clear old notes on CHORD track in this bar time window
+            val trackList = repository.getTracksForSession(sessionId).first()
+            val chordTrack = trackList.firstOrNull { it.name.uppercase() == "CHORD" }
+            if (chordTrack != null) {
+                val existingNotes = repository.getNotesForTrackOnce(chordTrack.id)
+                val filteredNotes = existingNotes.filter { it.beat < barStart || it.beat >= barEnd }
+                repository.deleteNotesForTrack(chordTrack.id)
+
+                val pattern = targetBar.strumPatternId.toStepPattern()
+                val speed = targetBar.strumSpeedValue ?: ui.value.strumSpeed
+                val bpm = repository.getSession(sessionId).first()?.bpm ?: 120
+
+                val newNotes = generateStrumNotes(
+                    midiNotes = newTheoryChord.midiNotes,
+                    pattern = pattern,
+                    useStrum = true,
+                    strumSpeedSeconds = speed,
+                    bpm = bpm,
+                    beatStart = barStart,
+                    beatsPerBar = beatsPerBar,
+                    trackId = chordTrack.id
+                )
+
+                repository.saveNotes(filteredNotes + newNotes)
+            }
+
+            update { copy(statusMessage = "Substituted bar ${barIndex + 1} with ${newTheoryChord.label}") }
+            onComplete()
+        }
+    }
 }

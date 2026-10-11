@@ -139,21 +139,19 @@ fun suggestNextOptionsWithPhrases(progression: List<ChordEvent>): List<Suggestio
     return decisionSet.options.map { option ->
         val effectiveBars = if (option.type == PairingType.REPEAT) lastPhraseLength else option.suggestedBars
         val phrases = if (option.type == PairingType.REPEAT) {
-            val suggestedBars = minOf(effectiveBars, progression.size)
-            if (progression.size >= 2 && suggestedBars > 0) {
-                val sourceBars = progression.takeLast(suggestedBars)
-                val theoryChords = sourceBars.mapNotNull { MusicTheory.parseChordName(it.chordName) }
-                val labels = sourceBars.map { it.chordName }
+            val phraseLen = progression.lastOrNull()?.phraseLength ?: 4
+            val chunks = progression.chunked(phraseLen)
+            chunks.mapIndexedNotNull { chunkIdx, chunk ->
+                val theoryChords = chunk.mapNotNull { MusicTheory.parseChordName(it.chordName) }
+                val labels = chunk.map { it.chordName }
                 if (theoryChords.isNotEmpty()) {
-                    listOf(
-                        GeneratedProgression(
-                            chords = theoryChords,
-                            confidence = 0.90f,
-                            explanation = "Repeat sequence: ${labels.joinToString(" – ")}"
-                        )
+                    GeneratedProgression(
+                        chords = theoryChords,
+                        confidence = 0.90f - (chunkIdx * 0.05f),
+                        explanation = "Repeat Phrase ${chunkIdx + 1} (${labels.joinToString(" – ")})"
                     )
-                } else emptyList()
-            } else emptyList()
+                } else null
+            }
         } else {
             val request = ProgressionGenerationRequest(
                 sourceAnalysis = analysis,
