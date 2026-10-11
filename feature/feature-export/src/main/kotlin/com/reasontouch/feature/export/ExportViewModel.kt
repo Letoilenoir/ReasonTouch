@@ -76,9 +76,10 @@ class ExportViewModel(
 
         val pianoTracks = tracksVal.mapIndexed { i, track ->
             val notes = repository.getNotesForTrackOnce(track.id)
+            val isDrum = track.midiChannel == 9 || track.name.uppercase() in listOf("DRUM", "DRUMS")
             MultiTrackMidiWriter.PianoRollTrack(
                 name      = track.name,
-                channel   = (i + 1).coerceIn(0, 15),
+                channel   = if (isDrum) 9 else (i + 1).coerceIn(0, 15),
                 gmProgram = 0,
                 notes     = notes.map { note ->
                     MultiTrackMidiWriter.PianoRollNote(
