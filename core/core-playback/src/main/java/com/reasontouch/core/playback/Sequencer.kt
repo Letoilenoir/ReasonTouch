@@ -22,6 +22,7 @@ class Sequencer @Inject constructor(
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var job: Job? = null
+    private var passJob: Job? = null
 
     private val CHORD_AUDITION_DUR_SEC = 0.5f
 
@@ -39,6 +40,10 @@ class Sequencer @Inject constructor(
         val endBeat = if (loopMode) loopE else computeEndBeat(allNotes)
 
         transport.update { it.copy(isPlaying = true) }
+
+        passJob?.cancel()
+        passJob = SupervisorJob()
+        var passScope = CoroutineScope(Dispatchers.IO + passJob!!)
 
         fun isDrumTrack(track: MidiTrack) =
             track.midiChannel == 9 || track.name.uppercase() in listOf("DRUM", "DRUMS")
@@ -81,7 +86,7 @@ class Sequencer @Inject constructor(
                         val dur = ringDur(note, clusters)
                         val trackId = track.id
 
-                        scope.launch(Dispatchers.IO) {
+                        passScope.launch {
                             val wait = originMs + delayMs - System.currentTimeMillis()
                             if (wait > 0) delay(wait)
                             if (!transport.value.isPlaying) return@launch
@@ -114,6 +119,9 @@ class Sequencer @Inject constructor(
                         origin = System.currentTimeMillis()
                         passStart = loopS
                         transport.update { it.copy(playheadBeat = loopS) }
+                        passJob?.cancel()
+                        passJob = SupervisorJob()
+                        passScope = CoroutineScope(Dispatchers.IO + passJob!!)
                         schedulePass(loopS, origin)
                     }
 
@@ -133,6 +141,8 @@ class Sequencer @Inject constructor(
     fun stop(transport: MutableStateFlow<TransportState>) {
         job?.cancel()
         job = null
+        passJob?.cancel()
+        passJob = null
         transport.update { it.copy(isPlaying = false) }
     }
 
