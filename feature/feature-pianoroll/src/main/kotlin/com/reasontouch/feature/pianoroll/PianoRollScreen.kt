@@ -279,10 +279,10 @@ fun PianoRollScreen(
             )
         }
 
-        val isChordTrack = tracks.getOrNull(activeIndex)?.name?.uppercase() == "CHORD"
-        if (isChordTrack && chords.isNotEmpty()) {
+        val activeTrackName = tracks.getOrNull(activeIndex)?.name?.uppercase() ?: ""
+        if (activeTrackName.isNotEmpty()) {
             val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-            val currentBar = (playheadBeat / chordUiState.barDuration.toFloat()).toInt().coerceIn(0, chords.size - 1)
+            val currentBar = (playheadBeat / 4f).toInt().coerceIn(0, totalBars - 1)
             androidx.compose.runtime.LaunchedEffect(currentBar) {
                 listState.animateScrollToItem(currentBar)
             }
@@ -295,24 +295,33 @@ fun PianoRollScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("SUBSTITUTE CHORD:", color = Color(0xFF38BDF8), fontSize = 9.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+                Text("$activeTrackName INSPECT:", color = Color(0xFF38BDF8), fontSize = 9.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
                 androidx.compose.foundation.lazy.LazyRow(
                     state = listState,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(chords.size) { barIdx ->
-                        val chordEvent = chords.firstOrNull { it.barIndex == barIdx }
+                    items(totalBars) { barIdx ->
                         val isCurrent = barIdx == currentBar
+                        val label = when (activeTrackName) {
+                            "CHORD", "PAD" -> chords.firstOrNull { it.barIndex == barIdx }?.chordName ?: "—"
+                            "BASS" -> "Style"
+                            "DRUMS" -> "Groove"
+                            "LEAD" -> "Melody"
+                            else -> "Bar"
+                        }
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(if (isCurrent) Color(0xFFE84040).copy(alpha = 0.3f) else Color(0xFF2A2A32))
                                 .border(1.dp, if (isCurrent) Color(0xFFE84040) else Color(0xFF3A3A45), RoundedCornerShape(4.dp))
-                                .clickable { chordBarToInspect = barIdx }
+                                .clickable {
+                                    if (activeTrackName == "CHORD") chordBarToInspect = barIdx
+                                    else trayExpanded = true
+                                }
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = "Bar ${barIdx + 1}: ${chordEvent?.chordName ?: "—"}",
+                                text = "Bar ${barIdx + 1}: $label",
                                 color = if (isCurrent) Color.White else Color(0xFFC8C8D4),
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace,
