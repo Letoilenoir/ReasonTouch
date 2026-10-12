@@ -1019,4 +1019,93 @@ class ChordViewModel @Inject constructor(
             onComplete()
         }
     }
+
+    fun substituteBass(barIndex: Int, style: BassStyle, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            val bars = repository.getChordsForSessionOnce(sessionId)
+            val trackList = repository.getTracksForSession(sessionId).first()
+            val bassTrack = trackList.firstOrNull { it.name.uppercase() == "BASS" } ?: return@launch
+
+            val beatsPerBar = ui.value.barDuration.toFloat()
+            val barStart = barIndex * beatsPerBar
+            val barEnd = barStart + beatsPerBar
+
+            val existingNotes = repository.getNotesForTrackOnce(bassTrack.id)
+            val filteredNotes = existingNotes.filter { it.beat < barStart || it.beat >= barEnd }
+            repository.deleteNotesForTrack(bassTrack.id)
+
+            val newNotes = BassGenerator.generate(
+                chords = listOf(bars[barIndex]),
+                style = style,
+                targetTrackId = bassTrack.id,
+                beatsPerBar = beatsPerBar,
+                appendOffset = barStart,
+                snapValue = 0.25f
+            )
+
+            repository.saveNotes(filteredNotes + newNotes)
+            update { copy(statusMessage = "Substituted Bass bar ${barIndex + 1} with ${style.label}") }
+            onComplete()
+        }
+    }
+
+    fun substituteLead(barIndex: Int, patternName: String, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            val bars = repository.getChordsForSessionOnce(sessionId)
+            val trackList = repository.getTracksForSession(sessionId).first()
+            val leadTrack = trackList.firstOrNull { it.name.uppercase() == "LEAD" } ?: return@launch
+
+            val beatsPerBar = ui.value.barDuration.toFloat()
+            val barStart = barIndex * beatsPerBar
+            val barEnd = barStart + beatsPerBar
+
+            val existingNotes = repository.getNotesForTrackOnce(leadTrack.id)
+            val filteredNotes = existingNotes.filter { it.beat < barStart || it.beat >= barEnd }
+            repository.deleteNotesForTrack(leadTrack.id)
+
+            val pattern = LeadPresets.all[patternName] ?: LeadPresets.ANTHEM
+            val chordNames = bars.map { it.chordName.substringBefore(" ") }
+            val key = KeyDetector.detect(chordNames).firstOrNull()
+
+            val newNotes = LeadGenerator.generate(
+                chords = listOf(bars[barIndex]),
+                key = key,
+                pattern = pattern,
+                targetTrackId = leadTrack.id,
+                beatsPerBar = beatsPerBar,
+                appendOffset = barStart
+            )
+
+            repository.saveNotes(filteredNotes + newNotes)
+            update { copy(statusMessage = "Substituted Lead bar ${barIndex + 1} with $patternName") }
+            onComplete()
+        }
+    }
+
+    fun substitutePad(barIndex: Int, newTheoryChord: TheoryChord, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            val bars = repository.getChordsForSessionOnce(sessionId)
+            val trackList = repository.getTracksForSession(sessionId).first()
+            val padTrack = trackList.firstOrNull { it.name.uppercase() == "PAD" } ?: return@launch
+
+            val beatsPerBar = ui.value.barDuration.toFloat()
+            val barStart = barIndex * beatsPerBar
+            val barEnd = barStart + beatsPerBar
+
+            val existingNotes = repository.getNotesForTrackOnce(padTrack.id)
+            val filteredNotes = existingNotes.filter { it.beat < barStart || it.beat >= barEnd }
+            repository.deleteNotesForTrack(padTrack.id)
+
+            val newNotes = PadGenerator.generate(
+                chords = listOf(bars[barIndex].copy(midiNotes = newTheoryChord.midiNotes.joinToString(","))),
+                targetTrackId = padTrack.id,
+                beatsPerBar = beatsPerBar,
+                appendOffset = barStart
+            )
+
+            repository.saveNotes(filteredNotes + newNotes)
+            update { copy(statusMessage = "Substituted Pad bar ${barIndex + 1} with ${newTheoryChord.label}") }
+            onComplete()
+        }
+    }
 }

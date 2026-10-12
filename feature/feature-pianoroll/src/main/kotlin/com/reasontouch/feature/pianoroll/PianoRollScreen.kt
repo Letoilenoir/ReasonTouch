@@ -135,7 +135,7 @@ fun PianoRollScreen(
     var showInstrumentPanel by remember { mutableStateOf(false) }
     var trayExpanded by remember { mutableStateOf(false) }
     var traySection by remember { mutableStateOf(TraySection.HOME) }
-    var chordBarToInspect by remember { mutableStateOf<Int?>(null) }
+    var activeBarToInspect by remember { mutableStateOf<Int?>(null) }
     var currentSuggestions by remember {
         mutableStateOf<List<com.reasontouch.feature.chords.SuggestionWorkflow.SuggestionOption>>(emptyList())
     }
@@ -302,6 +302,7 @@ fun PianoRollScreen(
                 ) {
                     items(totalBars) { barIdx ->
                         val isCurrent = barIdx == currentBar
+                        val isEditing = barIdx == activeBarToInspect
                         val label = when (activeTrackName) {
                             "CHORD", "PAD" -> chords.firstOrNull { it.barIndex == barIdx }?.chordName ?: "—"
                             "BASS" -> "Style"
@@ -312,17 +313,33 @@ fun PianoRollScreen(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(if (isCurrent) Color(0xFFE84040).copy(alpha = 0.3f) else Color(0xFF2A2A32))
-                                .border(1.dp, if (isCurrent) Color(0xFFE84040) else Color(0xFF3A3A45), RoundedCornerShape(4.dp))
+                                .background(
+                                    when {
+                                        isEditing -> Color(0xFF3DDC84).copy(alpha = 0.3f) // Green for editing
+                                        isCurrent -> Color(0xFFE84040).copy(alpha = 0.3f) // Red for playback
+                                        else -> Color(0xFF2A2A32)
+                                    }
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = when {
+                                        isEditing -> Color(0xFF3DDC84)
+                                        isCurrent -> Color(0xFFE84040)
+                                        else -> Color(0xFF3A3A45)
+                                    },
+                                    shape = RoundedCornerShape(4.dp)
+                                )
                                 .clickable {
-                                    if (activeTrackName == "CHORD") chordBarToInspect = barIdx
-                                    else trayExpanded = true
+                                    activeBarToInspect = barIdx
                                 }
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
                                 text = "Bar ${barIdx + 1}: $label",
-                                color = if (isCurrent) Color.White else Color(0xFFC8C8D4),
+                                color = when {
+                                    isEditing || isCurrent -> Color.White
+                                    else -> Color(0xFFC8C8D4)
+                                },
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold
@@ -345,24 +362,58 @@ fun PianoRollScreen(
                 modifier  = Modifier.fillMaxSize()
             )
 
-            if (chordBarToInspect != null) {
-                val barIdx = chordBarToInspect!!
+            if (activeBarToInspect != null) {
+                val barIdx = activeBarToInspect!!
                 val chordEvent = chords.firstOrNull { it.barIndex == barIdx }
                 val chordNames = chords.map { it.chordName.substringBefore(" ") }
                 val key = KeyDetector.detect(chordNames).firstOrNull()
 
-                com.reasontouch.feature.chords.components.ChordInspectorDialog(
-                    barIndex = barIdx,
-                    currentChord = chordEvent,
-                    key = key,
-                    onSubstitute = { newTheoryChord ->
-                        chordViewModel.substituteChord(barIdx, newTheoryChord) {
-                            viewModel.refreshNotes()
-                        }
-                        chordBarToInspect = null
-                    },
-                    onDismiss = { chordBarToInspect = null }
-                )
+                when (activeTrackName) {
+                    "CHORD" -> com.reasontouch.feature.chords.components.ChordInspectorDialog(
+                        barIndex = barIdx,
+                        currentChord = chordEvent,
+                        key = key,
+                        onSubstitute = { newTheoryChord ->
+                            chordViewModel.substituteChord(barIdx, newTheoryChord) { viewModel.refreshNotes() }
+                            activeBarToInspect = null
+                        },
+                        onDismiss = { activeBarToInspect = null }
+                    )
+                    "BASS" -> com.reasontouch.feature.chords.components.BassInspectorDialog(
+                        barIndex = barIdx,
+                        currentStyle = null,
+                        onApply = { style ->
+                            chordViewModel.substituteBass(barIdx, style) { viewModel.refreshNotes() }
+                            activeBarToInspect = null
+                        },
+                        onDismiss = { activeBarToInspect = null }
+                    )
+                    "DRUMS" -> com.reasontouch.feature.pianoroll.components.DrumInspectorDialog(
+                        barIndex = barIdx,
+                        onApplyFill = { fillType ->
+                            drumViewModel.writeFillToPianoRoll(fillType, barIdx, appendMode = true) { viewModel.refreshNotes() }
+                            activeBarToInspect = null
+                        },
+                        onDismiss = { activeBarToInspect = null }
+                    )
+                    "LEAD" -> com.reasontouch.feature.chords.components.LeadInspectorDialog(
+                        barIndex = barIdx,
+                        onApplyPreset = { presetName ->
+                            chordViewModel.substituteLead(barIdx, presetName) { viewModel.refreshNotes() }
+                            activeBarToInspect = null
+                        },
+                        onDismiss = { activeBarToInspect = null }
+                    )
+                    "PAD" -> com.reasontouch.feature.chords.components.PadInspectorDialog(
+                        barIndex = barIdx,
+                        currentChord = chordEvent,
+                        onApplyVoicing = { voicing ->
+                            chordViewModel.substitutePad(barIdx, voicing) { viewModel.refreshNotes() }
+                            activeBarToInspect = null
+                        },
+                        onDismiss = { activeBarToInspect = null }
+                    )
+                }
             }
 
             CompositionTray(
