@@ -975,17 +975,30 @@ class ChordViewModel @Inject constructor(
     fun substituteChord(barIndex: Int, newTheoryChord: TheoryChord, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             val bars = repository.getChordsForSessionOnce(sessionId)
-            val targetBar = bars.getOrNull(barIndex) ?: return@launch
+            val targetBar = bars.getOrNull(barIndex)
 
             val beatsPerBar = ui.value.barDuration.toFloat()
             val barStart = barIndex * beatsPerBar
             val barEnd = barStart + beatsPerBar
 
-            // 1. Update ChordEvent
-            val updatedChord = targetBar.copy(
+            // 1. Update or create ChordEvent
+            val pattern = targetBar?.strumPatternId?.toStepPattern() ?: StepPattern.EMPTY
+            val speed = targetBar?.strumSpeedValue ?: ui.value.strumSpeed
+
+            val updatedChord = targetBar?.copy(
                 chordName = newTheoryChord.guitarLabel(),
                 rootMidi = newTheoryChord.midiNotes.firstOrNull() ?: 60,
                 midiNotes = newTheoryChord.midiNotes.joinToString(",")
+            ) ?: ChordEvent(
+                id = UUID.randomUUID().toString(),
+                sessionId = sessionId,
+                barIndex = barIndex,
+                chordName = newTheoryChord.guitarLabel(),
+                rootMidi = newTheoryChord.midiNotes.firstOrNull() ?: 60,
+                midiNotes = newTheoryChord.midiNotes.joinToString(","),
+                voicing = "Open",
+                strumPatternId = pattern.toChordEventString(),
+                strumSpeedValue = speed
             )
             repository.saveChord(updatedChord)
 
@@ -997,8 +1010,6 @@ class ChordViewModel @Inject constructor(
                 val filteredNotes = existingNotes.filter { it.beat < barStart || it.beat >= barEnd }
                 repository.deleteNotesForTrack(chordTrack.id)
 
-                val pattern = targetBar.strumPatternId.toStepPattern()
-                val speed = targetBar.strumSpeedValue ?: ui.value.strumSpeed
                 val bpm = repository.getSession(sessionId).first()?.bpm ?: 120
 
                 val newNotes = generateStrumNotes(
@@ -1013,6 +1024,11 @@ class ChordViewModel @Inject constructor(
                 )
 
                 repository.saveNotes(filteredNotes + newNotes)
+            }
+
+            val currentSession = repository.getSession(sessionId).first()
+            if (currentSession != null && barIndex >= currentSession.totalBars) {
+                repository.updateSession(currentSession.copy(totalBars = barIndex + 1))
             }
 
             update { copy(statusMessage = "Substituted bar ${barIndex + 1} with ${newTheoryChord.label}") }
