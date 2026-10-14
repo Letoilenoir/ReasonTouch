@@ -53,6 +53,7 @@ private val RACK   = Color(0xFF222228)
 private val PANEL  = Color(0xFF2A2A32)
 private val BORDER = Color(0xFF3A3A45)
 private val TEXT_DIM = Color(0xFF666675)
+private val GREEN  = Color(0xFF3DDC84)
 
 @Composable
 fun ReasonTouchApp(repository: SessionRepository) {
@@ -239,18 +240,19 @@ fun ReasonTouchApp(repository: SessionRepository) {
                     }
                     Spacer(modifier = Modifier.width(6.dp))
 
-                    // BACK BUTTON
-                    if (onBackAction != null) {
+                    // MIDI EXPORT BUTTON
+                    if (currentSessionId.isNotEmpty()) {
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(Color(0xFFE84040).copy(alpha = 0.8f))
-                                .clickable { onBackAction?.invoke() }
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .background(Color(0xFF1A3A2A))
+                                .border(1.dp, GREEN, RoundedCornerShape(4.dp))
+                                .clickable { showExport = true }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = "← BACK",
-                                color = Color.White,
+                                text = "↓ MIDI",
+                                color = GREEN,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace
