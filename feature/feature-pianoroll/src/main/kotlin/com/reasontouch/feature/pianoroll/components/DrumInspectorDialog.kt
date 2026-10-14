@@ -18,14 +18,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reasontouch.core.ui.theme.ReasonTouchTheme
 import com.reasontouch.feature.drums.DrumFillPatterns
+import com.reasontouch.feature.drums.DrumPresets
 
 @Composable
 fun DrumInspectorDialog(
     barIndex: Int,
     onApplyFill: (String) -> Unit,
+    onApplyPreset: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
+    var tab by remember { mutableStateOf(0) } // 0 = Fills, 1 = Presets
 
     Box(
         modifier = Modifier
@@ -52,34 +55,88 @@ fun DrumInspectorDialog(
             )
             Spacer(Modifier.height(skin.paddingMedium))
 
-            Text(
-                text = "Insert Drum Fill / Pattern for this bar",
-                color = skin.textPrimary,
-                fontSize = 13.sp
-            )
-            Spacer(Modifier.height(skin.paddingLarge))
-
-            val fillsList = DrumFillPatterns.FILLS.entries.toList()
-            LazyColumn(
-                modifier = Modifier.height(220.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            // Tab Toggle: Fills vs Presets
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(skin.panelAlt, RoundedCornerShape(skin.cornerRadiusSmall))
+                    .padding(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                items(count = fillsList.size) { index ->
-                    val entry = fillsList[index]
-                    val key = entry.key
-                    val fill = entry.value
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(skin.cornerRadiusSmall))
-                            .background(skin.panelAlt)
-                            .border(1.dp, skin.border, RoundedCornerShape(skin.cornerRadiusSmall))
-                            .clickable { onApplyFill(key); onDismiss() }
-                            .padding(horizontal = skin.paddingMedium, vertical = 8.dp)
-                    ) {
-                        Column {
-                            Text(text = fill.name, color = skin.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text(text = fill.description, color = skin.textSecondary, fontSize = 10.sp)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(skin.cornerRadiusSmall))
+                        .background(if (tab == 0) skin.accent else Color.Transparent)
+                        .clickable { tab = 0 }
+                        .padding(vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "FILLS", color = if (tab == 0) Color.Black else skin.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(skin.cornerRadiusSmall))
+                        .background(if (tab == 1) skin.accent else Color.Transparent)
+                        .clickable { tab = 1 }
+                        .padding(vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "PRESETS", color = if (tab == 1) Color.Black else skin.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(Modifier.height(skin.paddingMedium))
+
+            if (tab == 0) {
+                Text(text = "Insert Drum Fill", color = skin.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                val fillsList = DrumFillPatterns.FILLS.entries.toList()
+                LazyColumn(
+                    modifier = Modifier.height(200.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(count = fillsList.size) { index ->
+                        val entry = fillsList[index]
+                        val key = entry.key
+                        val fill = entry.value
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(skin.cornerRadiusSmall))
+                                .background(skin.panelAlt)
+                                .border(1.dp, skin.border, RoundedCornerShape(skin.cornerRadiusSmall))
+                                .clickable { onApplyFill(key); onDismiss() }
+                                .padding(horizontal = skin.paddingMedium, vertical = 8.dp)
+                        ) {
+                            Column {
+                                Text(text = fill.name, color = skin.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text(text = fill.description, color = skin.textSecondary, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text(text = "Apply Drum Preset Pattern", color = skin.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                val presetsList = DrumPresets.all.keys.toList()
+                LazyColumn(
+                    modifier = Modifier.height(200.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(count = presetsList.size) { index ->
+                        val presetName = presetsList[index]
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(skin.cornerRadiusSmall))
+                                .background(skin.panelAlt)
+                                .border(1.dp, skin.border, RoundedCornerShape(skin.cornerRadiusSmall))
+                                .clickable { onApplyPreset(presetName); onDismiss() }
+                                .padding(horizontal = skin.paddingMedium, vertical = 10.dp)
+                        ) {
+                            Text(text = presetName, color = skin.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

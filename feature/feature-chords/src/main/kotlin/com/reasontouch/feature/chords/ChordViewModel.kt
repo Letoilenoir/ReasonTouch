@@ -972,7 +972,7 @@ class ChordViewModel @Inject constructor(
         }
     }
 
-    fun substituteChord(barIndex: Int, newTheoryChord: TheoryChord, onComplete: () -> Unit = {}) {
+    fun substituteChord(barIndex: Int, newTheoryChord: TheoryChord, customStrumPattern: StepPattern? = null, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             val bars = repository.getChordsForSessionOnce(sessionId)
             val targetBar = bars.getOrNull(barIndex)
@@ -982,13 +982,14 @@ class ChordViewModel @Inject constructor(
             val barEnd = barStart + beatsPerBar
 
             // 1. Update or create ChordEvent
-            val pattern = targetBar?.strumPatternId?.toStepPattern() ?: StepPattern.EMPTY
+            val pattern = customStrumPattern ?: targetBar?.strumPatternId?.toStepPattern() ?: StepPattern.EMPTY
             val speed = targetBar?.strumSpeedValue ?: ui.value.strumSpeed
 
             val updatedChord = targetBar?.copy(
                 chordName = newTheoryChord.guitarLabel(),
                 rootMidi = newTheoryChord.midiNotes.firstOrNull() ?: 60,
-                midiNotes = newTheoryChord.midiNotes.joinToString(",")
+                midiNotes = newTheoryChord.midiNotes.joinToString(","),
+                strumPatternId = pattern.toChordEventString()
             ) ?: ChordEvent(
                 id = UUID.randomUUID().toString(),
                 sessionId = sessionId,
@@ -1036,9 +1037,29 @@ class ChordViewModel @Inject constructor(
         }
     }
 
+    private suspend fun getOrCreateChordForBar(sessionId: String, barIndex: Int): ChordEvent {
+        val bars = repository.getChordsForSessionOnce(sessionId)
+        bars.getOrNull(barIndex)?.let { return it }
+
+        val defaultChord = TheoryChord(NoteClass.C, ChordQuality.MAJ)
+        val chordEvent = ChordEvent(
+            id = UUID.randomUUID().toString(),
+            sessionId = sessionId,
+            barIndex = barIndex,
+            chordName = defaultChord.guitarLabel(),
+            rootMidi = defaultChord.midiNotes.firstOrNull() ?: 60,
+            midiNotes = defaultChord.midiNotes.joinToString(","),
+            voicing = "Open",
+            strumPatternId = StepPattern.EMPTY.toChordEventString(),
+            strumSpeedValue = 0.02
+        )
+        repository.saveChord(chordEvent)
+        return chordEvent
+    }
+
     fun substituteBass(barIndex: Int, style: BassStyle, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
-            val bars = repository.getChordsForSessionOnce(sessionId)
+            val targetChord = getOrCreateChordForBar(sessionId, barIndex)
             val trackList = repository.getTracksForSession(sessionId).first()
             val bassTrack = trackList.firstOrNull { it.name.uppercase() == "BASS" } ?: return@launch
 
@@ -1051,7 +1072,7 @@ class ChordViewModel @Inject constructor(
             repository.deleteNotesForTrack(bassTrack.id)
 
             val newNotes = BassGenerator.generate(
-                chords = listOf(bars[barIndex]),
+                chords = listOf(targetChord),
                 style = style,
                 targetTrackId = bassTrack.id,
                 beatsPerBar = beatsPerBar,
@@ -1067,6 +1088,7 @@ class ChordViewModel @Inject constructor(
 
     fun substituteLead(barIndex: Int, patternName: String, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
+            val targetChord = getOrCreateChordForBar(sessionId, barIndex)
             val bars = repository.getChordsForSessionOnce(sessionId)
             val trackList = repository.getTracksForSession(sessionId).first()
             val leadTrack = trackList.firstOrNull { it.name.uppercase() == "LEAD" } ?: return@launch
@@ -1084,7 +1106,7 @@ class ChordViewModel @Inject constructor(
             val key = KeyDetector.detect(chordNames).firstOrNull()
 
             val newNotes = LeadGenerator.generate(
-                chords = listOf(bars[barIndex]),
+                chords = listOf(targetChord),
                 key = key,
                 pattern = pattern,
                 targetTrackId = leadTrack.id,
@@ -1100,7 +1122,7 @@ class ChordViewModel @Inject constructor(
 
     fun substitutePad(barIndex: Int, newTheoryChord: TheoryChord, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
-            val bars = repository.getChordsForSessionOnce(sessionId)
+            val targetChord = getOrCreateChordForBar(sessionId, barIndex)
             val trackList = repository.getTracksForSession(sessionId).first()
             val padTrack = trackList.firstOrNull { it.name.uppercase() == "PAD" } ?: return@launch
 
@@ -1113,7 +1135,7 @@ class ChordViewModel @Inject constructor(
             repository.deleteNotesForTrack(padTrack.id)
 
             val newNotes = PadGenerator.generate(
-                chords = listOf(bars[barIndex].copy(midiNotes = newTheoryChord.midiNotes.joinToString(","))),
+                chords = listOf(targetChord.copy(midiNotes = newTheoryChord.midiNotes.joinToString(","))),
                 targetTrackId = padTrack.id,
                 beatsPerBar = beatsPerBar,
                 appendOffset = barStart

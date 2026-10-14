@@ -45,6 +45,7 @@ import com.reasontouch.feature.drums.DrumPresets
 import com.reasontouch.feature.drums.generateDrumNotes
 import com.reasontouch.feature.chords.BassGenerator
 import com.reasontouch.feature.chords.KeyDetector
+import com.reasontouch.feature.chords.toStepPattern
 // GmInstrument defined locally to avoid cross-module dependency
 data class TrackInstrument(val label: String, val program: Int)
 
@@ -237,10 +238,7 @@ fun PianoRollScreen(
             onSnapCycle       = { viewModel.setSnapIndex((snapIndex + 1) % viewModel.snapValues.size) },
             onLoopToggle      = viewModel::toggleLoop,
             onInstrumentClick = { showInstrumentPanel = !showInstrumentPanel },
-            onSuggestNext     = {
-                traySection = TraySection.SUGGEST_NEXT
-                trayExpanded = true
-            }
+            onUndo            = { viewModel.undo() }
         )
 
         if (uiState.hasSelection) {
@@ -373,8 +371,10 @@ fun PianoRollScreen(
                         barIndex = barIdx,
                         currentChord = chordEvent,
                         key = key,
-                        onSubstitute = { newTheoryChord ->
-                            chordViewModel.substituteChord(barIdx, newTheoryChord) { viewModel.refreshNotes() }
+                        currentStrumPattern = chordEvent?.strumPatternId?.toStepPattern(),
+                        onSubstitute = { newTheoryChord, strumPattern ->
+                            viewModel.recordSnapshot()
+                            chordViewModel.substituteChord(barIdx, newTheoryChord, strumPattern) { viewModel.refreshNotes() }
                             activeBarToInspect = null
                         },
                         onDismiss = { activeBarToInspect = null }
@@ -383,6 +383,7 @@ fun PianoRollScreen(
                         barIndex = barIdx,
                         currentStyle = null,
                         onApply = { style ->
+                            viewModel.recordSnapshot()
                             chordViewModel.substituteBass(barIdx, style) { viewModel.refreshNotes() }
                             activeBarToInspect = null
                         },
@@ -391,7 +392,14 @@ fun PianoRollScreen(
                     "DRUMS" -> com.reasontouch.feature.pianoroll.components.DrumInspectorDialog(
                         barIndex = barIdx,
                         onApplyFill = { fillType ->
+                            viewModel.recordSnapshot()
                             drumViewModel.writeFillToPianoRoll(fillType, barIdx, appendMode = true) { viewModel.refreshNotes() }
+                            activeBarToInspect = null
+                        },
+                        onApplyPreset = { presetName ->
+                            viewModel.recordSnapshot()
+                            DrumPresets.all[presetName]?.let { drumViewModel.applyPreset(it) }
+                            drumViewModel.writeToPianoRoll(appendMode = true) { viewModel.refreshNotes() }
                             activeBarToInspect = null
                         },
                         onDismiss = { activeBarToInspect = null }
@@ -399,6 +407,7 @@ fun PianoRollScreen(
                     "LEAD" -> com.reasontouch.feature.chords.components.LeadInspectorDialog(
                         barIndex = barIdx,
                         onApplyPreset = { presetName ->
+                            viewModel.recordSnapshot()
                             chordViewModel.substituteLead(barIdx, presetName) { viewModel.refreshNotes() }
                             activeBarToInspect = null
                         },
@@ -408,6 +417,7 @@ fun PianoRollScreen(
                         barIndex = barIdx,
                         currentChord = chordEvent,
                         onApplyVoicing = { voicing ->
+                            viewModel.recordSnapshot()
                             chordViewModel.substitutePad(barIdx, voicing) { viewModel.refreshNotes() }
                             activeBarToInspect = null
                         },
@@ -431,6 +441,7 @@ fun PianoRollScreen(
                         ?.phrases
                         ?.getOrNull(phraseIndex)
                         ?.let { phrase ->
+                            viewModel.recordSnapshot()
                             chordViewModel.addPhrase(
                                 generatedProgression = phrase,
                                 pairingType = intentType,
@@ -460,6 +471,7 @@ fun PianoRollScreen(
                 onEndFillChange      = drumViewModel::setEndFill,
                 onLead               = { traySection = TraySection.LEAD },
                 onApplyLead          = { presetName, append ->
+                    viewModel.recordSnapshot()
                     chordViewModel.generateLead(presetName, append) {
                         viewModel.refreshNotes()
                     }
@@ -469,6 +481,7 @@ fun PianoRollScreen(
                     ?.let { track -> allNotes[track.id]?.isNotEmpty() } ?: false,
                 onPad                = { traySection = TraySection.PAD },
                 onApplyPad           = { append ->
+                    viewModel.recordSnapshot()
                     chordViewModel.generatePad(append) {
                         viewModel.refreshNotes()
                     }
@@ -478,6 +491,7 @@ fun PianoRollScreen(
                     ?.let { track -> allNotes[track.id]?.isNotEmpty() } ?: false,
                 onFills              = { traySection = TraySection.FILLS },
                 onApplyFill          = { fillType, barIndex, append ->
+                    viewModel.recordSnapshot()
                     drumViewModel.writeFillToPianoRoll(fillType, barIndex, append) {
                         viewModel.refreshNotes()
                     }
@@ -486,12 +500,14 @@ fun PianoRollScreen(
                 hasFills             = tracks.firstOrNull { it.name.uppercase() == "DRUMS" }
                     ?.let { track -> allNotes[track.id]?.any { note -> note.duration == 0.25f && note.velocity >= 95 } } ?: false,
                 onApplyBass          = { style, append ->
+                    viewModel.recordSnapshot()
                     chordViewModel.generateBass(style, append) {
                         viewModel.refreshNotes()
                     }
                     trayExpanded = false
                 },
                 onApplyDrums         = { presetName, append ->
+                    viewModel.recordSnapshot()
                     DrumPresets.all[presetName]?.let { drumViewModel.applyPreset(it) }
                     drumViewModel.writeToPianoRoll(append) { viewModel.refreshNotes() }
                     trayExpanded = false
@@ -513,6 +529,7 @@ fun PianoRollScreen(
                     }
                 },
                 onApplyGroove         = {
+                    viewModel.recordSnapshot()
                     groovePreview?.let { preview ->
                         viewModel.saveGeneratedNotes(preview.bassNotes + preview.drumNotes)
                     }
@@ -692,7 +709,7 @@ fun PianoRollToolbar(
     onSnapCycle:       () -> Unit,
     onLoopToggle:      () -> Unit,
     onInstrumentClick: () -> Unit,
-    onSuggestNext:     () -> Unit
+    onUndo:            () -> Unit
 ) {
     val activeTrack = uiState.tracks.getOrNull(uiState.activeIndex)
     val emoji       = if (activeTrack != null) emojiForTrack(activeTrack.name) else "\uD83C\uDFB5"
@@ -728,12 +745,12 @@ fun PianoRollToolbar(
         )
         Divider()
         ToolChip(
-            label          = "SUGGEST",
+            label          = "UNDO",
             selected       = false,
-            selectedColor  = Color(0xFF1A3A5A),
-            selectedBorder = Color(0xFF38BDF8),
-            selectedText   = Color(0xFF38BDF8),
-            onClick        = onSuggestNext
+            selectedColor  = Color(0xFF3A2A1A),
+            selectedBorder = Color(0xFFF5C518),
+            selectedText   = Color(0xFFF5C518),
+            onClick        = onUndo
         )
         Divider()
         // Instrument selector button - right side, weight fills remaining space

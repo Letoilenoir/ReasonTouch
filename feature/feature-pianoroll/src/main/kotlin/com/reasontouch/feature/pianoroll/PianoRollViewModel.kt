@@ -11,6 +11,8 @@ import com.reasontouch.core.data.MidiTrack
 import com.reasontouch.core.data.NoteEvent
 import com.reasontouch.core.data.Session
 import com.reasontouch.core.data.SessionRepository
+import com.reasontouch.core.data.SessionSnapshot
+import com.reasontouch.core.data.UndoHistoryManager
 import com.reasontouch.core.playback.PlaybackController
 import com.reasontouch.feature.chords.CompositionIntent
 import com.reasontouch.feature.chords.GeneratedProgression
@@ -40,6 +42,7 @@ class PianoRollViewModel @Inject constructor(
     private val sf2Player: Sf2Player,
     private val drumSamplePlayer: DrumSamplePlayer,
     private val playbackController: PlaybackController,
+    private val undoHistoryManager: UndoHistoryManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -69,6 +72,28 @@ class PianoRollViewModel @Inject constructor(
                 SharingStarted.WhileSubscribed(5000),
                 emptyList()
             )
+
+    fun recordSnapshot() {
+        viewModelScope.launch {
+            val chords = repository.getChordsForSessionOnce(sessionId)
+            val trackList = tracks.value
+            val notesMap = trackList.associate { it.id to repository.getNotesForTrackOnce(it.id) }
+            undoHistoryManager.push(sessionId, SessionSnapshot(chords, notesMap))
+        }
+    }
+
+    fun undo() {
+        viewModelScope.launch {
+            val snapshot = undoHistoryManager.pop(sessionId) ?: return@launch
+            repository.deleteChordsForSession(sessionId)
+            repository.saveChords(snapshot.chords)
+            tracks.value.forEach { track ->
+                repository.deleteNotesForTrack(track.id)
+                snapshot.notesMap[track.id]?.let { repository.saveNotes(it) }
+            }
+            refreshNotes()
+        }
+    }
 
     private val _activeTrackIndex = MutableStateFlow(0)
     val activeTrackIndex: StateFlow<Int> =
@@ -615,6 +640,8 @@ class PianoRollViewModel @Inject constructor(
 
         if (clipboard.isEmpty()) return
 
+        recordSnapshot()
+
         val activeTrack =
             tracks.value.getOrNull(_activeTrackIndex.value)
                 ?: return
@@ -662,6 +689,8 @@ class PianoRollViewModel @Inject constructor(
         val ids = _selectedNoteIds.value
 
         if (ids.isEmpty()) return
+
+        recordSnapshot()
 
         val activeTrack =
             tracks.value.getOrNull(_activeTrackIndex.value)

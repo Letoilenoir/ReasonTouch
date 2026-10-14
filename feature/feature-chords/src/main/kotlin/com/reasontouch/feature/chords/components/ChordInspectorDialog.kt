@@ -27,12 +27,14 @@ fun ChordInspectorDialog(
     barIndex: Int,
     currentChord: ChordEvent?,
     key: KeyCandidate?,
-    onSubstitute: (TheoryChord) -> Unit,
+    currentStrumPattern: StepPattern?,
+    onSubstitute: (TheoryChord, StepPattern?) -> Unit,
     onDismiss: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
     var selectedRoot by remember { mutableStateOf(key?.root ?: NoteClass.C) }
     var selectedQuality by remember { mutableStateOf(ChordQuality.MAJ) }
+    var selectedStrum by remember { mutableStateOf(currentStrumPattern ?: StrumPatterns.all.values.first()) }
 
     val suggestions = remember(currentChord, key) {
         val root = key?.root ?: NoteClass.C
@@ -49,7 +51,7 @@ fun ChordInspectorDialog(
     ) {
         Column(
             modifier = Modifier
-                .width(360.dp)
+                .width(620.dp)
                 .clip(RoundedCornerShape(skin.cornerRadiusMedium))
                 .background(skin.panel)
                 .border(1.dp, skin.border, RoundedCornerShape(skin.cornerRadiusMedium))
@@ -57,7 +59,7 @@ fun ChordInspectorDialog(
                 .padding(skin.paddingLarge)
         ) {
             Text(
-                text = "CHORD INSPECTOR — BAR ${barIndex + 1}",
+                text = "CHORD & STRUM INSPECTOR — BAR ${barIndex + 1}",
                 color = skin.accent,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
@@ -65,89 +67,81 @@ fun ChordInspectorDialog(
             )
             Spacer(Modifier.height(skin.paddingMedium))
 
-            Text(
-                text = "Current: ${currentChord?.chordName ?: "None"}",
-                color = skin.textPrimary,
-                fontSize = 13.sp
-            )
-            Spacer(Modifier.height(skin.paddingLarge))
-
-            Text(
-                text = "SUGGESTED SUBSTITUTIONS",
-                color = skin.textSecondary,
-                fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.5.sp
-            )
-            Spacer(Modifier.height(6.dp))
-
-            LazyColumn(
-                modifier = Modifier.height(130.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(skin.paddingLarge)
             ) {
-                items(suggestions) { chord ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(skin.cornerRadiusSmall))
-                            .background(skin.panelAlt)
-                            .border(1.dp, skin.border, RoundedCornerShape(skin.cornerRadiusSmall))
-                            .clickable { onSubstitute(chord); onDismiss() }
-                            .padding(horizontal = skin.paddingMedium, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = chord.label,
-                            color = skin.textPrimary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                // LEFT COLUMN: Chord Harmony & Manual Picker
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "SUGGESTED SUBSTITUTIONS", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+                    Spacer(Modifier.height(6.dp))
+                    LazyColumn(modifier = Modifier.height(110.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        items(suggestions) { chord ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(skin.cornerRadiusSmall))
+                                    .background(skin.panelAlt)
+                                    .border(1.dp, skin.border, RoundedCornerShape(skin.cornerRadiusSmall))
+                                    .clickable { onSubstitute(chord, selectedStrum); onDismiss() }
+                                    .padding(horizontal = skin.paddingMedium, vertical = 6.dp)
+                            ) {
+                                Text(text = chord.label, color = skin.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(skin.paddingMedium))
+                    Text(text = "MANUAL PICKER", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+                    Spacer(Modifier.height(4.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        items(NoteClass.entries.toList()) { note ->
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .background(if (selectedRoot == note) skin.accent else skin.panelAlt, RoundedCornerShape(3.dp))
+                                    .clickable { selectedRoot = note },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = note.label, color = if (selectedRoot == note) Color.Black else skin.textPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        items(ChordQuality.entries.toList()) { quality ->
+                            Box(
+                                modifier = Modifier
+                                    .background(if (selectedQuality == quality) skin.accent else skin.panelAlt, RoundedCornerShape(3.dp))
+                                    .clickable { selectedQuality = quality }
+                                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = quality.label, color = if (selectedQuality == quality) Color.Black else skin.textPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
-            }
 
-            Spacer(Modifier.height(skin.paddingLarge))
-            Text(
-                text = "MANUAL PICKER",
-                color = skin.textSecondary,
-                fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.5.sp
-            )
-            Spacer(Modifier.height(6.dp))
-
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                items(NoteClass.entries.toList()) { note ->
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(
-                                if (selectedRoot == note) skin.accent else skin.panelAlt,
-                                RoundedCornerShape(4.dp)
-                            )
-                            .clickable { selectedRoot = note },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = note.label, color = if (selectedRoot == note) Color.Black else skin.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                items(ChordQuality.entries.toList()) { quality ->
-                    Box(
-                        modifier = Modifier
-                            .padding(vertical = 2.dp)
-                            .background(
-                                if (selectedQuality == quality) skin.accent else skin.panelAlt,
-                                RoundedCornerShape(4.dp)
-                            )
-                            .clickable { selectedQuality = quality }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = quality.label, color = if (selectedQuality == quality) Color.Black else skin.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                // RIGHT COLUMN: Strum Pattern Selection
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "STRUM PATTERN RHYTHM", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+                    Spacer(Modifier.height(6.dp))
+                    LazyColumn(modifier = Modifier.height(210.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        items(StrumPatterns.all.entries.toList()) { (patName, pattern) ->
+                            val isSelected = selectedStrum.steps == pattern.steps
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(skin.cornerRadiusSmall))
+                                    .background(if (isSelected) skin.accent.copy(alpha = 0.2f) else skin.panelAlt)
+                                    .border(1.5.dp, if (isSelected) skin.accent else skin.border, RoundedCornerShape(skin.cornerRadiusSmall))
+                                    .clickable { selectedStrum = pattern }
+                                    .padding(horizontal = skin.paddingMedium, vertical = 6.dp)
+                            ) {
+                                Text(text = patName, color = skin.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            }
+                        }
                     }
                 }
             }
@@ -174,7 +168,7 @@ fun ChordInspectorDialog(
                         .weight(1f)
                         .background(skin.accent, RoundedCornerShape(skin.cornerRadiusSmall))
                         .clickable {
-                            onSubstitute(TheoryChord(selectedRoot, selectedQuality))
+                            onSubstitute(TheoryChord(selectedRoot, selectedQuality), selectedStrum)
                             onDismiss()
                         }
                         .padding(vertical = 10.dp),
