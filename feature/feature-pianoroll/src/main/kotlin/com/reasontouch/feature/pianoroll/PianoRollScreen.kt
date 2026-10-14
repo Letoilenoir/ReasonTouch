@@ -398,8 +398,7 @@ fun PianoRollScreen(
                         },
                         onApplyPreset = { presetName ->
                             viewModel.recordSnapshot()
-                            DrumPresets.all[presetName]?.let { drumViewModel.applyPreset(it) }
-                            drumViewModel.writeToPianoRoll(appendMode = true) { viewModel.refreshNotes() }
+                            drumViewModel.writePresetToPianoRoll(presetName, barIdx, appendMode = true) { viewModel.refreshNotes() }
                             activeBarToInspect = null
                         },
                         onDismiss = { activeBarToInspect = null }

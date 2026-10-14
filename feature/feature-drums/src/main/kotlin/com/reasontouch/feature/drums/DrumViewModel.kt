@@ -240,6 +240,53 @@ class DrumViewModel @Inject constructor(
         }
     }
 
+    fun writePresetToPianoRoll(
+        presetName: String,
+        targetBarIndex: Int,
+        appendMode: Boolean,
+        onComplete: (String) -> Unit
+    ) {
+        stop()
+
+        viewModelScope.launch {
+            val drumTrack = getOrCreateDrumsTrack()
+            val preset = DrumPresets.all[presetName] ?: return@launch
+            val beatsPerBar = 4f
+            val barStart = targetBarIndex * beatsPerBar
+            val stepDur = 1f / 4f
+
+            val notes = mutableListOf<NoteEvent>()
+            DrumKit.lanes.forEachIndexed { li, lane ->
+                (0 until preset.steps).forEach { si ->
+                    if (preset.isActive(li, si)) {
+                        notes.add(
+                            NoteEvent(
+                                id = UUID.randomUUID().toString(),
+                                trackId = drumTrack.id,
+                                pitch = lane.pitch,
+                                beat = barStart + (si * stepDur),
+                                duration = stepDur * 0.9f,
+                                velocity = preset.velocity(li, si)
+                            )
+                        )
+                    }
+                }
+            }
+
+            if (appendMode) {
+                val existingNotes = repository.getNotesForTrackOnce(drumTrack.id)
+                repository.saveNotes(existingNotes + notes)
+            } else {
+                val existingNotes = repository.getNotesForTrackOnce(drumTrack.id)
+                val filteredNotes = existingNotes.filter { it.beat < barStart || it.beat >= barStart + beatsPerBar }
+                repository.deleteNotesForTrack(drumTrack.id)
+                repository.saveNotes(filteredNotes + notes)
+            }
+
+            onComplete("Written $presetName preset to bar ${targetBarIndex + 1} on ${drumTrack.name} (${notes.size} notes)")
+        }
+    }
+
     // ── Segment-aware write (Phase 6b) ──────────────────────────────────
 
     /**
