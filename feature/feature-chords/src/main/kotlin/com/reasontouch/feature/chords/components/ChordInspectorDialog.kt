@@ -123,26 +123,17 @@ fun ChordInspectorDialog(
                     }
                 }
 
-                // RIGHT COLUMN: Strum Pattern Selection
+                // RIGHT COLUMN: Strum Pattern & Customize
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "STRUM PATTERN RHYTHM", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+                    Text(text = "STRUM PATTERN & CUSTOMIZE", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
                     Spacer(Modifier.height(6.dp))
-                    LazyColumn(modifier = Modifier.height(210.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        items(StrumPatterns.all.entries.toList()) { (patName, pattern) ->
-                            val isSelected = selectedStrum.steps == pattern.steps
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(skin.cornerRadiusSmall))
-                                    .background(if (isSelected) skin.accent.copy(alpha = 0.2f) else skin.panelAlt)
-                                    .border(1.5.dp, if (isSelected) skin.accent else skin.border, RoundedCornerShape(skin.cornerRadiusSmall))
-                                    .clickable { selectedStrum = pattern }
-                                    .padding(horizontal = skin.paddingMedium, vertical = 6.dp)
-                            ) {
-                                Text(text = patName, color = skin.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                            }
-                        }
-                    }
+                    StrumPatternTray(
+                        selectedPattern = selectedStrum,
+                        onPatternSelected = { selectedStrum = it },
+                        patterns = StrumPatterns.groups,
+                        selectedSpeed = 1.0,
+                        onSpeedSelected = {}
+                    )
                 }
             }
 
