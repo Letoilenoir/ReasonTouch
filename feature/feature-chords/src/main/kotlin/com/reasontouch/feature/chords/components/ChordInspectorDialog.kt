@@ -125,15 +125,67 @@ fun ChordInspectorDialog(
 
                 // RIGHT COLUMN: Strum Pattern & Customize
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "STRUM PATTERN & CUSTOMIZE", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+                    var isCustomizing by remember { mutableStateOf(false) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = if (isCustomizing) "CUSTOM STRUM GRID" else "STRUM PATTERN", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+                        Text(
+                            text = if (isCustomizing) "← Presets" else "✎ Customize",
+                            color = skin.accent,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable { isCustomizing = !isCustomizing }
+                        )
+                    }
                     Spacer(Modifier.height(6.dp))
-                    StrumPatternTray(
-                        selectedPattern = selectedStrum,
-                        onPatternSelected = { selectedStrum = it },
-                        patterns = StrumPatterns.groups,
-                        selectedSpeed = 1.0,
-                        onSpeedSelected = {}
-                    )
+
+                    if (isCustomizing) {
+                        var customSteps by remember { mutableStateOf(selectedStrum.steps) }
+                        Column(modifier = Modifier.height(210.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                            com.reasontouch.core.ui.components.StepSequencerEditor(
+                                steps = customSteps,
+                                onStepChanged = { idx, state ->
+                                    customSteps = customSteps.toMutableList().also { it[idx] = state }
+                                },
+                                mode = com.reasontouch.core.ui.components.SequencerMode.CHORD_STRUM,
+                                label = "",
+                                showLegend = false
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(skin.accent, RoundedCornerShape(4.dp))
+                                    .clickable {
+                                        selectedStrum = StepPattern(steps = customSteps)
+                                        isCustomizing = false
+                                    }
+                                    .padding(vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("APPLY CUSTOM PATTERN", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else {
+                        LazyColumn(modifier = Modifier.height(210.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            items(StrumPatterns.all.entries.toList()) { (patName, pattern) ->
+                                val isSelected = selectedStrum.steps == pattern.steps
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(skin.cornerRadiusSmall))
+                                        .background(if (isSelected) skin.accent.copy(alpha = 0.2f) else skin.panelAlt)
+                                        .border(1.5.dp, if (isSelected) skin.accent else skin.border, RoundedCornerShape(skin.cornerRadiusSmall))
+                                        .clickable { selectedStrum = pattern }
+                                        .padding(horizontal = skin.paddingMedium, vertical = 6.dp)
+                                ) {
+                                    Text(text = patName, color = skin.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
