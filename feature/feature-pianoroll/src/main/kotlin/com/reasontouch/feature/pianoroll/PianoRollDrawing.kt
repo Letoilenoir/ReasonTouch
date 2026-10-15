@@ -229,3 +229,35 @@ fun DrawScope.drawVerticalScrollBar(state: PianoRollState) {
     drawRect(color = Color(0xFF2A2A35), topLeft = Offset(0f, 0f), size = Size(size.width, size.height))
     drawRect(color = Color(0xFF555568), topLeft = Offset(2f, thumbY), size = Size(size.width - 4f, thumbH))
 }
+
+fun DrawScope.drawCanvasWatermark(
+    state: PianoRollState,
+    textMeasurer: TextMeasurer,
+    keyLabel: String,
+    bpm: Int,
+    playheadBeat: Float
+) {
+    val topY = state.pitchToY(12) // C7 upper register
+    if (topY < 0f || topY > size.height) return
+
+    val text = "KEY: $keyLabel  •  $bpm BPM"
+    val measured = textMeasurer.measure(
+        text,
+        style = TextStyle(
+            color = Color(0x66C8C8D4),
+            fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold
+        )
+    )
+
+    val badgeX = (state.scrollX + size.width - measured.size.width - 24f).coerceAtLeast(state.scrollX + 16f)
+    val badgeY = topY + 8f
+
+    drawRect(
+        color = Color(0x332A2A35),
+        topLeft = Offset(badgeX - 8f, badgeY - 4f),
+        size = Size(measured.size.width + 16f, measured.size.height + 8f)
+    )
+    drawText(measured, topLeft = Offset(badgeX, badgeY))
+}

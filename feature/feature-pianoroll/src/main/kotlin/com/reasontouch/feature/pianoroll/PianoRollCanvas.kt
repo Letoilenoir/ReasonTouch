@@ -58,6 +58,7 @@ fun PianoRollCanvas(
                 drawRowBackgrounds(state)
                 drawGridLines(state, uiState.snapValue)
                 drawRuler(state, textMeasurer)
+                drawCanvasWatermark(state, textMeasurer, uiState.keyLabel, uiState.bpm, uiState.playheadBeat)
 
                 if (uiState.loopEnabled) drawLoopRegion(state, uiState.loopStart, uiState.loopEnd)
 

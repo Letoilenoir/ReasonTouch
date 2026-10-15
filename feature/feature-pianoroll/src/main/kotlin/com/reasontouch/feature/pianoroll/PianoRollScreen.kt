@@ -164,6 +164,9 @@ fun PianoRollScreen(
     val loopEnd      by viewModel.loopEnd.collectAsState()
     val bpm       = session?.bpm ?: 120
     val totalBars = session?.totalBars ?: 4
+    val sessionVal = session
+    val bpmVal = sessionVal?.bpm ?: 120
+    val keyLabelVal = "${sessionVal?.keyRoot ?: "C"} ${sessionVal?.keyQuality?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Major"}"
 
     val uiState = PianoRollUiState(
         tracks       = tracks,
@@ -180,7 +183,9 @@ fun PianoRollScreen(
         isPlaying    = isPlaying,
         totalBars    = totalBars,
         hasClipboard = hasClipboard,
-        drawDuration = drawDuration
+        drawDuration = drawDuration,
+        bpm          = bpmVal,
+        keyLabel     = keyLabelVal
     )
 
     LaunchedEffect(playheadBeat, isPlaying) {
