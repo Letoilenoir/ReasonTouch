@@ -178,6 +178,21 @@ fun SessionSettingsScreen(
                 )
             }
 
+            // ── Master Transpose ───────────────────────────────────────────
+            item {
+                SettingsSection("MASTER TRANSPOSE")
+                var transposeDelta by remember { mutableStateOf(0) }
+                val displayVal = if (transposeDelta > 0) "+$transposeDelta" else "$transposeDelta"
+                SettingsStepperRow(
+                    label           = "Semitones",
+                    value           = displayVal,
+                    onDecrement     = { transposeDelta -= 1; viewModel.transposeSession(-1) },
+                    onIncrement     = { transposeDelta += 1; viewModel.transposeSession(1) },
+                    onFastDecrement = { transposeDelta -= 12; viewModel.transposeSession(-12) },
+                    onFastIncrement = { transposeDelta += 12; viewModel.transposeSession(12) }
+                )
+            }
+
             // ── Structure ──────────────────────────────────────────────────
             item {
                 SettingsSection("STRUCTURE")

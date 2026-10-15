@@ -87,5 +87,11 @@ class SessionSettingsViewModel @Inject constructor(
         }
     }
 
+    fun transposeSession(delta: Int) {
+        viewModelScope.launch {
+            repository.transposeSession(sessionId, delta)
+        }
+    }
+
     fun notifySaved() { _saved.value = true }
 }

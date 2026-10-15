@@ -17,6 +17,9 @@ interface SessionDao {
     @Query("SELECT * FROM sessions WHERE id = :id")
     fun getSessionById(id: String): Flow<Session?>
 
+    @Query("SELECT * FROM sessions WHERE id = :id")
+    suspend fun getSessionByIdOnce(id: String): Session?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSession(session: Session)
 

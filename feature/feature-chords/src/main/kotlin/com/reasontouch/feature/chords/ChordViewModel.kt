@@ -1146,4 +1146,61 @@ class ChordViewModel @Inject constructor(
             onComplete()
         }
     }
+
+    fun transposeBar(barIndex: Int, delta: Int, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            val beatsPerBar = ui.value.barDuration.toFloat()
+            val barStart = barIndex * beatsPerBar
+            val barEnd = barStart + beatsPerBar
+
+            val trackList = repository.getTracksForSession(sessionId).first()
+            trackList.forEach { track ->
+                val notes = repository.getNotesForTrackOnce(track.id)
+                val updatedNotes = notes.map { note ->
+                    if (note.beat >= barStart && note.beat < barEnd) {
+                        note.copy(pitch = (note.pitch + delta).coerceIn(0, 87))
+                    } else note
+                }
+                repository.deleteNotesForTrack(track.id)
+                repository.saveNotes(updatedNotes)
+            }
+            val bars = repository.getChordsForSessionOnce(sessionId)
+            val chord = bars.getOrNull(barIndex)
+            if (chord != null) {
+                val newRoot = (chord.rootMidi + delta).coerceIn(0, 127)
+                val newMidiNotes = chord.midiNotes.split(",").mapNotNull { it.trim().toIntOrNull() }
+                    .map { (it + delta).coerceIn(0, 127) }.joinToString(",")
+                repository.saveChord(chord.copy(rootMidi = newRoot, midiNotes = newMidiNotes))
+            }
+            update { copy(statusMessage = "Transposed bar ${barIndex + 1} by $delta semitones") }
+            onComplete()
+        }
+    }
+
+    fun invertBar(barIndex: Int, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            val beatsPerBar = ui.value.barDuration.toFloat()
+            val barStart = barIndex * beatsPerBar
+            val barEnd = barStart + beatsPerBar
+
+            val trackList = repository.getTracksForSession(sessionId).first()
+            trackList.forEach { track ->
+                val notes = repository.getNotesForTrackOnce(track.id)
+                val barNotes = notes.filter { it.beat >= barStart && it.beat < barEnd }
+                if (barNotes.isNotEmpty()) {
+                    val avgPitch = barNotes.map { it.pitch }.average().toInt()
+                    val updatedNotes = notes.map { note ->
+                        if (note.beat >= barStart && note.beat < barEnd) {
+                            val reflected = (2 * avgPitch - note.pitch).coerceIn(0, 87)
+                            note.copy(pitch = reflected)
+                        } else note
+                    }
+                    repository.deleteNotesForTrack(track.id)
+                    repository.saveNotes(updatedNotes)
+                }
+            }
+            update { copy(statusMessage = "Inverted notes in bar ${barIndex + 1}") }
+            onComplete()
+        }
+    }
 }

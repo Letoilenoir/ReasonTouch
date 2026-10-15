@@ -1,6 +1,7 @@
 package com.reasontouch.core.data
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -208,5 +209,35 @@ class SessionRepository @Inject constructor(
         result.add(Pair(reggae, reggaeSteps))
 
         return result
+    }
+
+    suspend fun transposeSession(sessionId: String, delta: Int) {
+        if (delta == 0) return
+        val session = sessionDao.getSessionByIdOnce(sessionId)
+        if (session != null) {
+            val roots = listOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
+            val currIdx = roots.indexOf(session.keyRoot).coerceAtLeast(0)
+            val newRoot = roots[((currIdx + delta) % 12 + 12) % 12]
+            sessionDao.updateSession(session.copy(keyRoot = newRoot, updatedAt = System.currentTimeMillis()))
+        }
+
+        val tracks = trackDao.getTracksForSession(sessionId).first()
+        tracks.forEach { track ->
+            val notes = noteDao.getNotesForTrackOnce(track.id)
+            val updatedNotes = notes.map { note ->
+                note.copy(pitch = (note.pitch + delta).coerceIn(0, 87))
+            }
+            noteDao.deleteNotesForTrack(track.id)
+            noteDao.insertNotes(updatedNotes)
+        }
+        val chords = chordDao.getChordsForSessionOnce(sessionId)
+        val updatedChords = chords.map { chord ->
+            val newRoot = (chord.rootMidi + delta).coerceIn(0, 127)
+            val newMidiNotes = chord.midiNotes.split(",").mapNotNull { it.trim().toIntOrNull() }
+                .map { (it + delta).coerceIn(0, 127) }.joinToString(",")
+            chord.copy(rootMidi = newRoot, midiNotes = newMidiNotes)
+        }
+        chordDao.deleteChordsForSession(sessionId)
+        chordDao.insertChords(updatedChords)
     }
 }

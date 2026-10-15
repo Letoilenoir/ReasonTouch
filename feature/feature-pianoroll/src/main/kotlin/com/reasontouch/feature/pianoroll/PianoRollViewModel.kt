@@ -717,6 +717,48 @@ class PianoRollViewModel @Inject constructor(
         }
     }
 
+    fun transposeSelectedNotes(delta: Int) {
+        val ids = _selectedNoteIds.value
+        if (ids.isEmpty()) return
+        val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
+        recordSnapshot()
+        viewModelScope.launch {
+            val notes = _allNotes.value[activeTrack.id] ?: emptyList()
+            val updatedNotes = notes.map { note ->
+                if (note.id in ids) {
+                    note.copy(pitch = (note.pitch + delta).coerceIn(0, 87))
+                } else note
+            }
+            repository.deleteNotesForTrack(activeTrack.id)
+            repository.saveNotes(updatedNotes)
+            _allNotes.value = _allNotes.value.toMutableMap().apply { put(activeTrack.id, updatedNotes) }
+            updateActiveNotes()
+        }
+    }
+
+    fun invertSelectedNotes() {
+        val ids = _selectedNoteIds.value
+        if (ids.isEmpty()) return
+        val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
+        recordSnapshot()
+        viewModelScope.launch {
+            val notes = _allNotes.value[activeTrack.id] ?: emptyList()
+            val selectedNotes = notes.filter { it.id in ids }
+            if (selectedNotes.isEmpty()) return@launch
+            val avgPitch = selectedNotes.map { it.pitch }.average().toInt()
+            val updatedNotes = notes.map { note ->
+                if (note.id in ids) {
+                    val reflected = (2 * avgPitch - note.pitch).coerceIn(0, 87)
+                    note.copy(pitch = reflected)
+                } else note
+            }
+            repository.deleteNotesForTrack(activeTrack.id)
+            repository.saveNotes(updatedNotes)
+            _allNotes.value = _allNotes.value.toMutableMap().apply { put(activeTrack.id, updatedNotes) }
+            updateActiveNotes()
+        }
+    }
+
     // ---------------------------------------------------------------------
     // PLAYBACK
     // ---------------------------------------------------------------------

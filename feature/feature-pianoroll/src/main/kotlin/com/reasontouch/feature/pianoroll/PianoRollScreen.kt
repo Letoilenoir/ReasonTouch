@@ -60,6 +60,7 @@ private val TEXT     = Color(0xFFC8C8D4)
 private val TEXT_DIM = Color(0xFF666675)
 private val PURPLE   = Color(0xFFA78BFA)
 private val BLUE     = Color(0xFF38BDF8)
+private val GOLD     = Color(0xFFF5C518)
 
 // -- Per-track instrument lists ------------------------------------------------
 
@@ -254,7 +255,9 @@ fun PianoRollScreen(
                 onCopy        = { viewModel.copySelectedNotes() },
                 onPaste       = { viewModel.pasteNotes(playheadBeat, uiState.snapValue) },
                 onDelete      = { viewModel.deleteSelectedNotes() },
-                onClear       = { viewModel.clearSelection() }
+                onClear       = { viewModel.clearSelection() },
+                onTranspose   = { delta -> viewModel.transposeSelectedNotes(delta) },
+                onInvert      = { viewModel.invertSelectedNotes() }
             )
         }
 
@@ -380,6 +383,16 @@ fun PianoRollScreen(
                         onSubstitute = { newTheoryChord, strumPattern ->
                             viewModel.recordSnapshot()
                             chordViewModel.substituteChord(barIdx, newTheoryChord, strumPattern) { viewModel.refreshNotes() }
+                            activeBarToInspect = null
+                        },
+                        onTranspose = { delta ->
+                            viewModel.recordSnapshot()
+                            chordViewModel.transposeBar(barIdx, delta) { viewModel.refreshNotes() }
+                            activeBarToInspect = null
+                        },
+                        onInvert = {
+                            viewModel.recordSnapshot()
+                            chordViewModel.invertBar(barIdx) { viewModel.refreshNotes() }
                             activeBarToInspect = null
                         },
                         onDismiss = { activeBarToInspect = null }
@@ -655,10 +668,12 @@ fun SelectionActionBar(
     selectedCount: Int,
     hasClipboard:  Boolean,
     pasteAtBeat:   Float = 0f,
-    onCopy:   () -> Unit,
-    onPaste:  () -> Unit,
-    onDelete: () -> Unit,
-    onClear:  () -> Unit
+    onCopy:        () -> Unit,
+    onPaste:       () -> Unit,
+    onDelete:      () -> Unit,
+    onClear:       () -> Unit,
+    onTranspose:   (Int) -> Unit,
+    onInvert:      () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -667,21 +682,25 @@ fun SelectionActionBar(
             .background(Color(0xFF1E1A2E))
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
             text = "$selectedCount selected",
             color = PURPLE, fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f)
+            fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold
         )
         SelectionChip("COPY",   PURPLE, onCopy)
         if (hasClipboard) {
             SelectionChip(
-                "PASTE \u2192 bar ${(pasteAtBeat / 4).toInt() + 1}",
+                "PASTE",
                 GREEN, onPaste
             )
         }
+        SelectionChip("-12", BLUE, { onTranspose(-12) })
+        SelectionChip("-1", BLUE, { onTranspose(-1) })
+        SelectionChip("+1", BLUE, { onTranspose(1) })
+        SelectionChip("+12", BLUE, { onTranspose(12) })
+        SelectionChip("INVERT", GOLD, onInvert)
         SelectionChip("DELETE", ACCENT,   onDelete)
         SelectionChip("X",      TEXT_DIM, onClear)
     }
