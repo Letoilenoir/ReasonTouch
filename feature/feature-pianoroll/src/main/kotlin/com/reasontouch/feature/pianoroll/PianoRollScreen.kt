@@ -3,6 +3,7 @@ package com.reasontouch.feature.pianoroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -686,20 +687,18 @@ fun SelectionActionBar(
     onTranspose:   (Int) -> Unit,
     onInvert:      () -> Unit
 ) {
+    val scrollState = androidx.compose.foundation.rememberScrollState()
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(36.dp)
             .background(Color(0xFF1E1A2E))
+            .horizontalScroll(scrollState)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Text(
-            text = "$selectedCount selected",
-            color = PURPLE, fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold
-        )
+        SelectionChip("DELETE", ACCENT,   onDelete)
         SelectionChip("COPY",   PURPLE, onCopy)
         if (hasClipboard) {
             SelectionChip(
@@ -712,7 +711,6 @@ fun SelectionActionBar(
         SelectionChip("+1", BLUE, { onTranspose(1) })
         SelectionChip("+12", BLUE, { onTranspose(12) })
         SelectionChip("INVERT", GOLD, onInvert)
-        SelectionChip("DELETE", ACCENT,   onDelete)
         SelectionChip("X",      TEXT_DIM, onClear)
     }
     Box(modifier = Modifier.fillMaxWidth().height(1.dp)
