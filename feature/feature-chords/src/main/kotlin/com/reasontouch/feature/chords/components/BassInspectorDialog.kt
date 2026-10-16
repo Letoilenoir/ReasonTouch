@@ -4,10 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Switch
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,11 +43,13 @@ fun BassInspectorDialog(
         Column(
             modifier = Modifier
                 .width(360.dp)
+                .heightIn(max = 520.dp)
                 .clip(RoundedCornerShape(skin.cornerRadiusMedium))
                 .background(skin.panel)
                 .border(1.dp, skin.border, RoundedCornerShape(skin.cornerRadiusMedium))
                 .clickable(enabled = false) {}
                 .padding(skin.paddingLarge)
+                .verticalScroll(rememberScrollState())
         ) {
             Text(
                 text = "BASS INSPECTOR — BAR ${barIndex + 1}",
@@ -61,20 +62,17 @@ fun BassInspectorDialog(
 
             Text(text = "STYLIST MODIFIERS", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
             Spacer(Modifier.height(4.dp))
-            StylistToggleRow("Motown Chromatic Walk", useMotown) { useMotown = it }
-            StylistToggleRow("Fusion 7ths/9ths (Jaco)", useJaco) { useJaco = it }
-            StylistToggleRow("Ghost Note Pocket (Dart)", useDart) { useDart = it }
-            StylistToggleRow("Phrase Motif Variation", useVariation) { useVariation = it }
+            StylistRadioRow("Motown Chromatic Walk", useMotown) { useMotown = it }
+            StylistRadioRow("Fusion 7ths/9ths (Jaco)", useJaco) { useJaco = it }
+            StylistRadioRow("Ghost Note Pocket (Dart)", useDart) { useDart = it }
+            StylistRadioRow("Phrase Motif Variation", useVariation) { useVariation = it }
 
             Spacer(Modifier.height(skin.paddingMedium))
             Text(text = "SELECT BASS STYLE", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
             Spacer(Modifier.height(4.dp))
 
-            LazyColumn(
-                modifier = Modifier.height(140.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                items(BassStyle.entries.toList()) { style ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                BassStyle.entries.toList().forEach { style ->
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -82,7 +80,7 @@ fun BassInspectorDialog(
                             .background(skin.panelAlt)
                             .border(1.dp, skin.border, RoundedCornerShape(skin.cornerRadiusSmall))
                             .clickable { onApply(style, useMotown, useJaco, useDart, useVariation); onDismiss() }
-                            .padding(horizontal = skin.paddingMedium, vertical = 6.dp)
+                            .padding(horizontal = skin.paddingMedium, vertical = 8.dp)
                     ) {
                         Column {
                             Text(text = style.label, color = skin.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -108,16 +106,36 @@ fun BassInspectorDialog(
 }
 
 @Composable
-private fun StylistToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun StylistRadioRow(label: String, selected: Boolean, onSelect: (Boolean) -> Unit) {
     val skin = ReasonTouchTheme.skin
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(bottom = 3.dp)
+            .background(if (selected) skin.accent.copy(alpha = 0.15f) else skin.panelAlt, RoundedCornerShape(skin.cornerRadiusSmall))
+            .border(width = if (selected) 1.dp else 0.dp, color = if (selected) skin.accent else Color.Transparent, shape = RoundedCornerShape(skin.cornerRadiusSmall))
+            .clickable { onSelect(!selected) }
+            .padding(horizontal = skin.paddingMedium, vertical = 6.dp),
+        contentAlignment = Alignment.CenterStart
     ) {
-        Text(text = label, color = skin.textPrimary, fontSize = 12.sp)
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = label, color = skin.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Box(
+                modifier = Modifier
+                    .width(16.dp)
+                    .height(16.dp)
+                    .background(if (selected) skin.accent else Color.Transparent, RoundedCornerShape(8.dp))
+                    .border(1.5.dp, if (selected) skin.accent else skin.textMuted, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (selected) {
+                    Box(modifier = Modifier.width(6.dp).height(6.dp).background(Color.Black, RoundedCornerShape(3.dp)))
+                }
+            }
+        }
     }
 }

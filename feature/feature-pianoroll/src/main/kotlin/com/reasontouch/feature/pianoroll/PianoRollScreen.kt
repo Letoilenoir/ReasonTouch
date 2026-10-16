@@ -206,20 +206,31 @@ fun PianoRollScreen(
 
     val scope = rememberCoroutineScope()
 
-    suspend fun generateGroovePreview(bassStyle: BassStyle, drumPresetName: String): GroovePreview? {
+    suspend fun generateGroovePreview(
+        bassStyle: BassStyle,
+        drumPresetName: String,
+        motown: Boolean,
+        jaco: Boolean,
+        dart: Boolean,
+        variation: Boolean
+    ): GroovePreview? {
         val bassTrack = tracks.firstOrNull { it.name.uppercase() == "BASS" } ?: return null
         val drumTrack = tracks.firstOrNull { it.name.uppercase() == "DRUMS" } ?: return null
 
+        val context = com.reasontouch.feature.chords.CompositionContextBuilder.buildContext(session, chords, chordUiState.barDuration.toFloat())
         val bassNotes = BassGenerator.generate(
             chords = chords,
             style = bassStyle,
             targetTrackId = bassTrack.id,
             beatsPerBar = chordUiState.barDuration.toFloat(),
             appendOffset = 0f,
-            snapValue = 0.25f
+            snapValue = 0.25f,
+            context = context,
+            useMotownWalk = motown,
+            useJacoExtensions = jaco,
+            useDartGhostNotes = dart,
+            useMotifVariation = variation
         )
-
-        val context = com.reasontouch.feature.chords.CompositionContextBuilder.buildContext(session, chords, chordUiState.barDuration.toFloat())
         val segments = drumViewModel.generateSegmentsFromContext(context, drumPresetName)
         val drumNotes = mutableListOf<com.reasontouch.core.data.NoteEvent>()
         segments.forEach { segment ->
@@ -540,9 +551,9 @@ fun PianoRollScreen(
                 grooveBassSuggestions = grooveBassSuggestions,
                 grooveDrumSuggestions = grooveDrumSuggestions,
                 groovePreview         = groovePreview,
-                onGenerateGroove      = { bassStyle, drumPresetName ->
+                onGenerateGroove      = { bassStyle, drumPresetName, motown, jaco, dart, variation ->
                     scope.launch {
-                        groovePreview = generateGroovePreview(bassStyle, drumPresetName)
+                        groovePreview = generateGroovePreview(bassStyle, drumPresetName, motown, jaco, dart, variation)
                     }
                 },
                 onApplyGroove         = {

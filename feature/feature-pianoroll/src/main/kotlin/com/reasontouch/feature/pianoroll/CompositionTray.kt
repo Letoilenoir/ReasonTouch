@@ -92,7 +92,7 @@ fun CompositionTray(
     grooveBassSuggestions: List<RankedSuggestion<BassStyle>> = emptyList(),
     grooveDrumSuggestions: List<RankedSuggestion<String>> = emptyList(),
     groovePreview: GroovePreview? = null,
-    onGenerateGroove: (BassStyle, String) -> Unit,
+    onGenerateGroove: (BassStyle, String, Boolean, Boolean, Boolean, Boolean) -> Unit,
     onApplyGroove: () -> Unit,
     onDiscardGroove: () -> Unit,
     transitionFill: Boolean = true,
@@ -274,23 +274,27 @@ private fun BassPanel(
     var useDart by remember { mutableStateOf(true) }
     var useVariation by remember { mutableStateOf(true) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+    ) {
         Text(text = "BASS", color = skin.accent, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(skin.paddingMedium))
 
         Text(text = "STYLIST MODIFIERS", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
         Spacer(Modifier.height(4.dp))
-        StylistToggleRow("Motown Chromatic Walk", useMotown) { useMotown = it }
-        StylistToggleRow("Fusion 7ths/9ths (Jaco)", useJaco) { useJaco = it }
-        StylistToggleRow("Ghost Note Pocket (Dart)", useDart) { useDart = it }
-        StylistToggleRow("Phrase Motif Variation", useVariation) { useVariation = it }
+        StylistRadioRow("Motown Chromatic Walk", useMotown) { useMotown = it }
+        StylistRadioRow("Fusion 7ths/9ths (Jaco)", useJaco) { useJaco = it }
+        StylistRadioRow("Ghost Note Pocket (Dart)", useDart) { useDart = it }
+        StylistRadioRow("Phrase Motif Variation", useVariation) { useVariation = it }
 
         Spacer(Modifier.height(skin.paddingMedium))
         Text(text = "SELECT BASS STYLE", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
         Spacer(Modifier.height(4.dp))
 
-        LazyColumn(modifier = Modifier.weight(1f)) {
-            items(BassStyle.values().toList()) { style ->
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            BassStyle.values().toList().forEach { style ->
                 SuggestableRow(
                     label = style.label,
                     description = style.description,
@@ -300,6 +304,7 @@ private fun BassPanel(
             }
         }
 
+        Spacer(Modifier.height(skin.paddingMedium))
         AppendModeRow(appendMode = appendMode, onToggle = { appendMode = it })
         Spacer(Modifier.height(skin.paddingMedium))
         TrayActionRow(label = "BACK", onClick = onBack)
@@ -307,17 +312,37 @@ private fun BassPanel(
 }
 
 @Composable
-private fun StylistToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun StylistRadioRow(label: String, selected: Boolean, onSelect: (Boolean) -> Unit) {
     val skin = ReasonTouchTheme.skin
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(bottom = 3.dp)
+            .background(if (selected) skin.accent.copy(alpha = 0.15f) else skin.panelAlt, RoundedCornerShape(skin.cornerRadiusSmall))
+            .border(width = if (selected) 1.dp else 0.dp, color = if (selected) skin.accent else Color.Transparent, shape = RoundedCornerShape(skin.cornerRadiusSmall))
+            .clickable { onSelect(!selected) }
+            .padding(horizontal = skin.paddingMedium, vertical = 6.dp),
+        contentAlignment = Alignment.CenterStart
     ) {
-        Text(text = label, color = skin.textPrimary, fontSize = 12.sp)
-        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = label, color = skin.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Box(
+                modifier = Modifier
+                    .width(16.dp)
+                    .height(16.dp)
+                    .background(if (selected) skin.accent else Color.Transparent, RoundedCornerShape(8.dp))
+                    .border(1.5.dp, if (selected) skin.accent else skin.textMuted, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (selected) {
+                    Box(modifier = Modifier.width(6.dp).height(6.dp).background(Color.Black, RoundedCornerShape(3.dp)))
+                }
+            }
+        }
     }
 }
 
@@ -550,7 +575,7 @@ private fun FullGroovePanel(
     onTransitionFillChange: (Boolean) -> Unit,
     endFill: Boolean,
     onEndFillChange: (Boolean) -> Unit,
-    onGenerate: (BassStyle, String) -> Unit,
+    onGenerate: (BassStyle, String, Boolean, Boolean, Boolean, Boolean) -> Unit,
     onApply: () -> Unit,
     onDiscard: () -> Unit,
     onBack: () -> Unit
@@ -564,6 +589,10 @@ private fun FullGroovePanel(
     var selectedDrum by remember(drumSuggestions) {
         mutableStateOf(if (isAssisted) drumSuggestions.firstOrNull()?.value else null)
     }
+    var useMotown by remember { mutableStateOf(true) }
+    var useJaco by remember { mutableStateOf(true) }
+    var useDart by remember { mutableStateOf(true) }
+    var useVariation by remember { mutableStateOf(true) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Text(text = "FULL GROOVE", color = skin.accent, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
@@ -625,6 +654,15 @@ private fun FullGroovePanel(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = "BASS", color = skin.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(bottom = skin.paddingSmall))
+
+                        Text(text = "MODIFIERS", color = skin.textSecondary, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                        Spacer(Modifier.height(2.dp))
+                        StylistRadioRow("Motown Walk", useMotown) { useMotown = it }
+                        StylistRadioRow("Jaco 7ths/9ths", useJaco) { useJaco = it }
+                        StylistRadioRow("Ghost Pocket", useDart) { useDart = it }
+                        StylistRadioRow("Motif Variation", useVariation) { useVariation = it }
+                        Spacer(Modifier.height(4.dp))
+
                         BassStyle.values().forEach { style ->
                             CompactSuggestableRow(
                                 label = style.label,
@@ -685,7 +723,7 @@ private fun FullGroovePanel(
                             RoundedCornerShape(skin.cornerRadiusSmall)
                         )
                         .clickable(enabled = canGenerate) {
-                            onGenerate(selectedBass!!, selectedDrum!!)
+                            onGenerate(selectedBass!!, selectedDrum!!, useMotown, useJaco, useDart, useVariation)
                         }
                         .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center
