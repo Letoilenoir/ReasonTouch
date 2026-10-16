@@ -11,12 +11,12 @@ import java.util.UUID
  * Pitch convention: pitch = 108 - midiNote, so MIDI 40 = pitch 68.
  *
  * Each style produces musically distinct patterns:
- *   ROOT       — whole note on root
+ *   ROOT       — whole note on root (with optional octave variation on bars 3-4)
  *   ROOT_FIFTH — root on beat 1, perfect fifth on beat 3
  *   OCTAVE     — root on beat 1, root+12 on beat 3
- *   WALKING    — chromatic/scale approach from root to next root
- *   ARPEGGIO   — chord tones ascending: root, third, fifth, octave
- *   GROOVE     — syncopated: root on 1, ghost on 2.5, root on 3, ghost on 3.5
+ *   WALKING    — Jamerson-style chromatic approach & passing tones leading to next root
+ *   ARPEGGIO   — Jaco-inspired upper-extension arpeggios (7ths/9ths)
+ *   GROOVE     — Joe Dart-style pocket groove with micro-timed ghost notes
  *   PEDAL      — root sustained for full bar duration
  */
 object BassGenerator {
@@ -28,21 +28,29 @@ object BassGenerator {
     /**
      * Generate bass notes for a complete progression.
      *
-     * @param chords       ChordEvent list from Room
-     * @param style        Selected BassStyle
-     * @param targetTrackId  Room track ID for the bass track
-     * @param beatsPerBar  Session bar duration in beats
-     * @param appendOffset Beat offset if appending to existing content
-     * @param snapValue    Snap grid value for note quantisation
+     * @param chords           ChordEvent list from Room
+     * @param style            Selected BassStyle
+     * @param targetTrackId    Room track ID for the bass track
+     * @param beatsPerBar      Session bar duration in beats
+     * @param appendOffset     Beat offset if appending to existing content
+     * @param snapValue        Snap grid value for note quantisation
+     * @param useMotownWalk    Jamerson chromatic approaches toggle
+     * @param useJacoExtensions Jaco 7ths/9ths toggle
+     * @param useDartGhostNotes Joe Dart ghost notes toggle
+     * @param useMotifVariation  Phrase-level motif variation toggle
      */
     fun generate(
-        chords:        List<ChordEvent>,
-        style:         BassStyle,
-        targetTrackId: String,
-        beatsPerBar:   Float = 4f,
-        appendOffset:  Float = 0f,
-        snapValue:     Float = 0.25f,
-        context:       CompositionContext? = null
+        chords:            List<ChordEvent>,
+        style:             BassStyle,
+        targetTrackId:     String,
+        beatsPerBar:       Float = 4f,
+        appendOffset:      Float = 0f,
+        snapValue:         Float = 0.25f,
+        context:           CompositionContext? = null,
+        useMotownWalk:     Boolean = true,
+        useJacoExtensions: Boolean = true,
+        useDartGhostNotes: Boolean = true,
+        useMotifVariation: Boolean = true
     ): List<NoteEvent> {
         if (chords.isEmpty()) return emptyList()
 
@@ -71,13 +79,16 @@ object BassGenerator {
                 style
             }
 
+            // Motif & Variation Control: introduce subtle variation on bars 3 and 4 of a loop
+            val isVariationBar = useMotifVariation && (barIdx % 4 >= 2)
+
             val barNotes = when (effectiveStyle) {
-                BassStyle.ROOT       -> generateRoot(rootMidi, barStart, beatsPerBar, targetTrackId)
+                BassStyle.ROOT       -> generateRoot(rootMidi, barStart, beatsPerBar, targetTrackId, isVariationBar)
                 BassStyle.ROOT_FIFTH -> generateRootFifth(rootMidi, barStart, beatsPerBar, targetTrackId)
                 BassStyle.OCTAVE     -> generateOctave(rootMidi, barStart, beatsPerBar, targetTrackId)
-                BassStyle.WALKING    -> generateWalking(rootMidi, nextRootMidi, barStart, beatsPerBar, targetTrackId)
-                BassStyle.ARPEGGIO   -> generateArpeggio(chordTones, rootMidi, barStart, beatsPerBar, targetTrackId)
-                BassStyle.GROOVE     -> generateGroove(rootMidi, barStart, beatsPerBar, targetTrackId)
+                BassStyle.WALKING    -> generateWalking(rootMidi, nextRootMidi, barStart, beatsPerBar, targetTrackId, useMotownWalk)
+                BassStyle.ARPEGGIO   -> generateArpeggio(chordTones, rootMidi, barStart, beatsPerBar, targetTrackId, useJacoExtensions)
+                BassStyle.GROOVE     -> generateGroove(rootMidi, barStart, beatsPerBar, targetTrackId, useDartGhostNotes)
                 BassStyle.PEDAL      -> generatePedal(rootMidi, barStart, beatsPerBar, targetTrackId)
             }
             notes.addAll(barNotes)
@@ -87,12 +98,21 @@ object BassGenerator {
 
     // ── Style generators ──────────────────────────────────────────────────
 
-    /** Root — single whole note on beat 1 */
+    /** Root — single whole note on beat 1 (with octave variation on bars 3-4) */
     private fun generateRoot(
-        root: Int, barStart: Float, barDur: Float, trackId: String
-    ): List<NoteEvent> = listOf(
-        note(trackId, root, barStart, barDur * 0.95f, 95)
-    )
+        root: Int, barStart: Float, barDur: Float, trackId: String, isVariation: Boolean
+    ): List<NoteEvent> {
+        return if (isVariation) {
+            val octave = (root + 12).coerceAtMost(BASS_MAX_MIDI)
+            val halfBar = barDur / 2f
+            listOf(
+                note(trackId, root, barStart, halfBar * 0.95f, 95),
+                note(trackId, octave, barStart + halfBar, halfBar * 0.95f, 85)
+            )
+        } else {
+            listOf(note(trackId, root, barStart, barDur * 0.95f, 95))
+        }
+    }
 
     /** Root + 5th — root on beat 1, perfect fifth on beat 3 */
     private fun generateRootFifth(
@@ -121,69 +141,76 @@ object BassGenerator {
     }
 
     /**
-     * Walking Bass — root on beat 1, chromatic approach notes leading
-     * to the next chord's root on beat 4.
-     * Beat 1: root
-     * Beat 2: root + 2 semitones (scale passing note)
-     * Beat 3: halfway between root and next root
-     * Beat 4: chromatic approach (next root ± 1)
+     * Jamerson-style Walking Bass — root on beat 1, passing minor third, fifth,
+     * and chromatic approach leading to the next root on beat 4.
      */
     private fun generateWalking(
-        root: Int, nextRoot: Int?, barStart: Float, barDur: Float, trackId: String
+        root: Int, nextRoot: Int?, barStart: Float, barDur: Float, trackId: String, useMotownWalk: Boolean
     ): List<NoteEvent> {
         val beatDur  = barDur / 4f
         val noteDur  = beatDur * 0.9f
         val target   = nextRoot ?: root
-        val approach = if (target > root) target - 1 else target + 1
-        val mid      = bassRegister((root + target) / 2)
+        val approach = if (useMotownWalk) {
+            if (target > root) target - 1 else target + 1
+        } else {
+            target
+        }
+        val passing  = if (useMotownWalk) bassRegister(root + 3) else bassRegister(root + 4)
 
         return listOf(
-            note(trackId, root,              barStart,              noteDur, 100),
-            note(trackId, bassRegister(root + 2), barStart + beatDur,   noteDur, 80),
-            note(trackId, mid,               barStart + beatDur*2f, noteDur, 85),
-            note(trackId, bassRegister(approach), barStart + beatDur*3f, noteDur, 90)
+            note(trackId, root,                   barStart,              noteDur, 100),
+            note(trackId, passing,                barStart + beatDur,    noteDur, 82),
+            note(trackId, bassRegister(root + 7), barStart + beatDur*2f, noteDur, 88),
+            note(trackId, bassRegister(approach), barStart + beatDur*3f, noteDur, 95)
         )
     }
 
     /**
-     * Arpeggio — chord tones in sequence, one per beat.
-     * Wraps back to root if fewer than 4 tones.
+     * Jaco-inspired Arpeggio — upper-extension arpeggiation (7ths & 9ths)
+     * outlining chord tones in sequence.
      */
     private fun generateArpeggio(
-        tones: List<Int>, root: Int, barStart: Float, barDur: Float, trackId: String
+        tones: List<Int>, root: Int, barStart: Float, barDur: Float, trackId: String, useJacoExtensions: Boolean
     ): List<NoteEvent> {
         val beatDur = barDur / 4f
         val noteDur = beatDur * 0.85f
-        val pitches = if (tones.size >= 4) tones.take(4)
-                      else (tones + listOf(root + 12)).take(4)
+        val extendedTones = if (useJacoExtensions && tones.size >= 3) {
+            listOf(root, tones[1], tones.last(), bassRegister(tones.first() + 14))
+        } else if (tones.size >= 4) {
+            tones.take(4)
+        } else {
+            tones + listOf(root + 12)
+        }
+        val pitches = extendedTones.take(4)
 
         return pitches.mapIndexed { i, pitch ->
             note(trackId, bassRegister(pitch),
                 barStart + i * beatDur, noteDur,
-                if (i == 0) 100 else 75)
+                if (i == 0) 100 else 78)
         }
     }
 
     /**
-     * Groove — syncopated pattern:
-     * Beat 1:   root (strong)
-     * Beat 2.5: root (ghost, quiet)
-     * Beat 3:   root (medium)
-     * Beat 3.5: root (ghost, quiet)
+     * Joe Dart-style Groove — syncopated pattern with micro-timed low-velocity ghost notes.
      */
     private fun generateGroove(
-        root: Int, barStart: Float, barDur: Float, trackId: String
+        root: Int, barStart: Float, barDur: Float, trackId: String, useDartGhostNotes: Boolean
     ): List<NoteEvent> {
         val beatDur = barDur / 4f
         val eighth  = beatDur / 2f
         val noteDur = eighth * 0.85f
 
-        return listOf(
+        val notes = mutableListOf(
             note(trackId, root, barStart,               beatDur * 0.9f, 105),
-            note(trackId, root, barStart + beatDur*1.5f, noteDur,        55),
-            note(trackId, root, barStart + beatDur*2f,   beatDur * 0.45f, 90),
-            note(trackId, root, barStart + beatDur*2.5f, noteDur,         50)
+            note(trackId, root, barStart + beatDur * 2.0f,  beatDur * 0.45f, 95)
         )
+        if (useDartGhostNotes) {
+            notes.add(note(trackId, root, barStart + beatDur * 0.75f, noteDur * 0.6f, 45))
+            notes.add(note(trackId, root, barStart + beatDur * 1.5f,  noteDur,        60))
+            notes.add(note(trackId, root, barStart + beatDur * 2.75f, noteDur * 0.6f, 50))
+            notes.add(note(trackId, root, barStart + beatDur * 3.5f,  noteDur,        55))
+        }
+        return notes.sortedBy { it.beat }
     }
 
     /** Pedal — sustained root for the full bar */

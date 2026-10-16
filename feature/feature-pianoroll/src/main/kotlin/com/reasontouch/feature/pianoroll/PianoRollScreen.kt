@@ -400,9 +400,9 @@ fun PianoRollScreen(
                     "BASS" -> com.reasontouch.feature.chords.components.BassInspectorDialog(
                         barIndex = barIdx,
                         currentStyle = null,
-                        onApply = { style ->
+                        onApply = { style, motown, jaco, dart, variation ->
                             viewModel.recordSnapshot()
-                            chordViewModel.substituteBass(barIdx, style) { viewModel.refreshNotes() }
+                            chordViewModel.substituteBass(barIdx, style, motown, jaco, dart, variation) { viewModel.refreshNotes() }
                             activeBarToInspect = null
                         },
                         onDismiss = { activeBarToInspect = null }
@@ -516,9 +516,9 @@ fun PianoRollScreen(
                 },
                 hasFills             = tracks.firstOrNull { it.name.uppercase() == "DRUMS" }
                     ?.let { track -> allNotes[track.id]?.any { note -> note.duration == 0.25f && note.velocity >= 95 } } ?: false,
-                onApplyBass          = { style, append ->
+                onApplyBass          = { style, append, motown, jaco, dart, variation ->
                     viewModel.recordSnapshot()
-                    chordViewModel.generateBass(style, append) {
+                    chordViewModel.generateBass(style, append, motown, jaco, dart, variation) {
                         viewModel.refreshNotes()
                     }
                     trayExpanded = false

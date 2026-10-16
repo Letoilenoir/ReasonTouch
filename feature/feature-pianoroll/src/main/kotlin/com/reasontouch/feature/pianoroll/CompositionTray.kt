@@ -86,7 +86,7 @@ fun CompositionTray(
     onFullGrooveRequested: () -> Unit,
     bassSuggestions: List<BassStyle> = emptyList(),
     drumSuggestions: List<String> = emptyList(),
-    onApplyBass: (BassStyle, appendMode: Boolean) -> Unit,
+    onApplyBass: (BassStyle, appendMode: Boolean, motown: Boolean, jaco: Boolean, dart: Boolean, variation: Boolean) -> Unit,
     onApplyDrums: (presetName: String, appendMode: Boolean) -> Unit,
     compositionMode: CompositionMode = CompositionMode.ASSISTED,
     grooveBassSuggestions: List<RankedSuggestion<BassStyle>> = emptyList(),
@@ -264,15 +264,30 @@ fun CompositionTray(
 @Composable
 private fun BassPanel(
     suggestions: List<BassStyle>,
-    onApply: (BassStyle, Boolean) -> Unit,
+    onApply: (BassStyle, Boolean, Boolean, Boolean, Boolean, Boolean) -> Unit,
     onBack: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
     var appendMode by remember { mutableStateOf(false) }
+    var useMotown by remember { mutableStateOf(true) }
+    var useJaco by remember { mutableStateOf(true) }
+    var useDart by remember { mutableStateOf(true) }
+    var useVariation by remember { mutableStateOf(true) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Text(text = "BASS", color = skin.accent, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(skin.paddingMedium))
+
+        Text(text = "STYLIST MODIFIERS", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+        Spacer(Modifier.height(4.dp))
+        StylistToggleRow("Motown Chromatic Walk", useMotown) { useMotown = it }
+        StylistToggleRow("Fusion 7ths/9ths (Jaco)", useJaco) { useJaco = it }
+        StylistToggleRow("Ghost Note Pocket (Dart)", useDart) { useDart = it }
+        StylistToggleRow("Phrase Motif Variation", useVariation) { useVariation = it }
+
+        Spacer(Modifier.height(skin.paddingMedium))
+        Text(text = "SELECT BASS STYLE", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+        Spacer(Modifier.height(4.dp))
 
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(BassStyle.values().toList()) { style ->
@@ -280,7 +295,7 @@ private fun BassPanel(
                     label = style.label,
                     description = style.description,
                     isSuggested = style in suggestions,
-                    onClick = { onApply(style, appendMode) }
+                    onClick = { onApply(style, appendMode, useMotown, useJaco, useDart, useVariation) }
                 )
             }
         }
@@ -288,6 +303,21 @@ private fun BassPanel(
         AppendModeRow(appendMode = appendMode, onToggle = { appendMode = it })
         Spacer(Modifier.height(skin.paddingMedium))
         TrayActionRow(label = "BACK", onClick = onBack)
+    }
+}
+
+@Composable
+private fun StylistToggleRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val skin = ReasonTouchTheme.skin
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = label, color = skin.textPrimary, fontSize = 12.sp)
+        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

@@ -477,7 +477,15 @@ class ChordViewModel @Inject constructor(
     // BASS GENERATION
     // ------------------------------------------------------------
 
-    fun generateBass(style: BassStyle, appendMode: Boolean, onComplete: () -> Unit = {}) {
+    fun generateBass(
+        style: BassStyle,
+        appendMode: Boolean,
+        motown: Boolean = true,
+        jaco: Boolean = true,
+        dart: Boolean = true,
+        variation: Boolean = true,
+        onComplete: () -> Unit = {}
+    ) {
         viewModelScope.launch {
             val bars = repository.getChordsForSessionOnce(sessionId)
             if (bars.isEmpty()) {
@@ -513,7 +521,11 @@ class ChordViewModel @Inject constructor(
                 beatsPerBar = ui.value.barDuration.toFloat(),
                 appendOffset = appendOffset,
                 snapValue = 0.25f,
-                context = context
+                context = context,
+                useMotownWalk = motown,
+                useJacoExtensions = jaco,
+                useDartGhostNotes = dart,
+                useMotifVariation = variation
             )
 
             repository.saveNotes(notes)
@@ -1057,7 +1069,15 @@ class ChordViewModel @Inject constructor(
         return chordEvent
     }
 
-    fun substituteBass(barIndex: Int, style: BassStyle, onComplete: () -> Unit = {}) {
+    fun substituteBass(
+        barIndex: Int,
+        style: BassStyle,
+        motown: Boolean = true,
+        jaco: Boolean = true,
+        dart: Boolean = true,
+        variation: Boolean = true,
+        onComplete: () -> Unit = {}
+    ) {
         viewModelScope.launch {
             val targetChord = getOrCreateChordForBar(sessionId, barIndex)
             val trackList = repository.getTracksForSession(sessionId).first()
@@ -1077,7 +1097,11 @@ class ChordViewModel @Inject constructor(
                 targetTrackId = bassTrack.id,
                 beatsPerBar = beatsPerBar,
                 appendOffset = barStart,
-                snapValue = 0.25f
+                snapValue = 0.25f,
+                useMotownWalk = motown,
+                useJacoExtensions = jaco,
+                useDartGhostNotes = dart,
+                useMotifVariation = variation
             )
 
             repository.saveNotes(filteredNotes + newNotes)
