@@ -63,7 +63,6 @@ private val PURPLE   = Color(0xFFA78BFA)
 
 private val KEY_ROOTS  = listOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
 private val TIME_SIGS  = listOf(2, 3, 4, 5, 6, 7)
-private val BAR_OPTIONS = listOf(1, 2, 4, 8, 16, 32, 64)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -196,28 +195,6 @@ fun SessionSettingsScreen(
             // ── Structure ──────────────────────────────────────────────────
             item {
                 SettingsSection("STRUCTURE")
-                SettingsRow(label = "Total Bars") {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        BAR_OPTIONS.forEach { bars ->
-                            val isSelected = session?.totalBars == bars
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(if (isSelected) ACCENT else PANEL)
-                                    .border(1.dp,
-                                        if (isSelected) ACCENT else BORDER,
-                                        RoundedCornerShape(4.dp))
-                                    .clickable { viewModel.setTotalBars(bars) }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
-                            ) {
-                                Text("$bars",
-                                    color = if (isSelected) Color.White else TEXT_DIM,
-                                    fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace)
-                            }
-                        }
-                    }
-                }
                 SettingsRow(label = "Beats / Bar") {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         TIME_SIGS.forEach { num ->
