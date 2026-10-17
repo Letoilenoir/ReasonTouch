@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -91,6 +92,27 @@ fun StrumPatternTray(
                 letterSpacing = 2.sp,
                 modifier = Modifier.weight(1f)
             )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(ACCENT.copy(alpha = 0.2f))
+                    .border(1.dp, ACCENT, RoundedCornerShape(4.dp))
+                    .clickable {
+                        customSteps = selectedPattern?.steps ?: List(16) { StepState.OFF }
+                        isEditMode = true
+                        isExpanded = false
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "CUSTOMIZE",
+                    color = ACCENT,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+            Spacer(modifier = Modifier.width(6.dp))
             Icon(
                 imageVector = if (isEditMode) Icons.Default.Clear else (if (isExpanded) Icons.Default.Clear else Icons.Default.Add),
                 contentDescription = "Toggle",
@@ -276,31 +298,6 @@ fun StrumPatternTray(
                         }
                     }
                 }
-            }
-        }
-
-        // CUSTOMIZE button (visible when pattern selected and not in edit/expand mode)
-        if (!isEditMode && selectedPattern != null && !isExpanded) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(BORDER.copy(alpha = 0.3f))
-                    .border(1.dp, BORDER, RoundedCornerShape(4.dp))
-                    .clickable {
-                        customSteps = selectedPattern.steps
-                        isEditMode = true
-                    }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "✎ CUSTOMIZE",
-                    color = TEXT,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
             }
         }
     }
