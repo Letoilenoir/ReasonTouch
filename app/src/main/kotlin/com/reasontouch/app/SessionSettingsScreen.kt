@@ -151,13 +151,13 @@ fun SessionSettingsScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(4.dp))
-                                            .background(if (isSelected) skin.info.copy(alpha = 0.2f) else skin.panelAlt)
-                                            .border(1.dp, if (isSelected) skin.info else skin.border, RoundedCornerShape(4.dp))
+                                            .background(if (isSelected) skin.accent.copy(alpha = 0.2f) else skin.panelAlt)
+                                            .border(1.dp, if (isSelected) skin.accent else skin.border, RoundedCornerShape(4.dp))
                                             .clickable { viewModel.setTimeSignatureNumerator(num) }
                                             .padding(horizontal = 10.dp, vertical = 6.dp)
                                     ) {
                                         Text("$num/4",
-                                            color = if (isSelected) skin.info else skin.textMuted,
+                                            color = if (isSelected) skin.accent else skin.textMuted,
                                             fontSize = 13.sp, fontWeight = FontWeight.Bold,
                                             fontFamily = FontFamily.Monospace)
                                     }
@@ -191,8 +191,8 @@ fun SessionSettingsScreen(
                                         colors = TextFieldDefaults.colors(
                                             unfocusedContainerColor = skin.panelAlt,
                                             focusedContainerColor   = skin.panelAlt,
-                                            unfocusedTextColor      = skin.success,
-                                            focusedTextColor        = skin.success,
+                                            unfocusedTextColor      = skin.accent,
+                                            focusedTextColor        = skin.accent,
                                             unfocusedIndicatorColor = Color.Transparent,
                                             focusedIndicatorColor   = Color.Transparent
                                         ),
@@ -214,14 +214,14 @@ fun SessionSettingsScreen(
                                             DropdownMenuItem(
                                                 text = {
                                                     Text(root,
-                                                        color = if (root == session?.keyRoot) skin.success else skin.textPrimary,
+                                                        color = if (root == session?.keyRoot) skin.accent else skin.textPrimary,
                                                         fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                                                 },
                                                 onClick = {
                                                     viewModel.setKeyRoot(root)
                                                     keyDropdownExpanded = false
                                                 },
-                                                modifier = Modifier.background(if (root == session?.keyRoot) skin.success.copy(alpha = 0.15f) else Color.Transparent)
+                                                modifier = Modifier.background(if (root == session?.keyRoot) skin.accent.copy(alpha = 0.15f) else Color.Transparent)
                                             )
                                         }
                                     }
@@ -238,17 +238,16 @@ fun SessionSettingsScreen(
                                     listOf("MAJOR" to "Major (Bright)", "MINOR" to "Minor (Dark)")
                                         .forEach { (quality, label) ->
                                             val isSelected = session?.keyQuality == quality
-                                            val col = if (quality == "MAJOR") skin.gold else skin.purple
                                             Box(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(4.dp))
-                                                    .background(if (isSelected) col.copy(alpha = 0.2f) else skin.panelAlt)
-                                                    .border(1.dp, if (isSelected) col else skin.border, RoundedCornerShape(4.dp))
+                                                    .background(if (isSelected) skin.accent.copy(alpha = 0.2f) else skin.panelAlt)
+                                                    .border(1.dp, if (isSelected) skin.accent else skin.border, RoundedCornerShape(4.dp))
                                                     .clickable { viewModel.setKeyQuality(quality) }
                                                     .padding(horizontal = 12.dp, vertical = 8.dp)
                                             ) {
                                                 Text(label,
-                                                    color = if (isSelected) col else skin.textMuted,
+                                                    color = if (isSelected) skin.accent else skin.textMuted,
                                                     fontSize = 12.sp, fontWeight = FontWeight.Bold,
                                                     fontFamily = FontFamily.Monospace)
                                             }
