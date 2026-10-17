@@ -31,6 +31,9 @@ val NeoDarkSkin = ReasonTouchSkin(
     success = Color(0xFF3DDC84),
     warning = Color(0xFFFFB84D),
     danger = Color(0xFFE84040),
+    info = Color(0xFF38BDF8),
+    gold = Color(0xFFF5C518),
+    purple = Color(0xFFA78BFA),
     
     // Musical colours
     chordTrack = Color(0xFFA78BFA),

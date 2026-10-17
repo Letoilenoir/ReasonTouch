@@ -26,6 +26,9 @@ data class ReasonTouchSkin(
     val success: Color,
     val warning: Color,
     val danger: Color,
+    val info: Color,
+    val gold: Color,
+    val purple: Color,
     
     // Track / Musical colours
     val chordTrack: Color,
