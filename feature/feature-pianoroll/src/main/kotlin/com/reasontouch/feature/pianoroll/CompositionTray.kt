@@ -87,6 +87,7 @@ fun CompositionTray(
     bassSuggestions: List<BassStyle> = emptyList(),
     drumSuggestions: List<String> = emptyList(),
     onApplyBass: (BassStyle, appendMode: Boolean, motown: Boolean, jaco: Boolean, dart: Boolean, variation: Boolean) -> Unit,
+    onHarmonizeFromBass: () -> Unit = {},
     onApplyDrums: (presetName: String, appendMode: Boolean) -> Unit,
     compositionMode: CompositionMode = CompositionMode.ASSISTED,
     grooveBassSuggestions: List<RankedSuggestion<BassStyle>> = emptyList(),
@@ -218,6 +219,7 @@ fun CompositionTray(
                     TraySection.BASS -> BassPanel(
                         suggestions = bassSuggestions,
                         onApply = onApplyBass,
+                        onHarmonizeFromBass = onHarmonizeFromBass,
                         onBack = { onSectionChange(TraySection.HOME) }
                     )
                     TraySection.DRUMS -> DrumsPanel(
@@ -265,6 +267,7 @@ fun CompositionTray(
 private fun BassPanel(
     suggestions: List<BassStyle>,
     onApply: (BassStyle, Boolean, Boolean, Boolean, Boolean, Boolean) -> Unit,
+    onHarmonizeFromBass: () -> Unit,
     onBack: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
@@ -307,6 +310,8 @@ private fun BassPanel(
         Spacer(Modifier.height(skin.paddingMedium))
         AppendModeRow(appendMode = appendMode, onToggle = { appendMode = it })
         Spacer(Modifier.height(skin.paddingMedium))
+        TrayActionRow(label = "HARMONIZE FROM BASS", onClick = onHarmonizeFromBass)
+        Spacer(Modifier.height(skin.paddingSmall))
         TrayActionRow(label = "BACK", onClick = onBack)
     }
 }

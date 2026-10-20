@@ -1241,4 +1241,87 @@ class ChordViewModel @Inject constructor(
             onComplete()
         }
     }
+
+    fun harmonizeFromBassTrack(onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            val trackList = repository.getTracksForSession(sessionId).first()
+            val bassTrack = trackList.firstOrNull { it.name.uppercase() == "BASS" } ?: return@launch
+            val chordTrack = trackList.firstOrNull { it.name.uppercase() == "CHORD" }
+
+            val bassNotes = repository.getNotesForTrackOnce(bassTrack.id)
+            if (bassNotes.isEmpty()) {
+                update { copy(statusMessage = "Draw a bassline on the BASS track first") }
+                onComplete()
+                return@launch
+            }
+
+            val beatsPerBar = ui.value.barDuration.toFloat()
+            val maxBeat = bassNotes.maxOf { it.beat + it.duration }
+            val totalBars = kotlin.math.ceil(maxBeat / beatsPerBar).toInt().coerceAtLeast(4)
+
+            val currentSession = repository.getSession(sessionId).first()
+            if (currentSession != null) {
+                repository.updateSession(currentSession.copy(totalBars = totalBars))
+            }
+
+            repository.deleteChordsForSession(sessionId)
+            if (chordTrack != null) {
+                repository.deleteNotesForTrack(chordTrack.id)
+            }
+
+            val newChords = mutableListOf<ChordEvent>()
+            val newChordNotes = mutableListOf<NoteEvent>()
+            val phraseId = UUID.randomUUID().toString()
+
+            for (barIndex in 0 until totalBars) {
+                val barStart = barIndex * beatsPerBar
+                val barEnd = barStart + beatsPerBar
+                val barBassNotes = bassNotes.filter { it.beat >= barStart && it.beat < barEnd }
+
+                val rootPitch = barBassNotes.minByOrNull { it.beat }?.pitch ?: 40
+                val midiNote = 108 - rootPitch
+                val semitone = midiNote % 12
+                val rootNote = NoteClass.fromSemitone(semitone) ?: NoteClass.C
+                val theoryChord = TheoryChord(rootNote, ChordQuality.MAJ)
+
+                val chordEvent = ChordEvent(
+                    id = UUID.randomUUID().toString(),
+                    sessionId = sessionId,
+                    barIndex = barIndex,
+                    chordName = theoryChord.guitarLabel(),
+                    rootMidi = theoryChord.midiNotes.firstOrNull() ?: 60,
+                    midiNotes = theoryChord.midiNotes.joinToString(","),
+                    voicing = "Open",
+                    strumPatternId = StepPattern.EMPTY.toChordEventString(),
+                    strumSpeedValue = ui.value.strumSpeed,
+                    phraseId = phraseId,
+                    phraseLength = totalBars
+                )
+                newChords.add(chordEvent)
+                repository.saveChord(chordEvent)
+
+                if (chordTrack != null) {
+                    newChordNotes.addAll(
+                        generateStrumNotes(
+                            midiNotes = theoryChord.midiNotes,
+                            pattern = StepPattern.EMPTY,
+                            useStrum = true,
+                            strumSpeedSeconds = ui.value.strumSpeed,
+                            bpm = currentSession?.bpm ?: 120,
+                            beatStart = barStart,
+                            beatsPerBar = beatsPerBar,
+                            trackId = chordTrack.id
+                        )
+                    )
+                }
+            }
+
+            if (newChordNotes.isNotEmpty()) {
+                repository.saveNotes(newChordNotes)
+            }
+
+            update { copy(statusMessage = "Harmonized $totalBars bars from BASS track") }
+            onComplete()
+        }
+    }
 }

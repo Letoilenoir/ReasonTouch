@@ -571,6 +571,11 @@ fun PianoRollScreen(
                     ?.let { track -> allNotes[track.id]?.isNotEmpty() } ?: false,
                 hasDrums             = tracks.firstOrNull { it.name.uppercase() == "DRUMS" }
                     ?.let { track -> allNotes[track.id]?.isNotEmpty() } ?: false,
+                onHarmonizeFromBass  = {
+                    viewModel.recordSnapshot()
+                    chordViewModel.harmonizeFromBassTrack { viewModel.refreshNotes() }
+                    trayExpanded = false
+                },
                 modifier             = Modifier.align(Alignment.BottomCenter)
             )
         }
