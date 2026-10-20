@@ -40,6 +40,7 @@ import com.reasontouch.feature.chords.StrumPatterns
 import com.reasontouch.core.midi.StepState
 import com.reasontouch.feature.chords.PairingDecision
 import com.reasontouch.feature.chords.ProgressionChip
+import com.reasontouch.feature.chords.HarmonyPanel
 
 
 // Theme colors
@@ -79,6 +80,50 @@ fun ManualWorkspace(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(bottom = 120.dp)
         ) {
+            // HARMONY ANALYSIS TOGGLE BUTTON
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (showHarmonyPanel) Color(0xFFA78BFA).copy(alpha = 0.2f) else PANEL)
+                        .border(1.dp, if (showHarmonyPanel) Color(0xFFA78BFA) else BORDER, RoundedCornerShape(8.dp))
+                        .clickable {
+                            showHarmonyPanel = !showHarmonyPanel
+                            if (showHarmonyPanel) {
+                                viewModel.analyseProgression()
+                            }
+                        }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "\uD83E\uDDE0  HARMONY ANALYSIS",
+                        color = if (showHarmonyPanel) Color(0xFFA78BFA) else TEXT_DIM,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+
+            if (showHarmonyPanel) {
+                item {
+                    HarmonyPanel(
+                        state = harmonyState,
+                        onSelectKey = { viewModel.selectKey(it) },
+                        onAddChord = { suggestion -> viewModel.addSuggestedChord(suggestion) },
+                        onAudition = { suggestion -> viewModel.auditionSuggestion(suggestion) },
+                        onAddBorrowed = { borrowed -> viewModel.addBorrowedChord(borrowed) },
+                        onAuditionBorrowed = { borrowed -> viewModel.auditionBorrowed(borrowed) },
+                        onMoodChange = { bias -> viewModel.setMoodBias(bias) },
+                        onDismiss = { showHarmonyPanel = false }
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
+
             // DESCRIPTOR HEADER (collapsible)
             item {
                 if (showDescriptor) {

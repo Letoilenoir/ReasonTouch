@@ -428,6 +428,20 @@ class ChordViewModel @Inject constructor(
 
         val borrowed = ChordSuggestionEngine.borrowedChords(candidate)
 
+        viewModelScope.launch {
+            val sessionObj = repository.getSession(sessionId).first()
+            if (sessionObj != null) {
+                val qualityStr = if (candidate.isMinor) "MINOR" else "MAJOR"
+                repository.updateSession(
+                    sessionObj.copy(
+                        keyRoot = candidate.root.label,
+                        keyQuality = qualityStr,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+            }
+        }
+
         update {
             copy(
                 harmony = harmony.copy(
