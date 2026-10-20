@@ -106,9 +106,11 @@ fun CompositionTray(
     hasLead: Boolean = false,
     onLead: () -> Unit = {},
     onApplyLead: (String, Boolean) -> Unit = { _, _ -> },
+    onHarmonizeFromLead: () -> Unit = {},
     hasPad: Boolean = false,
     onPad: () -> Unit = {},
     onApplyPad: (Boolean) -> Unit = { _ -> },
+    onHarmonizeFromPad: () -> Unit = {},
     hasFills: Boolean = false,
     onFills: () -> Unit = {},
     onApplyFill: (String, Int, Boolean) -> Unit = { _, _, _ -> },
@@ -247,10 +249,12 @@ fun CompositionTray(
                     )
                     TraySection.LEAD -> LeadPanel(
                         onApply = onApplyLead,
+                        onHarmonizeFromLead = onHarmonizeFromLead,
                         onBack = { onSectionChange(TraySection.HOME) }
                     )
                     TraySection.PAD -> PadPanel(
                         onApply = onApplyPad,
+                        onHarmonizeFromPad = onHarmonizeFromPad,
                         onBack = { onSectionChange(TraySection.HOME) }
                     )
                     TraySection.FILLS -> FillsPanel(
@@ -841,6 +845,7 @@ private fun FillToggles(
 @Composable
 private fun LeadPanel(
     onApply: (String, Boolean) -> Unit,
+    onHarmonizeFromLead: () -> Unit,
     onBack: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
@@ -864,6 +869,8 @@ private fun LeadPanel(
 
         AppendModeRow(appendMode = appendMode, onToggle = { appendMode = it })
         Spacer(Modifier.height(skin.paddingMedium))
+        TrayActionRow(label = "HARMONIZE FROM LEAD", onClick = onHarmonizeFromLead)
+        Spacer(Modifier.height(skin.paddingSmall))
         TrayActionRow(label = "BACK", onClick = onBack)
     }
 }
@@ -871,6 +878,7 @@ private fun LeadPanel(
 @Composable
 private fun PadPanel(
     onApply: (Boolean) -> Unit,
+    onHarmonizeFromPad: () -> Unit,
     onBack: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
@@ -901,6 +909,8 @@ private fun PadPanel(
         Spacer(Modifier.height(skin.paddingMedium))
         AppendModeRow(appendMode = appendMode, onToggle = { appendMode = it })
         Spacer(Modifier.height(skin.paddingMedium))
+        TrayActionRow(label = "HARMONIZE FROM PAD", onClick = onHarmonizeFromPad)
+        Spacer(Modifier.height(skin.paddingSmall))
         TrayActionRow(label = "BACK", onClick = onBack)
     }
 }

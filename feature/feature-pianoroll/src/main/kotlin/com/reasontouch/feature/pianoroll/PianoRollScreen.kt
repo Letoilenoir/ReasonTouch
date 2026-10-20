@@ -506,6 +506,11 @@ fun PianoRollScreen(
                     }
                     trayExpanded = false
                 },
+                onHarmonizeFromLead  = {
+                    viewModel.recordSnapshot()
+                    chordViewModel.harmonizeFromLeadTrack { viewModel.refreshNotes() }
+                    trayExpanded = false
+                },
                 hasLead              = tracks.firstOrNull { it.name.uppercase() == "LEAD" }
                     ?.let { track -> allNotes[track.id]?.isNotEmpty() } ?: false,
                 onPad                = { traySection = TraySection.PAD },
@@ -514,6 +519,11 @@ fun PianoRollScreen(
                     chordViewModel.generatePad(append) {
                         viewModel.refreshNotes()
                     }
+                    trayExpanded = false
+                },
+                onHarmonizeFromPad   = {
+                    viewModel.recordSnapshot()
+                    chordViewModel.harmonizeFromPadTrack { viewModel.refreshNotes() }
                     trayExpanded = false
                 },
                 hasPad               = tracks.firstOrNull { it.name.uppercase() == "PAD" }

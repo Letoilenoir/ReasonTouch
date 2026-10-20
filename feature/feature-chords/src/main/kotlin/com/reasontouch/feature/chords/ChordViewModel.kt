@@ -1243,20 +1243,32 @@ class ChordViewModel @Inject constructor(
     }
 
     fun harmonizeFromBassTrack(onComplete: () -> Unit = {}) {
+        harmonizeFromTrack("BASS", onComplete)
+    }
+
+    fun harmonizeFromLeadTrack(onComplete: () -> Unit = {}) {
+        harmonizeFromTrack("LEAD", onComplete)
+    }
+
+    fun harmonizeFromPadTrack(onComplete: () -> Unit = {}) {
+        harmonizeFromTrack("PAD", onComplete)
+    }
+
+    private fun harmonizeFromTrack(trackName: String, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             val trackList = repository.getTracksForSession(sessionId).first()
-            val bassTrack = trackList.firstOrNull { it.name.uppercase() == "BASS" } ?: return@launch
+            val targetTrack = trackList.firstOrNull { it.name.uppercase() == trackName } ?: return@launch
             val chordTrack = trackList.firstOrNull { it.name.uppercase() == "CHORD" }
 
-            val bassNotes = repository.getNotesForTrackOnce(bassTrack.id)
-            if (bassNotes.isEmpty()) {
-                update { copy(statusMessage = "Draw a bassline on the BASS track first") }
+            val trackNotes = repository.getNotesForTrackOnce(targetTrack.id)
+            if (trackNotes.isEmpty()) {
+                update { copy(statusMessage = "Draw notes on the $trackName track first") }
                 onComplete()
                 return@launch
             }
 
             val beatsPerBar = ui.value.barDuration.toFloat()
-            val maxBeat = bassNotes.maxOf { it.beat + it.duration }
+            val maxBeat = trackNotes.maxOf { it.beat + it.duration }
             val totalBars = kotlin.math.ceil(maxBeat / beatsPerBar).toInt().coerceAtLeast(4)
 
             val currentSession = repository.getSession(sessionId).first()
@@ -1276,9 +1288,9 @@ class ChordViewModel @Inject constructor(
             for (barIndex in 0 until totalBars) {
                 val barStart = barIndex * beatsPerBar
                 val barEnd = barStart + beatsPerBar
-                val barBassNotes = bassNotes.filter { it.beat >= barStart && it.beat < barEnd }
+                val barNotes = trackNotes.filter { it.beat >= barStart && it.beat < barEnd }
 
-                val rootPitch = barBassNotes.minByOrNull { it.beat }?.pitch ?: 40
+                val rootPitch = barNotes.minByOrNull { it.beat }?.pitch ?: 40
                 val midiNote = 108 - rootPitch
                 val semitone = midiNote % 12
                 val rootNote = NoteClass.fromSemitone(semitone) ?: NoteClass.C
@@ -1320,7 +1332,7 @@ class ChordViewModel @Inject constructor(
                 repository.saveNotes(newChordNotes)
             }
 
-            update { copy(statusMessage = "Harmonized $totalBars bars from BASS track") }
+            update { copy(statusMessage = "Harmonized $totalBars bars from $trackName track") }
             onComplete()
         }
     }
