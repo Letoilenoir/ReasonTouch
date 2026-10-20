@@ -13,10 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.reasontouch.core.ui.theme.*
-import androidx.compose.ui.graphics.Color
 import com.reasontouch.feature.chords.CompositionMode
 
 @Composable
@@ -46,14 +45,6 @@ fun CompositionModeBar(
             selected = mode == CompositionMode.ASSISTED,
             accent = AssistedModeColor,
             onClick = { onModeSelected(CompositionMode.ASSISTED) },
-            modifier = Modifier.weight(1f)
-        )
-
-        CompositionModeChip(
-            label = "GUIDED",
-            selected = mode == CompositionMode.GUIDED,
-            accent = GuidedModeColor,
-            onClick = { onModeSelected(CompositionMode.GUIDED) },
             modifier = Modifier.weight(1f)
         )
     }

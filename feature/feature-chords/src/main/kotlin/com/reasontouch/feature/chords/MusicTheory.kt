@@ -34,8 +34,7 @@ enum class HarmonicFunction { TONIC, PREDOMINANT, DOMINANT }
 
 enum class CompositionMode {
     MANUAL,
-    ASSISTED,
-    GUIDED
+    ASSISTED
 }
 
 fun CompositionMode.toSessionValue(): String = this.name

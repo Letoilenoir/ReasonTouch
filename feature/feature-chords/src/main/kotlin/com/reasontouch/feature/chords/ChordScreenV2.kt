@@ -155,12 +155,6 @@ fun ChordScreenV2(
                     }
                 }
             }
-
-            CompositionMode.GUIDED -> {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Guided Workspace (TBD)", color = Color(0xFFE84040), fontSize = 16.sp)
-                }
-            }
         }
     }
 }
