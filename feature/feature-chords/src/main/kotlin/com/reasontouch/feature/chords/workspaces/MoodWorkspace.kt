@@ -444,53 +444,27 @@ private fun SuggestedProgressionDisplay(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(4.dp))
+                .background(
+                    if (selectedStrumPattern != null) ACCENT else ACCENT.copy(alpha = 0.4f)
+                )
+                .clickable(enabled = selectedStrumPattern != null && !isPlaying) {
+                    android.util.Log.d("AcceptButton", "ACCEPT clicked with pattern: ${selectedStrumPattern?.steps}")
+                    onProgressionReady(chords, selectedStrumPattern!!)
+                }
+                .padding(vertical = 10.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(BORDER.copy(alpha = 0.5f))
-                    .clickable(enabled = !isPlaying) {
-                        isPlaying = true
-                        onPlayProgression(chords, selectedStrumPattern)
-                    }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "REGENERATE",
-                    color = TEXT_DIM,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(
-                        if (selectedStrumPattern != null) ACCENT else ACCENT.copy(alpha = 0.4f)
-                    )
-                    .clickable(enabled = selectedStrumPattern != null && !isPlaying) {
-                        android.util.Log.d("AcceptButton", "ACCEPT clicked with pattern: ${selectedStrumPattern?.steps}")
-                        onProgressionReady(chords, selectedStrumPattern!!)
-                    }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "ACCEPT",
-                    color = if (selectedStrumPattern != null) Color.White else TEXT_DIM,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
+            Text(
+                text = "ACCEPT",
+                color = if (selectedStrumPattern != null) Color.White else TEXT_DIM,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
         }
     }
 
