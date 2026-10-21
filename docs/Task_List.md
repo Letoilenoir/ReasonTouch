@@ -69,11 +69,10 @@ Confirmed 2026-08-02 via full-project search: `PairingEngine` can and does retur
 
 **Not in scope for this refactor:** the EXPAND HALF-cadence/RESOLVE conflict (Option C fix, still separately pending) and the actual Composition Tray UI build are both downstream of this work, not part of it.
 
-- [ ] Review `PairingDecision.kt`, `PairingType.kt`, `IntentEngine.kt` (dead code, but potentially reusable shape) before designing
-- [ ] Design the new `PairingEngine.suggestNext()` return shape (ranked list, confidence per option, etc.)
-- [ ] Refactor `suggestAfterHighStability()`/`suggestAfterMediumStability()`/`suggestAfterLowStability()` to build a ranked list instead of an early-return single decision
-- [ ] Update both `ChordViewModel` and `PianoRollViewModel`'s `suggestNextSection()` call sites
-- [ ] Re-verify all 6 strategies' reachability against the new multi-option routing (should newly unlock RESOLVE's DECEPTIVE/isClosed() branches and EXPAND's HALF-cadence branch, in addition to whatever else the ranking surfaces)
+- [x] Review `PairingDecision.kt`, `PairingType.kt`, `IntentEngine.kt` before designing
+- [x] Design the new `PairingEngine.suggestNext()` return shape (ranked list, confidence per option, etc.)
+- [x] Refactor `suggestAfterHighStability()`/`suggestAfterMediumStability()`/`suggestAfterLowStability()` to build a ranked list instead of an early-return single decision
+- [x] Update both `ChordViewModel` and `PianoRollViewModel`'s `suggestNextSection()` call sites and wire `SuggestNextFlow` in CompositionTray UI
 - [ ] **Mood as a persistent generative motif, not just a seed-time bias** -- see `docs/design/MoodWorkspace_Mechanism_Findings.md` for the confirmed current mechanism. Currently `moodBias`/`moodBiasFine` (a single -1..+1 float, `harmonyBias`) only fires at initial seed generation and has no representation in `ProgressionAnalysis`/`ProgressionGenerationRequest`/the strategies -- SUGGEST has no way to know which mood a progression was seeded with, so it cannot continue it as a motif. Two separable problems: (1) persistence -- does the value even need remembering, and where; (2) expressiveness -- one scalar cannot distinguish all 6 named mood presets from each other (e.g. Cinematic 0.3 vs. Energetic 0.6 differ only by position on one axis, despite very different creative intents ("epic, dramatic" vs. "fast, driving")). Needs `harmonyBias`'s consumer identified before scoping further.
 - [ ] **Safe one-time write mechanism** -- see `docs/design/Safe_Write_Design_2026-08-01.md`. Needed before strum-speed review-stage re-editing can be built safely; later reusable for bass-first harmonisation.
 - [ ] **Strum speed field on `ChordEvent`** -- schema + migration + workspace UI control (Manual, Mood, Inspire, Progression all currently missing this; `strumPatternId` exists but not `strumSpeed`). Can proceed independently of the safe-write mechanism -- composition-time strum speed doesn't need write-safety logic, only review-time re-editing does.
