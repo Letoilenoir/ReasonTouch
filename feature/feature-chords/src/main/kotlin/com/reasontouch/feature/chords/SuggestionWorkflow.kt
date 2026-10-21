@@ -80,10 +80,7 @@ object SuggestionWorkflow {
         PairingType.LIFT      -> CompositionIntent.LIFT
         PairingType.CONTRAST  -> CompositionIntent.CONTRAST
         PairingType.RESOLVE   -> CompositionIntent.RESOLVE
-        PairingType.EXPAND    -> CompositionIntent.EXPAND
         PairingType.SURPRISE  -> CompositionIntent.SURPRISE
-        PairingType.SIMPLIFY  -> CompositionIntent.SIMPLIFY
-        PairingType.MODULATE  -> CompositionIntent.DEVELOP  // closest existing intent; no direct equivalent yet
     }
 
 /**

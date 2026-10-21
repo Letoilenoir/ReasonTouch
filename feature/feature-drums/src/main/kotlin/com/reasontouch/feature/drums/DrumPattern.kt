@@ -266,7 +266,6 @@ object DrumPresets {
         com.reasontouch.feature.chords.PairingType.LIFT     -> listOf("Funk", "Rock")
         com.reasontouch.feature.chords.PairingType.CONTRAST -> emptyList()
         com.reasontouch.feature.chords.PairingType.RESOLVE  -> listOf("4/4 Basic")
-        com.reasontouch.feature.chords.PairingType.SIMPLIFY -> listOf("4/4 Basic")
         else -> emptyList()
     }
 }

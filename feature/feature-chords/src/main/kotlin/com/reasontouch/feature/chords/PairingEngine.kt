@@ -98,7 +98,7 @@ object PairingEngine {
 
             PairingType.REPEAT -> 0.80f
 
-            PairingType.EXPAND, PairingType.SIMPLIFY, PairingType.MODULATE -> 0.0f
+            else -> 0.0f
         }
     }
 
@@ -155,8 +155,8 @@ object PairingEngine {
             PairingType.REPEAT ->
                 "Reuse an existing sequence to establish structure and familiarity"
 
-            PairingType.EXPAND, PairingType.SIMPLIFY, PairingType.MODULATE ->
-                "No live strategy implementation yet"
+            else ->
+                "Standard progression path"
         }
     }
 

@@ -86,7 +86,6 @@ enum class BassStyle(val label: String, val description: String) {
             PairingType.LIFT     -> listOf(GROOVE, WALKING)
             PairingType.CONTRAST -> emptyList() // signals "consider changing," not a specific target
             PairingType.RESOLVE  -> listOf(PEDAL, ROOT)
-            PairingType.SIMPLIFY -> listOf(ROOT, PEDAL)
             else                 -> emptyList()
         }
     }

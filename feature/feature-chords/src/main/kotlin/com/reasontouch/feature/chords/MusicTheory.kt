@@ -49,9 +49,7 @@ enum class CompositionIntent(val label: String) {
     RESOLVE("Resolve"),
     CONTRAST("Contrast"),
     DEVELOP("Develop"),
-    EXPAND("Expand"),
-    SURPRISE("Surprise"),
-    SIMPLIFY("Simplify")
+    SURPRISE("Surprise")
 }
 enum class EnergyLevel(val label: String) {
     VERY_LOW("Very Low"),

@@ -24,8 +24,6 @@ object IntentEngine {
 
         } else if (stability >= 0.4f) {
 
-            intents += IntentRanking(intent = CompositionIntent.EXPAND, confidence = 0.75f, rationale = "The harmony can naturally be developed further.")
-
             intents += IntentRanking(intent = CompositionIntent.CONTINUE, confidence = 0.70f, rationale = "The musical flow remains open.")
 
         } else {

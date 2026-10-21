@@ -8,10 +8,7 @@ enum class PairingType {
     LIFT,        // Build energy (high stability → change texture)
     CONTRAST,    // Change character (high stability → provide variation)
     RESOLVE,     // Complete phrase (low stability, dominant → resolve)
-    EXPAND,      // Extend range (medium stability → harmonic exploration)
-    MODULATE,    // Change key (deceptive cadence → surprise)
     SURPRISE,    // Break expectation (deceptive cadence → unexpected turn)
-    SIMPLIFY,    // Reduce complexity (high energy → pull back)
     REPEAT       // Reuse an existing sequence (form / structure)
 }
 
