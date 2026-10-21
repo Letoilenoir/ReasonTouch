@@ -87,8 +87,8 @@ Confirmed 2026-08-02 via full-project search: `PairingEngine` can and does retur
 
 - [x] Strum pattern support for `addPhrase()`-inserted (SUGGEST-generated) notes -- fully implemented via `generateStrumNotes()` and inherited/custom step patterns.
 - [x] **`EXPAND`, `MODULATE`, `SIMPLIFY` strategies** -- **DISCARDED** per MVP product focus.
-- [ ] Bass-first harmonisation -- draw a bassline, infer chord candidates from it. Now has a scoped write-safety approach to lean on (see Safe Write design doc).
-- [ ] Tray-driven forward composition -- contextual harmonic extension from the velocity tray repurposed as chord insertion, for full forward composition within Piano Roll
+- [x] **Bass-first harmonisation** -- implemented via `harmonizeFromBassTrack()` in `ChordViewModel` and "HARMONIZE FROM BASS" tray action row.
+- [x] **Tray-driven forward composition** -- implemented via `CompositionTray.kt` hosting `SuggestNextFlow` and `addPhrase()` for contextual harmonic extension within the Piano Roll.
 - [ ] Session Settings consolidation -- Chords module settings, bass instrument picker, key transposition; Mode setting to be removed (Harmony Engine now owns tonality)
 - [ ] MIDI import -- the one major feature still just "discussed, not started" since the earliest design doc
 - - [ ] **Diatonic chord-quality variation as an exploration lever** -- `ChordQuality` enum already defines DOM7/MAJ7/MIN7/SUS2/SUS4/AUG, and `MusicTheory.kt` already fully handles all of them (midiNotes generation, label rendering, parseChordName round-trip) -- but `MAJOR_QUALITIES`/`MINOR_QUALITIES` only ever assign MAJ/MIN/DIM to diatonic degrees, so no generated suggestion ever uses the richer qualities. Raised while scoping ExpandStrategy: "explore harmonic territory" currently only means visiting different roots within a fixed 3-quality palette, not exploring chord color at all -- would primarily benefit Expand, but the enum/rendering work already exists and is shared infrastructure.
