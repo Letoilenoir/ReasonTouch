@@ -1,8 +1,11 @@
 package com.reasontouch.app
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.reasontouch.core.audio.SoundPackManager
+import com.reasontouch.core.audio.SoundPackInfo
 import com.reasontouch.core.data.SessionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +19,7 @@ import javax.inject.Inject
 @HiltViewModel
 class SessionSettingsViewModel @Inject constructor(
     private val repository: SessionRepository,
+    private val soundPackManager: SoundPackManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -26,6 +30,9 @@ class SessionSettingsViewModel @Inject constructor(
 
     private val _saved = MutableStateFlow(false)
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
+
+    private val _installedPacks = MutableStateFlow<List<SoundPackInfo>>(soundPackManager.getInstalledPacks())
+    val installedPacks: StateFlow<List<SoundPackInfo>> = _installedPacks.asStateFlow()
 
     fun setName(name: String) {
         val current = session.value ?: return
@@ -44,6 +51,39 @@ class SessionSettingsViewModel @Inject constructor(
                 bpm = bpm.coerceIn(20, 300),
                 updatedAt = System.currentTimeMillis()
             ))
+        }
+    }
+
+    fun setPackId(packId: String) {
+        val current = session.value ?: return
+        viewModelScope.launch {
+            repository.updateSession(current.copy(
+                packId = packId,
+                updatedAt = System.currentTimeMillis()
+            ))
+        }
+    }
+
+    fun importPack(uri: Uri) {
+        viewModelScope.launch {
+            val success = soundPackManager.importPack(uri)
+            if (success) {
+                _installedPacks.value = soundPackManager.getInstalledPacks()
+            }
+        }
+    }
+
+    fun deletePack(packId: String) {
+        if (packId == "default") return
+        viewModelScope.launch {
+            val success = soundPackManager.deletePack(packId)
+            if (success) {
+                _installedPacks.value = soundPackManager.getInstalledPacks()
+                val current = session.value
+                if (current != null && current.packId == packId) {
+                    setPackId("default")
+                }
+            }
         }
     }
 

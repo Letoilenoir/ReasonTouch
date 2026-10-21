@@ -9,9 +9,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import kotlin.math.pow
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class Sf2Player(assetManager: AssetManager) {
+@Singleton
+class Sf2Player @Inject constructor(
+    assetManager: AssetManager,
+    private val soundPackManager: SoundPackManager
+) {
 
     private val scope  = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val parser = Sf2Parser(assetManager)
@@ -25,11 +34,12 @@ class Sf2Player(assetManager: AssetManager) {
         midiNote:    Int,
         durationSec: Float = 0.4f,
         velocity:    Int   = 100,
-        gmProgram:   Int   = 0
+        gmProgram:   Int   = 0,
+        packId:      String = "default"
     ) {
         scope.launch(Dispatchers.Default) {
             try {
-                val pcm   = render(midiNote, durationSec, velocity, gmProgram) ?: return@launch
+                val pcm   = render(midiNote, durationSec, velocity, gmProgram, packId) ?: return@launch
                 val track = buildTrack(pcm.size)
                 track.write(pcm, 0, pcm.size)
                 synchronized(trackLock) { activeTracks.add(track) }
@@ -43,80 +53,18 @@ class Sf2Player(assetManager: AssetManager) {
         }
     }
 
-    fun playDrum(
-        midiNote:    Int,
-        durationSec: Float = 0.25f,
-        velocity:    Int   = 100
-    ) {
-        scope.launch(Dispatchers.Default) {
-            try {
-
-                val result = parser.findDrumSample(midiNote)
-                if (result == null) {
-                    android.util.Log.e("DRUM", "No drum sample found for midiNote=$midiNote")
-                    return@launch
-                }
-
-                val (header, rawSamples) = result
-
-                android.util.Log.d(
-                    "DRUM",
-                    "Using sample=${header.name}, rate=${header.sampleRate}, " +
-                            "root=${header.originalPitch}, size=${rawSamples.size}, " +
-                            "loop=${header.hasLoop}"
-                )
-
-                // Drums play at recorded pitch
-                val pitchRatio = header.sampleRate.toFloat() / OUTPUT_SAMPLE_RATE
-                val totalSec       = durationSec + RELEASE_SEC
-                val outputSamples  = (totalSec * OUTPUT_SAMPLE_RATE).toInt()
-                val sustainSamples = (durationSec * OUTPUT_SAMPLE_RATE).toInt()
-                val out      = ShortArray(outputSamples)
-                val velScale = (velocity / 127f).coerceIn(0f, 1f)
-                val hasLoop      = header.hasLoop
-                val loopStartRel = header.relLoopStart
-                val loopEndRel   = header.relLoopEnd
-                val loopLen      = (loopEndRel - loopStartRel).coerceAtLeast(1)
-                var srcPos = 0.0
-                for (i in 0 until outputSamples) {
-                    val idx0 = srcPos.toInt()
-                    val frac = (srcPos - idx0).toFloat()
-                    val actualIdx = if (hasLoop && idx0 >= loopEndRel)
-                        loopStartRel + ((idx0 - loopStartRel) % loopLen)
-                    else idx0
-                    if (actualIdx >= rawSamples.size) break
-                    val s0 = rawSamples[actualIdx].toFloat()
-                    val s1 = if (actualIdx + 1 < rawSamples.size)
-                                 rawSamples[actualIdx + 1].toFloat() else s0
-                    val sample = s0 + frac * (s1 - s0)
-                    val env    = envelope(i, sustainSamples, outputSamples)
-                    out[i] = (sample * env * velScale)
-                        .toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
-                    srcPos += pitchRatio
-                }
-                val track = buildTrack(out.size)
-                track.write(out, 0, out.size)
-                synchronized(trackLock) { activeTracks.add(track) }
-                track.play()
-                val durationMs = (out.size.toLong() * 1000L / OUTPUT_SAMPLE_RATE) + 50L
-                delay(durationMs)
-                track.stop()
-                track.release()
-                synchronized(trackLock) { activeTracks.remove(track) }
-            } catch (e: Exception) { }
-        }
-    }
     fun playChord(
         midiNotes:    List<Int>,
         durationSec:  Float = 0.5f,
         velocity:     Int   = 100,
         gmProgram:    Int   = 0,
-        strumDelayMs: Long  = 0L
+        strumDelayMs: Long  = 0L,
+        packId:       String = "default"
     ) {
         midiNotes.forEachIndexed { i, note ->
             scope.launch {
                 if (strumDelayMs > 0) delay(i * strumDelayMs)
-                playNote(note, durationSec, velocity, gmProgram)
+                playNote(note, durationSec, velocity, gmProgram, packId)
             }
         }
     }
@@ -125,13 +73,42 @@ class Sf2Player(assetManager: AssetManager) {
         midiNote:    Int,
         durationSec: Float,
         velocity:    Int,
-        gmProgram:   Int
+        gmProgram:   Int,
+        packId:      String = "default"
     ): ShortArray? {
-        val (header, rawSamples) = parser.findSample(gmProgram, midiNote) ?: return null
+        val manifest = if (packId != "default") soundPackManager.getManifest(packId) else null
+        var customRelPath: String? = null
+        if (manifest != null) {
+            manifest.tracks.values.forEach { trackCfg ->
+                if (trackCfg.gmProgram == gmProgram || trackCfg.gmProgram == null) {
+                    val path = trackCfg.mapping?.get("$midiNote") ?: trackCfg.rootKeys?.get("$midiNote")
+                    if (path != null) customRelPath = path
+                }
+            }
+        }
 
-        android.util.Log.d("SF2DEBUG", "render: dur=${"%.3f".format(durationSec)}s " +
-            "hasLoop=${header.hasLoop} loopStart=${header.relLoopStart} " +
-            "loopEnd=${header.relLoopEnd} rawSize=${rawSamples.size}")
+        val (header, rawSamples) = if (customRelPath != null) {
+            val sampleFile = soundPackManager.getSampleFile(packId, customRelPath!!)
+            if (sampleFile.exists()) {
+                val pcm = loadWavFile(sampleFile)
+                if (pcm != null) {
+                    val mockHeader = Sf2Parser.SampleHeader(
+                        name = "custom",
+                        start = 0,
+                        end = pcm.size,
+                        loopStart = 0,
+                        loopEnd = 0,
+                        sampleRate = 44100,
+                        originalPitch = midiNote,
+                        pitchCorrection = 0,
+                        sampleType = 1
+                    )
+                    Pair(mockHeader, pcm)
+                } else parser.findSample(gmProgram, midiNote)
+            } else parser.findSample(gmProgram, midiNote)
+        } else {
+            parser.findSample(gmProgram, midiNote)
+        } ?: return null
 
         val semitones  = midiNote - header.originalPitch
         val pitchRatio = 2.0.pow(semitones / 12.0).toFloat() *
@@ -176,6 +153,79 @@ class Sf2Player(assetManager: AssetManager) {
         }
 
         return out
+    }
+
+    private fun loadWavFile(file: File): ShortArray? {
+        return try {
+            val bytes = file.readBytes()
+            val buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+            val riff = String(bytes, 0, 4)
+            if (riff != "RIFF") return null
+
+            buf.position(12)
+            var numChannels = 1
+            var sampleRate = 44100
+            var bitsPerSample = 16
+            var dataStart = 0
+            var dataSize = 0
+
+            while (buf.remaining() >= 8) {
+                val chunkId = String(bytes, buf.position(), 4)
+                buf.position(buf.position() + 4)
+                val chunkSize = buf.int
+
+                when (chunkId) {
+                    "fmt " -> {
+                        buf.short
+                        numChannels = buf.short.toInt() and 0xFFFF
+                        sampleRate = buf.int
+                        buf.int
+                        buf.short
+                        bitsPerSample = buf.short.toInt() and 0xFFFF
+                        val extra = chunkSize - 16
+                        if (extra > 0) buf.position(buf.position() + extra)
+                    }
+                    "data" -> {
+                        dataStart = buf.position()
+                        dataSize = chunkSize
+                        break
+                    }
+                    else -> {
+                        buf.position((buf.position() + chunkSize).coerceAtMost(buf.limit()))
+                    }
+                }
+            }
+
+            if (dataStart == 0 || dataSize == 0) return null
+
+            val rawSamples = when (bitsPerSample) {
+                16 -> ShortArray(dataSize / 2) { buf.short }
+                8 -> ShortArray(dataSize) { ((bytes[dataStart + it].toInt() and 0xFF) - 128).shl(8).toShort() }
+                else -> return null
+            }
+
+            val monoSamples = if (numChannels == 2) {
+                ShortArray(rawSamples.size / 2) { i ->
+                    ((rawSamples[i * 2].toInt() + rawSamples[i * 2 + 1].toInt()) / 2).toShort()
+                }
+            } else rawSamples
+
+            if (sampleRate == OUTPUT_SAMPLE_RATE) {
+                monoSamples
+            } else {
+                val ratio = sampleRate.toDouble() / OUTPUT_SAMPLE_RATE
+                val outLen = (monoSamples.size / ratio).toInt()
+                ShortArray(outLen) { i ->
+                    val srcPos = i * ratio
+                    val idx0 = srcPos.toInt().coerceAtMost(monoSamples.size - 1)
+                    val idx1 = (idx0 + 1).coerceAtMost(monoSamples.size - 1)
+                    val frac = (srcPos - idx0).toFloat()
+                    (monoSamples[idx0] * (1f - frac) + monoSamples[idx1] * frac).toInt().toShort()
+                }
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private fun envelope(sampleIndex: Int, sustainEnd: Int, totalSamples: Int): Float {

@@ -29,6 +29,9 @@ class Sequencer @Inject constructor(
     suspend fun playSession(sessionId: String, transport: MutableStateFlow<TransportState>) {
         if (transport.value.isPlaying) return
 
+        val session = repository.getSession(sessionId).first()
+        val packId = session?.packId ?: "default"
+
         val tracks = repository.getTracksForSession(sessionId).first()
         val allNotes = tracks.associate { it.id to repository.getNotesForTrackOnce(it.id) }
 
@@ -96,8 +99,8 @@ class Sequencer @Inject constructor(
                             val vel = (note.velocity * vol).toInt().coerceIn(1, 127)
                             val midi = (108 - note.pitch).coerceIn(0, 127)
 
-                            if (isDrum) drumPlayer.play(midi, vel)
-                            else sf2Player.playNote(midi, dur, vel, program)
+                            if (isDrum) drumPlayer.play(midi, vel, packId)
+                            else sf2Player.playNote(midi, dur, vel, program, packId)
                         }
                     }
             }

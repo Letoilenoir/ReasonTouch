@@ -24,5 +24,6 @@ android {
 dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.hilt.android)
+    implementation("com.google.code.gson:gson:2.11.0")
     ksp(libs.hilt.compiler)
 }

@@ -112,6 +112,121 @@ fun SessionSettingsScreen(
                     }
                 }
 
+                // ── Sound Pack (Future-Proofing .rpack System) ────────────────
+                item {
+                    val installedPacks by viewModel.installedPacks.collectAsState()
+                    var packDropdownExpanded by remember { mutableStateOf(false) }
+                    val currentPack = installedPacks.firstOrNull { it.packId == session?.packId } ?: installedPacks.firstOrNull()
+
+                    SettingsCard("SOUND PACK") {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Engine / Pack", color = skin.textPrimary, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+                                ExposedDropdownMenuBox(
+                                    expanded = packDropdownExpanded,
+                                    onExpandedChange = { packDropdownExpanded = it }
+                                ) {
+                                    TextField(
+                                        value = currentPack?.packName ?: "Default Sound Bank",
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        trailingIcon = {
+                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = packDropdownExpanded)
+                                        },
+                                        colors = TextFieldDefaults.colors(
+                                            unfocusedContainerColor = skin.panelAlt,
+                                            focusedContainerColor   = skin.panelAlt,
+                                            unfocusedTextColor      = skin.accent,
+                                            focusedTextColor        = skin.accent,
+                                            unfocusedIndicatorColor = Color.Transparent,
+                                            focusedIndicatorColor   = Color.Transparent
+                                        ),
+                                        textStyle = TextStyle(
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize   = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        modifier = Modifier
+                                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                            .width(180.dp)
+                                    )
+                                    ExposedDropdownMenu(
+                                        expanded = packDropdownExpanded,
+                                        onDismissRequest = { packDropdownExpanded = false },
+                                        modifier = Modifier.background(skin.panel)
+                                    ) {
+                                        installedPacks.forEach { pack ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(pack.packName,
+                                                        color = if (pack.packId == (session?.packId ?: "default")) skin.accent else skin.textPrimary,
+                                                        fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                                },
+                                                onClick = {
+                                                    viewModel.setPackId(pack.packId)
+                                                    packDropdownExpanded = false
+                                                },
+                                                modifier = Modifier.background(if (pack.packId == (session?.packId ?: "default")) skin.accent.copy(alpha = 0.15f) else Color.Transparent)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+                                contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+                            ) { uri ->
+                                uri?.let { viewModel.importPack(it) }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(skin.panelAlt)
+                                    .border(1.dp, skin.border, RoundedCornerShape(4.dp))
+                                    .clickable { launcher.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream", "*/*")) }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "+ IMPORT .RPACK / .ZIP PACK",
+                                    color = skin.accent,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+
+                            if (session?.packId != null && session?.packId != "default") {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(skin.accent.copy(alpha = 0.2f))
+                                        .border(1.dp, skin.accent, RoundedCornerShape(4.dp))
+                                        .clickable { viewModel.deletePack(session!!.packId) }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "🗑 DELETE CURRENT PACK",
+                                        color = skin.accent,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // ── Tempo ──────────────────────────────────────────────────────
                 item {
                     SettingsCard("TEMPO") {

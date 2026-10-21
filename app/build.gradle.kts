@@ -68,6 +68,7 @@ dependencies {
     kapt(libs.hilt.compiler)
 
     implementation(project(":core:core-data"))
+    implementation(project(":core:core-audio"))
     implementation(project(":feature:feature-chords"))
     implementation(project(":feature:feature-pianoroll"))
     implementation(project(":feature:feature-export"))

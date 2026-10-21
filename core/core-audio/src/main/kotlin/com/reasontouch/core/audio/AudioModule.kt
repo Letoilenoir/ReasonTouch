@@ -1,9 +1,11 @@
 package com.reasontouch.core.audio
 
-import android.app.Application
+import android.content.Context
+import android.content.res.AssetManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
@@ -16,12 +18,5 @@ object AudioModule {
     fun provideSynthEngine(): SynthEngine = SynthEngine()
 
     @Provides
-    @Singleton
-    fun provideDrumSamplePlayer(@dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context): DrumSamplePlayer =
-        DrumSamplePlayer(context.assets)
-
-    @Provides
-    @Singleton
-    fun provideSf2Player(app: Application): Sf2Player =
-        Sf2Player(app.assets)
+    fun provideAssetManager(@ApplicationContext context: Context): AssetManager = context.assets
 }
