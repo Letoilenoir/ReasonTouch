@@ -60,9 +60,24 @@ class DrumSamplePlayer @Inject constructor(
         scope.launch(Dispatchers.IO) {
             try {
                 val pcm = if (packId != "default") {
+                    val manifest = soundPackManager.getManifest(packId)
+                    var drumPath: String? = null
+                    manifest?.tracks?.values?.forEach { trackCfg ->
+                        val path = trackCfg.mapping?.get("$resolvedNote") ?: trackCfg.rootKeys?.get("$resolvedNote")
+                        if (path != null) drumPath = path
+                    }
+
+                    val candidateFiles = mutableListOf<File>()
+                    if (drumPath != null) {
+                        candidateFiles.add(soundPackManager.getSampleFile(packId, drumPath))
+                    }
                     val filename = NOTE_TO_FILE[resolvedNote] ?: "snare.wav"
-                    val sampleFile = soundPackManager.getSampleFile(packId, "drums/$filename")
-                    if (sampleFile.exists()) loadWavFile(sampleFile) else buffers[resolvedNote]
+                    candidateFiles.add(soundPackManager.getSampleFile(packId, "drums/$filename"))
+                    candidateFiles.add(soundPackManager.getSampleFile(packId, "samples/$filename"))
+                    candidateFiles.add(soundPackManager.getSampleFile(packId, filename))
+
+                    val customFile = candidateFiles.firstOrNull { it.exists() }
+                    if (customFile != null) loadWavFile(customFile) else buffers[resolvedNote]
                 } else {
                     buffers[resolvedNote]
                 } ?: return@launch

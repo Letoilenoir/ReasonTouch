@@ -76,21 +76,12 @@ class Sf2Player @Inject constructor(
         gmProgram:   Int,
         packId:      String = "default"
     ): ShortArray? {
-        val manifest = if (packId != "default") soundPackManager.getManifest(packId) else null
-        var customRelPath: String? = null
-        if (manifest != null) {
-            manifest.tracks.values.forEach { trackCfg ->
-                if (trackCfg.gmProgram == gmProgram || trackCfg.gmProgram == null) {
-                    val path = trackCfg.mapping?.get("$midiNote") ?: trackCfg.rootKeys?.get("$midiNote")
-                    if (path != null) customRelPath = path
-                }
-            }
-        }
+        val effectivePackId = if (packId == "default") soundPackManager.activePackId else packId
+        val resolution = soundPackManager.resolveSample(effectivePackId, "multisample", midiNote)
 
-        val (header, rawSamples) = if (customRelPath != null) {
-            val sampleFile = soundPackManager.getSampleFile(packId, customRelPath!!)
-            if (sampleFile.exists()) {
-                val pcm = loadWavFile(sampleFile)
+        val (header, rawSamples) = when (resolution) {
+            is SampleResolution.Resolved -> {
+                val pcm = loadWavFile(resolution.file)
                 if (pcm != null) {
                     val mockHeader = Sf2Parser.SampleHeader(
                         name = "custom",
@@ -104,10 +95,26 @@ class Sf2Player @Inject constructor(
                         sampleType = 1
                     )
                     Pair(mockHeader, pcm)
-                } else parser.findSample(gmProgram, midiNote)
-            } else parser.findSample(gmProgram, midiNote)
-        } else {
-            parser.findSample(gmProgram, midiNote)
+                } else {
+                    android.util.Log.e("Sf2Player", "[SampleResolution] DecodeFailed for file: ${resolution.file.absolutePath}")
+                    parser.findSample(gmProgram, midiNote)
+                }
+            }
+            is SampleResolution.MissingMapping -> {
+                android.util.Log.w("Sf2Player", "[SampleResolution] MissingMapping for MIDI note $midiNote in pack '$effectivePackId'. Falling back to default soundfont.")
+                parser.findSample(gmProgram, midiNote)
+            }
+            is SampleResolution.MissingFile -> {
+                android.util.Log.e("Sf2Player", "[SampleResolution] MissingFile at path '${resolution.path}'. Falling back to default soundfont.")
+                parser.findSample(gmProgram, midiNote)
+            }
+            is SampleResolution.DecodeFailed -> {
+                android.util.Log.e("Sf2Player", "[SampleResolution] DecodeFailed at '${resolution.path}': ${resolution.reason}")
+                parser.findSample(gmProgram, midiNote)
+            }
+            is SampleResolution.NoActivePack -> {
+                parser.findSample(gmProgram, midiNote)
+            }
         } ?: return null
 
         val semitones  = midiNote - header.originalPitch

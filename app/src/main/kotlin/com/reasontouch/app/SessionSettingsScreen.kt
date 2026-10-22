@@ -55,6 +55,28 @@ fun SessionSettingsScreen(
     var transposeDelta by remember { mutableStateOf(0) }
     val transposeDisplay = if (transposeDelta > 0) "+$transposeDelta" else "$transposeDelta"
 
+    val importStatus by viewModel.importStatus.collectAsState()
+    if (importStatus != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { viewModel.clearImportStatus() },
+            title = { Text("Sound Pack Import", color = skin.textPrimary, fontFamily = FontFamily.Monospace) },
+            text = { Text(importStatus!!, color = skin.textSecondary, fontFamily = FontFamily.Monospace) },
+            confirmButton = {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(skin.accent)
+                        .clickable { viewModel.clearImportStatus() }
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text("OK", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+            },
+            containerColor = skin.panel,
+            shape = RoundedCornerShape(skin.cornerRadiusMedium)
+        )
+    }
+
     Box(modifier = Modifier.fillMaxSize().background(skin.background)) {
         Column(modifier = Modifier.fillMaxSize().padding(bottom = 60.dp)) {
 

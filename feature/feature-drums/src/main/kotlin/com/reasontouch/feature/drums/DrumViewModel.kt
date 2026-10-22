@@ -34,6 +34,8 @@ class DrumViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val sessionId: String = checkNotNull(savedStateHandle["sessionId"])
+    private suspend fun currentPackId(): String =
+        repository.getSession(sessionId).first()?.packId ?: "default"
 
     val session: StateFlow<Session?> = repository.getSession(sessionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -72,7 +74,8 @@ class DrumViewModel @Inject constructor(
     fun auditionLane(laneIdx: Int, velocity: Int = 100) {
         val lane = DrumKit.lanes.getOrNull(laneIdx) ?: return
         viewModelScope.launch(Dispatchers.IO) {
-            drumPlayer.play(lane.gmNote, velocity)
+            val packId = currentPackId()
+            drumPlayer.play(lane.gmNote, velocity, packId)
         }
     }
 
@@ -85,6 +88,7 @@ class DrumViewModel @Inject constructor(
         val stepMs = (60000.0 / bpm / 4.0).toLong()
 
         playbackJob = viewModelScope.launch(Dispatchers.IO) {
+            val packId = currentPackId()
             var step = 0
             while (_isPlaying.value) {
                 _currentStep.value = step
@@ -92,7 +96,7 @@ class DrumViewModel @Inject constructor(
                 val livePat = _pattern.value
                 DrumKit.lanes.forEachIndexed { laneIdx, lane ->
                     if (livePat.isActive(laneIdx, step)) {
-                        drumPlayer.play(lane.gmNote, livePat.velocity(laneIdx, step))
+                        drumPlayer.play(lane.gmNote, livePat.velocity(laneIdx, step), packId)
                     }
                 }
                 delay(stepMs)

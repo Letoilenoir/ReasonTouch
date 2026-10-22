@@ -25,6 +25,9 @@ class SoundPackManager @Inject constructor(
     private val gson = Gson()
     private val packsDir = File(context.filesDir, "soundpacks")
     private val manifestCache = mutableMapOf<String, SoundPackManifest>()
+    private val noteIndexCache = mutableMapOf<String, Map<Int, File>>()
+
+    var activePackId: String = "default"
 
     init {
         if (!packsDir.exists()) packsDir.mkdirs()
@@ -33,6 +36,7 @@ class SoundPackManager @Inject constructor(
     fun getInstalledPacks(): List<SoundPackInfo> {
         val list = mutableListOf(SoundPackInfo("default", "Default Sound Bank (Built-in)", "1.0", "ReasonTouch"))
         manifestCache.clear()
+        noteIndexCache.clear()
         val subDirs = packsDir.listFiles { file -> file.isDirectory } ?: return list
 
         subDirs.forEach { dir ->
@@ -44,6 +48,32 @@ class SoundPackManager @Inject constructor(
                     }
                     if (manifest != null) {
                         manifestCache[manifest.packId] = manifest
+
+                        val noteMap = mutableMapOf<Int, File>()
+                        manifest.tracks.forEach { (trackKey, trackCfg) ->
+                            trackCfg.mapping?.forEach { (noteStr, relPath) ->
+                                noteStr.toIntOrNull()?.let { note ->
+                                    val sampleFile = File(dir, relPath)
+                                    if (sampleFile.exists()) {
+                                        noteMap[note] = sampleFile
+                                    } else {
+                                        android.util.Log.e("SoundPackManager", "[ValidationError] Pack '${manifest.packId}' track '$trackKey' missing mapped file for note $note at path: $relPath")
+                                    }
+                                }
+                            }
+                            trackCfg.rootKeys?.forEach { (noteStr, relPath) ->
+                                noteStr.toIntOrNull()?.let { note ->
+                                    val sampleFile = File(dir, relPath)
+                                    if (sampleFile.exists()) {
+                                        noteMap[note] = sampleFile
+                                    } else {
+                                        android.util.Log.e("SoundPackManager", "[ValidationError] Pack '${manifest.packId}' track '$trackKey' missing rootKey file for note $note at path: $relPath")
+                                    }
+                                }
+                            }
+                        }
+                        noteIndexCache[manifest.packId] = noteMap
+
                         list.add(
                             SoundPackInfo(
                                 packId = manifest.packId,
@@ -62,8 +92,25 @@ class SoundPackManager @Inject constructor(
     }
 
     fun getManifest(packId: String): SoundPackManifest? {
+        val effective = if (packId == "default") activePackId else packId
         if (manifestCache.isEmpty()) getInstalledPacks()
-        return manifestCache[packId]
+        return manifestCache[effective]
+    }
+
+    fun resolveSample(packId: String, trackType: String, midiNote: Int): SampleResolution {
+        val effective = if (packId == "default") activePackId else packId
+        if (effective == "default") return SampleResolution.NoActivePack
+
+        if (noteIndexCache.isEmpty()) getInstalledPacks()
+        val noteMap = noteIndexCache[effective] ?: return SampleResolution.MissingMapping(midiNote)
+
+        val file = noteMap[midiNote] ?: return SampleResolution.MissingMapping(midiNote)
+        if (!file.exists()) {
+            android.util.Log.e("SoundPackManager", "[SampleResolution] MissingFile for note $midiNote at ${file.absolutePath}")
+            return SampleResolution.MissingFile(file.absolutePath)
+        }
+
+        return SampleResolution.Resolved(file)
     }
 
     fun importPack(sourceUri: Uri): Boolean {
@@ -132,10 +179,15 @@ class SoundPackManager @Inject constructor(
             deleted = packDir.deleteRecursively()
         }
         manifestCache.remove(packId)
+        noteIndexCache.remove(packId)
+        if (activePackId == packId) {
+            activePackId = "default"
+        }
         return deleted
     }
 
     fun getSampleFile(packId: String, relativePath: String): File {
-        return File(packsDir, "$packId/$relativePath")
+        val effective = if (packId == "default") activePackId else packId
+        return File(packsDir, "$effective/$relativePath")
     }
 }

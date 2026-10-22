@@ -34,6 +34,19 @@ class SessionSettingsViewModel @Inject constructor(
     private val _installedPacks = MutableStateFlow<List<SoundPackInfo>>(soundPackManager.getInstalledPacks())
     val installedPacks: StateFlow<List<SoundPackInfo>> = _installedPacks.asStateFlow()
 
+    private val _importStatus = MutableStateFlow<String?>(null)
+    val importStatus: StateFlow<String?> = _importStatus.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            repository.getSession(sessionId).collect { s ->
+                if (s != null) {
+                    soundPackManager.activePackId = s.packId
+                }
+            }
+        }
+    }
+
     fun setName(name: String) {
         val current = session.value ?: return
         viewModelScope.launch {
@@ -56,6 +69,7 @@ class SessionSettingsViewModel @Inject constructor(
 
     fun setPackId(packId: String) {
         val current = session.value ?: return
+        soundPackManager.activePackId = packId
         viewModelScope.launch {
             repository.updateSession(current.copy(
                 packId = packId,
@@ -69,8 +83,15 @@ class SessionSettingsViewModel @Inject constructor(
             val success = soundPackManager.importPack(uri)
             if (success) {
                 _installedPacks.value = soundPackManager.getInstalledPacks()
+                _importStatus.value = "Successfully imported sound pack!"
+            } else {
+                _importStatus.value = "Failed to import pack. Ensure pack.json is valid."
             }
         }
+    }
+
+    fun clearImportStatus() {
+        _importStatus.value = null
     }
 
     fun deletePack(packId: String) {
