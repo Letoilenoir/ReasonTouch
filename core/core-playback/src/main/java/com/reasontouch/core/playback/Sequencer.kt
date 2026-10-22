@@ -99,8 +99,8 @@ class Sequencer @Inject constructor(
                             val vel = (note.velocity * vol).toInt().coerceIn(1, 127)
                             val midi = (108 - note.pitch).coerceIn(0, 127)
 
-                            if (isDrum) drumPlayer.play(midi, vel, packId)
-                            else sf2Player.playNote(midi, dur, vel, program, packId)
+                            if (isDrum) drumPlayer.play(midi, vel, packId, track.name)
+                            else sf2Player.playNote(midi, dur, vel, program, packId, track.name)
                         }
                     }
             }

@@ -49,7 +49,7 @@ class DrumSamplePlayer @Inject constructor(
         }
     }
 
-    fun play(gmNote: Int, velocity: Int = 100, packId: String = "default") {
+    fun play(gmNote: Int, velocity: Int = 100, packId: String = "default", trackName: String = "DRUMS") {
         val resolvedNote = when {
             buffers.containsKey(gmNote) -> gmNote
             gmNote in listOf(41, 43, 45, 47, 48, 50) -> 38
@@ -59,27 +59,28 @@ class DrumSamplePlayer @Inject constructor(
 
         scope.launch(Dispatchers.IO) {
             try {
-                val pcm = if (packId != "default") {
-                    val manifest = soundPackManager.getManifest(packId)
-                    var drumPath: String? = null
-                    manifest?.tracks?.values?.forEach { trackCfg ->
-                        val path = trackCfg.mapping?.get("$resolvedNote") ?: trackCfg.rootKeys?.get("$resolvedNote")
-                        if (path != null) drumPath = path
-                    }
+                val effectivePackId = if (packId == "default") soundPackManager.activePackId else packId
+                val resolution = soundPackManager.resolveSample(effectivePackId, trackName, resolvedNote)
 
-                    val candidateFiles = mutableListOf<File>()
-                    if (drumPath != null) {
-                        candidateFiles.add(soundPackManager.getSampleFile(packId, drumPath))
+                val pcm = when (resolution) {
+                    is SampleResolution.Resolved -> {
+                        loadWavFile(resolution.file) ?: buffers[resolvedNote]
                     }
-                    val filename = NOTE_TO_FILE[resolvedNote] ?: "snare.wav"
-                    candidateFiles.add(soundPackManager.getSampleFile(packId, "drums/$filename"))
-                    candidateFiles.add(soundPackManager.getSampleFile(packId, "samples/$filename"))
-                    candidateFiles.add(soundPackManager.getSampleFile(packId, filename))
-
-                    val customFile = candidateFiles.firstOrNull { it.exists() }
-                    if (customFile != null) loadWavFile(customFile) else buffers[resolvedNote]
-                } else {
-                    buffers[resolvedNote]
+                    is SampleResolution.MissingMapping -> {
+                        android.util.Log.d("DrumSamplePlayer", "[PerTrackIsolation] Track '$trackName' note $resolvedNote unmapped in pack '$effectivePackId' -> using default drum sample.")
+                        buffers[resolvedNote]
+                    }
+                    is SampleResolution.MissingFile -> {
+                        android.util.Log.e("DrumSamplePlayer", "[SampleResolution] MissingFile at path '${resolution.path}' -> falling back to default drum sample.")
+                        buffers[resolvedNote]
+                    }
+                    is SampleResolution.DecodeFailed -> {
+                        android.util.Log.e("DrumSamplePlayer", "[SampleResolution] DecodeFailed at '${resolution.path}': ${resolution.reason}")
+                        buffers[resolvedNote]
+                    }
+                    is SampleResolution.NoActivePack -> {
+                        buffers[resolvedNote]
+                    }
                 } ?: return@launch
 
                 val velScale = (velocity / 127f).coerceIn(0f, 1f)

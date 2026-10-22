@@ -1,15 +1,15 @@
-# Walkthrough - Explicit SampleResolution Pipeline for .rpack Sound Expansion
+# Walkthrough - Strict Per-Track Isolation for .rpack Sound Expansion
 
-Implemented the explicit `SampleResolution` sealed interface pipeline, replacing ad-hoc path guessing with pre-built, validated note indexing in `SoundPackManager` and explicit resolution queries in `Sf2Player` and `DrumSamplePlayer`.
+Successfully implemented strict per-track audio isolation for partial `.rpack` expansion packs. Unmapped or absent channels (like BASS, LEAD, or PAD when an expansion pack only defines DRUMS or CHORDS) now cleanly fall back to built-in default sounds without disruption or malformed fallback lookups.
 
 ## Changes
 
-### [core-audio]
+### [core-audio] & [core-playback]
 
-#### [SampleResolution.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-audio/src/main/kotlin/com/reasontouch/core/audio/SampleResolution.kt) [NEW], [SoundPackManager.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-audio/src/main/kotlin/com/reasontouch/core/audio/SoundPackManager.kt), [Sf2Player.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-audio/src/main/kotlin/com/reasontouch/core/audio/Sf2Player.kt)
-- Created `SampleResolution` sealed interface (`Resolved`, `MissingMapping`, `MissingFile`, `DecodeFailed`, `NoActivePack`).
-- Added pre-built note-to-file index validation during pack indexing and exposed `resolveSample()`.
-- Updated `Sf2Player` to query `resolveSample()` explicitly and log diagnostic failure reasons.
+#### [SoundPackManager.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-audio/src/main/kotlin/com/reasontouch/core/audio/SoundPackManager.kt), [Sf2Player.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-audio/src/main/kotlin/com/reasontouch/core/audio/Sf2Player.kt), [DrumSamplePlayer.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-audio/src/main/kotlin/com/reasontouch/core/audio/DrumSamplePlayer.kt), [Sequencer.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-playback/src/main/java/com/reasontouch/core/playback/Sequencer.kt)
+- Enforced strict track presence validation against `manifest.tracks[trackName]` in `SoundPackManager.resolveSample()`.
+- Threaded `trackName` through `Sf2Player.playNote()`, `DrumSamplePlayer.play()`, and `Sequencer.schedulePass()`.
+- Added explicit Logcat diagnostic logging for per-track resolution decisions.
 
 ## Verification Results
 

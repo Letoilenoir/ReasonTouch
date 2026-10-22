@@ -35,11 +35,12 @@ class Sf2Player @Inject constructor(
         durationSec: Float = 0.4f,
         velocity:    Int   = 100,
         gmProgram:   Int   = 0,
-        packId:      String = "default"
+        packId:      String = "default",
+        trackName:   String = "CHORD"
     ) {
         scope.launch(Dispatchers.Default) {
             try {
-                val pcm   = render(midiNote, durationSec, velocity, gmProgram, packId) ?: return@launch
+                val pcm   = render(midiNote, durationSec, velocity, gmProgram, packId, trackName) ?: return@launch
                 val track = buildTrack(pcm.size)
                 track.write(pcm, 0, pcm.size)
                 synchronized(trackLock) { activeTracks.add(track) }
@@ -59,12 +60,13 @@ class Sf2Player @Inject constructor(
         velocity:     Int   = 100,
         gmProgram:    Int   = 0,
         strumDelayMs: Long  = 0L,
-        packId:       String = "default"
+        packId:       String = "default",
+        trackName:    String = "CHORD"
     ) {
         midiNotes.forEachIndexed { i, note ->
             scope.launch {
                 if (strumDelayMs > 0) delay(i * strumDelayMs)
-                playNote(note, durationSec, velocity, gmProgram, packId)
+                playNote(note, durationSec, velocity, gmProgram, packId, trackName)
             }
         }
     }
@@ -74,10 +76,11 @@ class Sf2Player @Inject constructor(
         durationSec: Float,
         velocity:    Int,
         gmProgram:   Int,
-        packId:      String = "default"
+        packId:      String = "default",
+        trackName:   String = "CHORD"
     ): ShortArray? {
         val effectivePackId = if (packId == "default") soundPackManager.activePackId else packId
-        val resolution = soundPackManager.resolveSample(effectivePackId, "multisample", midiNote)
+        val resolution = soundPackManager.resolveSample(effectivePackId, trackName, midiNote)
 
         val (header, rawSamples) = when (resolution) {
             is SampleResolution.Resolved -> {
@@ -101,11 +104,11 @@ class Sf2Player @Inject constructor(
                 }
             }
             is SampleResolution.MissingMapping -> {
-                android.util.Log.w("Sf2Player", "[SampleResolution] MissingMapping for MIDI note $midiNote in pack '$effectivePackId'. Falling back to default soundfont.")
+                android.util.Log.d("Sf2Player", "[PerTrackIsolation] Track '$trackName' note $midiNote unmapped in pack '$effectivePackId' -> using default soundfont.")
                 parser.findSample(gmProgram, midiNote)
             }
             is SampleResolution.MissingFile -> {
-                android.util.Log.e("Sf2Player", "[SampleResolution] MissingFile at path '${resolution.path}'. Falling back to default soundfont.")
+                android.util.Log.e("Sf2Player", "[SampleResolution] MissingFile at path '${resolution.path}' -> falling back to default soundfont.")
                 parser.findSample(gmProgram, midiNote)
             }
             is SampleResolution.DecodeFailed -> {
