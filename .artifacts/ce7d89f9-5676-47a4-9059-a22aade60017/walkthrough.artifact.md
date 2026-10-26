@@ -1,15 +1,13 @@
-# Walkthrough - MIDI Import Feature
+# Walkthrough - MIDI Import Chord Progression Generation Fix
 
-Successfully implemented the **MIDI Import Feature** in ReasonTouch, allowing users to import standard `.mid` / `.midi` files into sessions, automatically parsing tempo and track events, mapping channels to ReasonTouch instrument roles (`BASS`, `CHORD`, `PAD`, `LEAD`, `DRUMS`), and populating the Piano Roll grid and session data.
+Fixed the issue where MIDI imports did not populate the chord progression timeline for Compose / SuggestNext. `MidiImportManager` now automatically analyzes imported chord notes bar-by-bar and generates corresponding `ChordEvent`s in the session database.
 
 ## Changes
 
-### [core-midi] & [app]
+### [core-midi]
 
-#### [MidiParser.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-midi/src/main/kotlin/com/reasontouch/core/midi/MidiParser.kt) [NEW], [MidiImportManager.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-midi/src/main/kotlin/com/reasontouch/core/midi/MidiImportManager.kt) [NEW], [SessionSettingsScreen.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/app/src/main/kotlin/com/reasontouch/app/SessionSettingsScreen.kt), [SessionSettingsViewModel.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/app/src/main/kotlin/com/reasontouch/app/SessionSettingsViewModel.kt)
-- Implemented Standard MIDI File (SMF Format 0 & 1) binary parser and import manager.
-- Added intelligent track classification heuristics and repository persistence.
-- Added `↓ IMPORT MIDI (.MID)` action button in Session Settings.
+#### [MidiImportManager.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-midi/src/main/kotlin/com/reasontouch/core/midi/MidiImportManager.kt)
+- Added automatic bar-by-bar `ChordEvent` generation from imported MIDI track notes, ensuring SuggestNext and progression views correctly detect and analyze imported chord sequences.
 
 ## Verification Results
 
