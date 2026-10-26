@@ -4,12 +4,16 @@ import android.content.Context
 import android.net.Uri
 import com.google.gson.Gson
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStreamReader
 import java.util.zip.ZipInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+
 
 data class SoundPackInfo(
     val packId: String,
@@ -26,7 +30,12 @@ class SoundPackManager @Inject constructor(
     private val packsDir = File(context.filesDir, "soundpacks")
     private val manifestCache = mutableMapOf<String, SoundPackManifest>()
 
-    var activePackId: String = "default"
+    private val _activePackId = MutableStateFlow("default")
+    val activePackIdFlow: StateFlow<String> = _activePackId.asStateFlow()
+
+    var activePackId: String
+        get() = _activePackId.value
+        set(value) { _activePackId.value = value }
 
     init {
         if (!packsDir.exists()) packsDir.mkdirs()

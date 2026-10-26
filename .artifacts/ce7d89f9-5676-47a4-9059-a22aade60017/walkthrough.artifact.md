@@ -1,15 +1,15 @@
-# Walkthrough - Strict Per-Track Isolation for .rpack Sound Expansion
+# Walkthrough - MIDI Import Feature
 
-Successfully implemented strict per-track audio isolation for partial `.rpack` expansion packs. Unmapped or absent channels (like BASS, LEAD, or PAD when an expansion pack only defines DRUMS or CHORDS) now cleanly fall back to built-in default sounds without disruption or malformed fallback lookups.
+Successfully implemented the **MIDI Import Feature** in ReasonTouch, allowing users to import standard `.mid` / `.midi` files into sessions, automatically parsing tempo and track events, mapping channels to ReasonTouch instrument roles (`BASS`, `CHORD`, `PAD`, `LEAD`, `DRUMS`), and populating the Piano Roll grid and session data.
 
 ## Changes
 
-### [core-audio] & [core-playback]
+### [core-midi] & [app]
 
-#### [SoundPackManager.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-audio/src/main/kotlin/com/reasontouch/core/audio/SoundPackManager.kt), [Sf2Player.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-audio/src/main/kotlin/com/reasontouch/core/audio/Sf2Player.kt), [DrumSamplePlayer.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-audio/src/main/kotlin/com/reasontouch/core/audio/DrumSamplePlayer.kt), [Sequencer.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-playback/src/main/java/com/reasontouch/core/playback/Sequencer.kt)
-- Enforced strict track presence validation against `manifest.tracks[trackName]` in `SoundPackManager.resolveSample()`.
-- Threaded `trackName` through `Sf2Player.playNote()`, `DrumSamplePlayer.play()`, and `Sequencer.schedulePass()`.
-- Added explicit Logcat diagnostic logging for per-track resolution decisions.
+#### [MidiParser.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-midi/src/main/kotlin/com/reasontouch/core/midi/MidiParser.kt) [NEW], [MidiImportManager.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-midi/src/main/kotlin/com/reasontouch/core/midi/MidiImportManager.kt) [NEW], [SessionSettingsScreen.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/app/src/main/kotlin/com/reasontouch/app/SessionSettingsScreen.kt), [SessionSettingsViewModel.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/app/src/main/kotlin/com/reasontouch/app/SessionSettingsViewModel.kt)
+- Implemented Standard MIDI File (SMF Format 0 & 1) binary parser and import manager.
+- Added intelligent track classification heuristics and repository persistence.
+- Added `↓ IMPORT MIDI (.MID)` action button in Session Settings.
 
 ## Verification Results
 

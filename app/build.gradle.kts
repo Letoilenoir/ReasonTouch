@@ -69,6 +69,7 @@ dependencies {
 
     implementation(project(":core:core-data"))
     implementation(project(":core:core-audio"))
+    implementation(project(":core:core-midi"))
     implementation(project(":feature:feature-chords"))
     implementation(project(":feature:feature-pianoroll"))
     implementation(project(":feature:feature-export"))

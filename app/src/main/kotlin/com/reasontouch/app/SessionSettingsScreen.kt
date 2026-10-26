@@ -224,6 +224,32 @@ fun SessionSettingsScreen(
                                 )
                             }
 
+                            val midiLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                                contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+                            ) { uri ->
+                                uri?.let { viewModel.importMidi(it) }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(skin.panelAlt)
+                                    .border(1.dp, skin.border, RoundedCornerShape(4.dp))
+                                    .clickable { midiLauncher.launch(arrayOf("audio/midi", "audio/x-midi", "application/octet-stream", "*/*")) }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "↓ IMPORT MIDI (.MID)",
+                                    color = skin.accent,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+
                             if (session?.packId != null && session?.packId != "default") {
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Box(

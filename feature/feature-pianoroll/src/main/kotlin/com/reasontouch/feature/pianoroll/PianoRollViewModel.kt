@@ -43,6 +43,7 @@ class PianoRollViewModel @Inject constructor(
     private val drumSamplePlayer: DrumSamplePlayer,
     private val playbackController: PlaybackController,
     private val undoHistoryManager: UndoHistoryManager,
+    private val soundPackManager: com.reasontouch.core.audio.SoundPackManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -51,6 +52,21 @@ class PianoRollViewModel @Inject constructor(
 
     val session: StateFlow<Session?> =
         repository.getSession(sessionId)
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                null
+            )
+
+    /**
+     * The currently active sound pack's manifest, re-derived whenever
+     * SoundPackManager.activePackId changes. Phase 1 of the Instrument
+     * Panel sound-pack display work -- see Phase 2 for where this gets
+     * consumed in InstrumentPanel. null means "default" (no custom pack).
+     */
+    val activeManifest: StateFlow<com.reasontouch.core.audio.SoundPackManifest?> =
+        soundPackManager.activePackIdFlow
+            .map { packId -> soundPackManager.getManifest(packId) }
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5000),

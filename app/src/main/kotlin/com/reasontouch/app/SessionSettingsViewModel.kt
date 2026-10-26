@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.reasontouch.core.audio.SoundPackManager
 import com.reasontouch.core.audio.SoundPackInfo
 import com.reasontouch.core.data.SessionRepository
+import com.reasontouch.core.midi.MidiImportManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,6 +21,7 @@ import javax.inject.Inject
 class SessionSettingsViewModel @Inject constructor(
     private val repository: SessionRepository,
     private val soundPackManager: SoundPackManager,
+    private val midiImportManager: MidiImportManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -86,6 +88,17 @@ class SessionSettingsViewModel @Inject constructor(
                 _importStatus.value = "Successfully imported sound pack!"
             } else {
                 _importStatus.value = "Failed to import pack. Ensure pack.json is valid."
+            }
+        }
+    }
+
+    fun importMidi(uri: Uri) {
+        viewModelScope.launch {
+            val success = midiImportManager.importMidiToSession(uri, sessionId)
+            if (success) {
+                _importStatus.value = "Successfully imported MIDI file!"
+            } else {
+                _importStatus.value = "Failed to import MIDI file."
             }
         }
     }
