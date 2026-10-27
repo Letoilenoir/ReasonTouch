@@ -230,14 +230,9 @@ class PianoRollViewModel @Inject constructor(
         updateActiveNotes()
     }
 
-    fun setTrackVolume(index: Int, volume: Float) {
-
+    fun setTrackVolume(trackId: String, volume: Float) {
         viewModelScope.launch {
-
-            val track =
-                tracks.value.getOrNull(index)
-                    ?: return@launch
-
+            val track = tracks.value.firstOrNull { it.id == trackId } ?: return@launch
             repository.updateTrack(
                 track.copy(
                     volume = volume.coerceIn(0f, 1f)
@@ -246,28 +241,18 @@ class PianoRollViewModel @Inject constructor(
         }
     }
 
-    fun setTrackGmProgram(index: Int, gmProgram: Int) {
-
+    fun setTrackGmProgram(trackId: String, gmProgram: Int) {
         viewModelScope.launch {
-
-            val track =
-                tracks.value.getOrNull(index)
-                    ?: return@launch
-
+            val track = tracks.value.firstOrNull { it.id == trackId } ?: return@launch
             repository.updateTrack(
                 track.copy(gmProgram = gmProgram)
             )
         }
     }
 
-    fun muteTrack(index: Int) {
-
+    fun muteTrack(trackId: String) {
         viewModelScope.launch {
-
-            val track =
-                tracks.value.getOrNull(index)
-                    ?: return@launch
-
+            val track = tracks.value.firstOrNull { it.id == trackId } ?: return@launch
             repository.updateTrack(
                 track.copy(muted = !track.muted)
             )

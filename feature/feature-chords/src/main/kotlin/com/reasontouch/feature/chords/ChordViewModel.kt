@@ -864,8 +864,9 @@ class ChordViewModel @Inject constructor(
             val startBarIndex = currentProgression.size
             val currentSession = repository.getSession(sessionId).first()
             val beatsPerBar = ui.value.barDuration.toFloat()
-            val chordTrack = repository.getTracksForSession(sessionId).first()
-                .firstOrNull { it.name.uppercase() == "CHORD" }
+            val tracks = repository.getTracksForSession(sessionId).first()
+            val chordTrack = tracks.firstOrNull { it.name.uppercase().contains("CHORD") }
+                ?: tracks.firstOrNull { it.name.uppercase() != "DRUMS" }
 
             val newNotes = mutableListOf<NoteEvent>()
 

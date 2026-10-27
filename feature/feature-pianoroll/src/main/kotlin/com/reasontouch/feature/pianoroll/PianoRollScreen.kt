@@ -281,7 +281,7 @@ fun PianoRollScreen(
                     trackName      = activeTrack.name,
                     currentProgram = activeTrack.gmProgram,
                     onSelect       = { program ->
-                        viewModel.setTrackGmProgram(activeIndex, program)
+                        viewModel.setTrackGmProgram(activeTrack.id, program)
                         showInstrumentPanel = false
                     },
                     onDismiss = { showInstrumentPanel = false }

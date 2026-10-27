@@ -32,8 +32,8 @@ fun NeoTrackCardRow(
     tracks: List<MidiTrack>,
     activeIndex: Int,
     onSelect: (Int) -> Unit,
-    onMuteToggle: (Int) -> Unit,
-    onVolumeChange: (Int, Float) -> Unit
+    onMuteToggle: (String) -> Unit,
+    onVolumeChange: (String, Float) -> Unit
 ) {
 
     Row(
@@ -53,8 +53,8 @@ fun NeoTrackCardRow(
                 color = trackColor,
                 active = index == activeIndex,
                 onSelect = { onSelect(index) },
-                onMute = { onMuteToggle(index) },
-                onVolumeChange = { onVolumeChange(index, it) }
+                onMute = { onMuteToggle(track.id) },
+                onVolumeChange = { onVolumeChange(track.id, it) }
             )
         }
     }

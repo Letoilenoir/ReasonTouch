@@ -1,13 +1,15 @@
-# Walkthrough - MIDI Import Chord Progression Generation Fix
+# Walkthrough - Dynamic MIDI Track Rendering & Track-ID State Management
 
-Fixed the issue where MIDI imports did not populate the chord progression timeline for Compose / SuggestNext. `MidiImportManager` now automatically analyzes imported chord notes bar-by-bar and generates corresponding `ChordEvent`s in the session database.
+Successfully updated dynamic MIDI track rendering and ViewModel state handling so that dynamically imported MIDI channels (e.g., Soft Karaoke, Organ, Vocal, Sax) behave identically to built-in tracks.
 
 ## Changes
 
-### [core-midi]
+### [feature-pianoroll]
 
-#### [MidiImportManager.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-midi/src/main/kotlin/com/reasontouch/core/midi/MidiImportManager.kt)
-- Added automatic bar-by-bar `ChordEvent` generation from imported MIDI track notes, ensuring SuggestNext and progression views correctly detect and analyze imported chord sequences.
+#### [PianoRollViewModel.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/PianoRollViewModel.kt), [NeoTrackCardRow.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/NeoTrackCardRow.kt), [PianoRollScreen.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/PianoRollScreen.kt)
+- Refactored `muteTrack`, `setTrackVolume`, and `setTrackGmProgram` in `PianoRollViewModel` to use `trackId: String` mapping.
+- Updated `NeoTrackCardRow` and `PianoRollScreen` to pass `track.id` for Mute toggle, volume fader adjustments, and GM patch selection.
+- Ensured all tracks (including dynamically imported channels) render full pill controls and correctly update audio playback state in the synthesizer engine.
 
 ## Verification Results
 
