@@ -51,6 +51,7 @@ import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.rememberScrollState
 // GmInstrument defined locally to avoid cross-module dependency
 data class TrackInstrument(val label: String, val program: Int)
 
@@ -277,37 +278,14 @@ fun PianoRollScreen(
             )
         }
 
-        val configuration = LocalConfiguration.current
-        val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+        val scrollState = rememberScrollState()
 
-        if (isPortrait && tracks.size > 5) {
-            val screenWidthDp = configuration.screenWidthDp
-            // Account for outer horizontal padding and 4 spacing gaps between 5 cards
-            val cardWidth = ((screenWidthDp - 40) / 5).dp
-
-            @OptIn(ExperimentalLayoutApi::class)
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                maxItemsInEachRow = 5
-            ) {
-                tracks.forEach { track ->
-                    val trackIndex = tracks.indexOf(track)
-                    Box(modifier = Modifier.width(cardWidth)) {
-                        NeoTrackCardRow(
-                            tracks = listOf(track),
-                            activeIndex = if (trackIndex == activeIndex) 0 else -1,
-                            onSelect = { viewModel.setActiveTrack(trackIndex) },
-                            onMuteToggle = { viewModel.muteTrack(track.id) },
-                            onVolumeChange = { trackId, vol -> viewModel.setTrackVolume(trackId, vol) }
-                        )
-                    }
-                }
-            }
-        } else {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(scrollState)
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
             NeoTrackCardRow(
                 tracks         = tracks,
                 activeIndex    = activeIndex,
