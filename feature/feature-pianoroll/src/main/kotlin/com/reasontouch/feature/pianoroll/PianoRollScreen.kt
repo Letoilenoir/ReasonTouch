@@ -47,6 +47,10 @@ import com.reasontouch.feature.drums.generateDrumNotes
 import com.reasontouch.feature.chords.BassGenerator
 import com.reasontouch.feature.chords.KeyDetector
 import com.reasontouch.feature.chords.toStepPattern
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 // GmInstrument defined locally to avoid cross-module dependency
 data class TrackInstrument(val label: String, val program: Int)
 
@@ -273,19 +277,35 @@ fun PianoRollScreen(
             )
         }
 
-        // Floating instrument panel - appears above track row when open
-        if (showInstrumentPanel) {
-            val activeTrack = tracks.getOrNull(activeIndex)
-            if (activeTrack != null) {
-                InstrumentPanel(
-                    trackName      = activeTrack.name,
-                    currentProgram = activeTrack.gmProgram,
-                    onSelect       = { program ->
-                        viewModel.setTrackGmProgram(activeTrack.id, program)
-                        showInstrumentPanel = false
-                    },
-                    onDismiss = { showInstrumentPanel = false }
-                )
+        val configuration = LocalConfiguration.current
+        val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+
+        if (isPortrait && tracks.size > 5) {
+            val screenWidthDp = configuration.screenWidthDp
+            // Account for outer horizontal padding and 4 spacing gaps between 5 cards
+            val cardWidth = ((screenWidthDp - 40) / 5).dp
+
+            @OptIn(ExperimentalLayoutApi::class)
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                maxItemsInEachRow = 5
+            ) {
+                tracks.forEach { track ->
+                    val trackIndex = tracks.indexOf(track)
+                    Box(modifier = Modifier.width(cardWidth)) {
+                        NeoTrackCardRow(
+                            tracks = listOf(track),
+                            activeIndex = if (trackIndex == activeIndex) 0 else -1,
+                            onSelect = { viewModel.setActiveTrack(trackIndex) },
+                            onMuteToggle = { viewModel.muteTrack(track.id) },
+                            onVolumeChange = { trackId, vol -> viewModel.setTrackVolume(trackId, vol) }
+                        )
+                    }
+                }
             }
         } else {
             NeoTrackCardRow(
@@ -293,7 +313,7 @@ fun PianoRollScreen(
                 activeIndex    = activeIndex,
                 onSelect       = viewModel::setActiveTrack,
                 onMuteToggle   = viewModel::muteTrack,
-                onVolumeChange = viewModel::setTrackVolume
+                onVolumeChange = { trackId, vol -> viewModel.setTrackVolume(trackId, vol) }
             )
         }
 
