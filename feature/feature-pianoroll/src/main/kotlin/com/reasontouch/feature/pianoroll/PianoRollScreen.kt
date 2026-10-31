@@ -47,6 +47,7 @@ import com.reasontouch.feature.drums.generateDrumNotes
 import com.reasontouch.feature.chords.BassGenerator
 import com.reasontouch.feature.chords.KeyDetector
 import com.reasontouch.feature.chords.toStepPattern
+import androidx.compose.foundation.rememberScrollState
 // GmInstrument defined locally to avoid cross-module dependency
 data class TrackInstrument(val label: String, val program: Int)
 
@@ -288,13 +289,22 @@ fun PianoRollScreen(
                 )
             }
         } else {
-            NeoTrackCardRow(
-                tracks         = tracks,
-                activeIndex    = activeIndex,
-                onSelect       = viewModel::setActiveTrack,
-                onMuteToggle   = viewModel::muteTrack,
-                onVolumeChange = viewModel::setTrackVolume
-            )
+            val scrollState = rememberScrollState()
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(scrollState)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                NeoTrackCardRow(
+                    tracks         = tracks,
+                    activeIndex    = activeIndex,
+                    onSelect       = viewModel::setActiveTrack,
+                    onMuteToggle   = viewModel::muteTrack,
+                    onVolumeChange = viewModel::setTrackVolume
+                )
+            }
         }
 
         val activeTrackName = tracks.getOrNull(activeIndex)?.name?.uppercase() ?: ""
