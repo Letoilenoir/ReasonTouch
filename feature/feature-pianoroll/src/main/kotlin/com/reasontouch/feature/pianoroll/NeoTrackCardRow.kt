@@ -22,6 +22,9 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.shadow
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.text.style.TextOverflow
 
 private val CARD_BG = Color(0xFF111118)
 private val CARD_BORDER = Color(0xFF343444)
@@ -33,15 +36,18 @@ fun NeoTrackCardRow(
     activeIndex: Int,
     onSelect: (Int) -> Unit,
     onMuteToggle: (String) -> Unit,
-    onVolumeChange: (String, Float) -> Unit
+    onVolumeChange: (String, Float) -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    val scrollState = rememberScrollState()
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(Color(0xFF18181D))
-            .padding(horizontal = 2.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+            .horizontalScroll(scrollState)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
 
         tracks.forEachIndexed { index, track ->
@@ -79,20 +85,20 @@ fun NeoTrackCard(
 
     Column(
         modifier = Modifier
-            .width(68.dp)
-            .height(60.dp)
+            .width(72.dp)
+            .height(62.dp)
+            .shadow(
+                elevation = if (active) 10.dp else 0.dp,
+                shape = RoundedCornerShape(14.dp),
+                ambientColor = color.copy(alpha = 0.35f),
+                spotColor = color.copy(alpha = 0.35f)
+            )
             .clip(RoundedCornerShape(14.dp))
             .background(backgroundBrush)
             .border(
                 width = 1.dp,
                 color = color.copy(alpha = 0.45f),
                 shape = RoundedCornerShape(14.dp)
-            )
-            .shadow(
-                elevation = if (active) 10.dp else 0.dp,
-                shape = RoundedCornerShape(14.dp),
-                ambientColor = color.copy(alpha = 0.35f),
-                spotColor = color.copy(alpha = 0.35f)
             )
             .padding(horizontal = 6.dp, vertical = 3.dp)
     ) {
@@ -105,6 +111,7 @@ fun NeoTrackCard(
 
             Box(
                 modifier = Modifier
+                    .weight(1f)
                     .clip(RoundedCornerShape(8.dp))
                     .background(
                         if (active)
@@ -121,9 +128,13 @@ fun NeoTrackCard(
                     color = if (active) color else Color.White,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
+
+            Spacer(modifier = Modifier.width(3.dp))
 
             Box(
                 modifier = Modifier
@@ -170,6 +181,7 @@ fun NeonFader(
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
 
     androidx.compose.foundation.Canvas(
         modifier = modifier
@@ -182,7 +194,7 @@ fun NeonFader(
                         (change.position.x / size.width)
                             .coerceIn(0f, 1f)
 
-                    onValueChange(newValue)
+                    currentOnValueChange(newValue)
                 }
             }
     ) {
