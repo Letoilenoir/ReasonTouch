@@ -14,6 +14,7 @@ import com.reasontouch.core.data.SessionRepository
 import com.reasontouch.core.data.SessionSnapshot
 import com.reasontouch.core.data.UndoHistoryManager
 import com.reasontouch.core.playback.PlaybackController
+import com.reasontouch.core.playback.TransportState
 import com.reasontouch.feature.chords.CompositionIntent
 import com.reasontouch.feature.chords.GeneratedProgression
 import com.reasontouch.feature.chords.KeyDetector
@@ -26,13 +27,17 @@ import com.reasontouch.feature.chords.ProgressionGenerator
 import com.reasontouch.feature.chords.SuggestionWorkflow
 import com.reasontouch.feature.chords.guitarLabel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 
@@ -90,16 +95,13 @@ class PianoRollViewModel @Inject constructor(
             )
 
     fun recordSnapshot() {
-        viewModelScope.launch {
-            val chords = repository.getChordsForSessionOnce(sessionId)
-            val trackList = tracks.value
-            val notesMap = trackList.associate { it.id to repository.getNotesForTrackOnce(it.id) }
-            undoHistoryManager.push(sessionId, SessionSnapshot(chords, notesMap))
-        }
+        val currentChords = chords.value
+        val currentNotes = _allNotes.value
+        undoHistoryManager.push(sessionId, SessionSnapshot(currentChords, currentNotes))
     }
 
     fun undo() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val snapshot = undoHistoryManager.pop(sessionId) ?: return@launch
             repository.deleteChordsForSession(sessionId)
             repository.saveChords(snapshot.chords)
@@ -107,7 +109,7 @@ class PianoRollViewModel @Inject constructor(
                 repository.deleteNotesForTrack(track.id)
                 snapshot.notesMap[track.id]?.let { repository.saveNotes(it) }
             }
-            refreshNotes()
+            _allNotes.update { snapshot.notesMap }
         }
     }
 
@@ -115,17 +117,21 @@ class PianoRollViewModel @Inject constructor(
     val activeTrackIndex: StateFlow<Int> =
         _activeTrackIndex.asStateFlow()
 
-    private val _activeNotes =
-        MutableStateFlow<List<NoteEvent>>(emptyList())
-
-    val activeNotes: StateFlow<List<NoteEvent>> =
-        _activeNotes.asStateFlow()
-
     private val _allNotes =
         MutableStateFlow<Map<String, List<NoteEvent>>>(emptyMap())
 
     val allNotes: StateFlow<Map<String, List<NoteEvent>>> =
         _allNotes.asStateFlow()
+
+    val activeNotes: StateFlow<List<NoteEvent>> =
+        combine(_allNotes, tracks, _activeTrackIndex) { all, trackList, activeIndex ->
+            val activeTrack = trackList.getOrNull(activeIndex)
+            activeTrack?.let { all[it.id] } ?: emptyList()
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            emptyList()
+        )
 
     enum class Tool {
         DRAW,
@@ -164,7 +170,7 @@ class PianoRollViewModel @Inject constructor(
     val hasClipboard: StateFlow<Boolean> =
         _hasClipboard.asStateFlow()
 
-    val transport = playbackController.state
+    val transport: StateFlow<TransportState> = playbackController.state
 
     // GLOBAL DRAW DURATION
     val drawDuration: StateFlow<Float> =
@@ -184,16 +190,16 @@ class PianoRollViewModel @Inject constructor(
 
         viewModelScope.launch {
             tracks.collect { trackList ->
-                _allNotes.value = fetchAllNotes(trackList)
-                updateActiveNotes()
+                val fetched = fetchAllNotes(trackList)
+                _allNotes.update { fetched }
             }
         }
     }
 
     private suspend fun fetchAllNotes(
         trackList: List<MidiTrack>
-    ): Map<String, List<NoteEvent>> {
-        return trackList.associate { track ->
+    ): Map<String, List<NoteEvent>> = withContext(Dispatchers.IO) {
+        trackList.associate { track ->
             track.id to repository.getNotesForTrackOnce(track.id)
         }
     }
@@ -208,30 +214,17 @@ class PianoRollViewModel @Inject constructor(
      */
     fun refreshNotes() {
         viewModelScope.launch {
-            _allNotes.value = fetchAllNotes(tracks.value)
-            updateActiveNotes()
+            val fetched = fetchAllNotes(tracks.value)
+            _allNotes.update { fetched }
         }
     }
 
-    private fun updateActiveNotes() {
-
-        val activeTrack =
-            tracks.value.getOrNull(_activeTrackIndex.value)
-                ?: return
-
-        _activeNotes.value =
-            _allNotes.value[activeTrack.id]
-                ?: emptyList()
-    }
-
     fun setActiveTrack(index: Int) {
-
         _activeTrackIndex.value = index
-        updateActiveNotes()
     }
 
     fun setTrackVolume(trackId: String, volume: Float) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val track = tracks.value.firstOrNull { it.id == trackId } ?: return@launch
             repository.updateTrack(
                 track.copy(
@@ -242,7 +235,7 @@ class PianoRollViewModel @Inject constructor(
     }
 
     fun setTrackGmProgram(trackId: String, gmProgram: Int) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val track = tracks.value.firstOrNull { it.id == trackId } ?: return@launch
             repository.updateTrack(
                 track.copy(gmProgram = gmProgram)
@@ -251,7 +244,7 @@ class PianoRollViewModel @Inject constructor(
     }
 
     fun muteTrack(trackId: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val track = tracks.value.firstOrNull { it.id == trackId } ?: return@launch
             repository.updateTrack(
                 track.copy(muted = !track.muted)
@@ -316,20 +309,15 @@ class PianoRollViewModel @Inject constructor(
             velocity = velocity
         )
 
-          viewModelScope.launch {
+        _allNotes.update { current ->
+            val trackNotes = (current[activeTrack.id] ?: emptyList()) + note
+            current + (activeTrack.id to trackNotes)
+        }
 
-              repository.saveNote(note)
-
-              val current = _allNotes.value.toMutableMap()
-
-              current[activeTrack.id] =
-                  (current[activeTrack.id] ?: emptyList()) + note
-
-              _allNotes.value = current
-
-              updateActiveNotes()
-          }
-      }
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.saveNote(note)
+        }
+    }
 
     /**
      * Saves a batch of already-generated notes (potentially across multiple
@@ -340,16 +328,16 @@ class PianoRollViewModel @Inject constructor(
     fun saveGeneratedNotes(notes: List<NoteEvent>) {
         if (notes.isEmpty()) return
 
-        viewModelScope.launch {
-            repository.saveNotes(notes)
-
-            val current = _allNotes.value.toMutableMap()
+        _allNotes.update { current ->
+            val updated = current.toMutableMap()
             notes.groupBy { it.trackId }.forEach { (trackId, trackNotes) ->
-                current[trackId] = (current[trackId] ?: emptyList()) + trackNotes
+                updated[trackId] = (updated[trackId] ?: emptyList()) + trackNotes
             }
-            _allNotes.value = current
+            updated
+        }
 
-            updateActiveNotes()
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.saveNotes(notes)
         }
     }
 
@@ -394,41 +382,32 @@ class PianoRollViewModel @Inject constructor(
     }
 
     private fun resizeSelectedNotes(newDuration: Float) {
-
         val ids = _selectedNoteIds.value
-
         if (ids.isEmpty()) return
 
         val activeTrack =
             tracks.value.getOrNull(_activeTrackIndex.value)
                 ?: return
 
-        val current =
-            _allNotes.value.toMutableMap()
+        var updatedNotesToSave: List<NoteEvent> = emptyList()
 
-        val notes =
-            current[activeTrack.id]
-                ?: return
-
-        val updated = notes.map { note ->
-
-            if (note.id in ids) {
-                note.copy(duration = newDuration)
-            } else {
-                note
+        _allNotes.update { current ->
+            val notes = current[activeTrack.id] ?: return@update current
+            val updated = notes.map { note ->
+                if (note.id in ids) {
+                    note.copy(duration = newDuration)
+                } else {
+                    note
+                }
             }
+            updatedNotesToSave = updated.filter { it.id in ids }
+            current + (activeTrack.id to updated)
         }
 
-        current[activeTrack.id] = updated
-        _allNotes.value = current
-
-        updateActiveNotes()
-
-        viewModelScope.launch {
-
-            updated
-                .filter { it.id in ids }
-                .forEach { repository.saveNote(it) }
+        if (updatedNotesToSave.isNotEmpty()) {
+            viewModelScope.launch(Dispatchers.IO) {
+                repository.saveNotes(updatedNotesToSave)
+            }
         }
     }
 
@@ -437,154 +416,115 @@ class PianoRollViewModel @Inject constructor(
     // ---------------------------------------------------------------------
 
     fun deleteNote(noteId: String) {
+        val activeTrack =
+            tracks.value.getOrNull(_activeTrackIndex.value)
 
-        viewModelScope.launch {
+        _allNotes.update { current ->
+            if (activeTrack != null) {
+                val trackNotes = (current[activeTrack.id] ?: emptyList()).filter { it.id != noteId }
+                current + (activeTrack.id to trackNotes)
+            } else {
+                current.mapValues { (_, notes) -> notes.filter { it.id != noteId } }
+            }
+        }
 
+        viewModelScope.launch(Dispatchers.IO) {
             repository.deleteNoteById(noteId)
-
-            val activeTrack =
-                tracks.value.getOrNull(_activeTrackIndex.value)
-                    ?: return@launch
-
-            val current =
-                _allNotes.value.toMutableMap()
-
-            current[activeTrack.id] =
-                (current[activeTrack.id] ?: emptyList())
-                    .filter { it.id != noteId }
-
-            _allNotes.value = current
-
-            updateActiveNotes()
         }
     }
-// ---------------------------------------------------------------------
-// NOTE MOVE
-// ---------------------------------------------------------------------
+
+    // ---------------------------------------------------------------------
+    // NOTE MOVE
+    // ---------------------------------------------------------------------
 
     fun moveSelectedNotes(
         deltaBeats: Float,
         deltaPitch: Int,
         snapValue: Float
     ) {
-
         val ids = _selectedNoteIds.value
-
         if (ids.isEmpty()) return
 
         val activeTrack =
             tracks.value.getOrNull(_activeTrackIndex.value)
                 ?: return
 
-        val current =
-            _allNotes.value.toMutableMap()
+        _allNotes.update { current ->
+            val notes = current[activeTrack.id] ?: return@update current
+            val updated = notes.map { note ->
+                if (note.id in ids) {
+                    val newBeat =
+                        snapBeat(
+                            note.beat + deltaBeats,
+                            snapValue
+                        ).coerceAtLeast(0f)
 
-        val notes =
-            current[activeTrack.id]
-                ?: return
+                    val newPitch =
+                        (note.pitch + deltaPitch)
+                            .coerceIn(0, 127)
 
-        val updated = notes.map { note ->
-
-            if (note.id in ids) {
-
-                val newBeat =
-                    snapBeat(
-                        note.beat + deltaBeats,
-                        snapValue
-                    ).coerceAtLeast(0f)
-
-                val newPitch =
-                    (note.pitch + deltaPitch)
-                        .coerceIn(0, 127)
-
-                note.copy(
-                    beat = newBeat,
-                    pitch = newPitch
-                )
-
-            } else {
-                note
+                    note.copy(
+                        beat = newBeat,
+                        pitch = newPitch
+                    )
+                } else {
+                    note
+                }
             }
+            current + (activeTrack.id to updated)
         }
-
-        current[activeTrack.id] = updated
-        _allNotes.value = current
-
-        updateActiveNotes()
     }
 
     fun commitMove() {
-
         val ids = _selectedNoteIds.value
-
         if (ids.isEmpty()) return
 
         val activeTrack =
             tracks.value.getOrNull(_activeTrackIndex.value)
                 ?: return
 
-        val notes =
-            _allNotes.value[activeTrack.id]
-                ?: return
+        val notesToSave = _allNotes.value[activeTrack.id]?.filter { it.id in ids } ?: return
 
-        viewModelScope.launch {
-
-            notes
-                .filter { it.id in ids }
-                .forEach {
-                    repository.saveNote(it)
-                }
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.saveNotes(notesToSave)
         }
     }
-// ---------------------------------------------------------------------
 
-// ---------------------------------------------------------------------
+    // ---------------------------------------------------------------------
 
     fun updateNoteDuration(
         noteId: String,
         newDuration: Float
     ) {
-
         val activeTrack =
             tracks.value.getOrNull(_activeTrackIndex.value)
                 ?: return
 
-        val current =
-            _allNotes.value.toMutableMap()
+        val minDuration = currentSnapValue()
+        var updatedNote: NoteEvent? = null
 
-        val notes =
-            current[activeTrack.id]
-                ?: return
-
-        val updated = notes.map { note ->
-
-            if (note.id == noteId) {
-
-                note.copy(
-                    duration = newDuration.coerceAtLeast(
-                        currentSnapValue()
+        _allNotes.update { current ->
+            val notes = current[activeTrack.id] ?: return@update current
+            val updated = notes.map { note ->
+                if (note.id == noteId) {
+                    val noteUpdated = note.copy(
+                        duration = newDuration.coerceAtLeast(minDuration)
                     )
-                )
-
-            } else {
-                note
+                    updatedNote = noteUpdated
+                    noteUpdated
+                } else {
+                    note
+                }
             }
+            current + (activeTrack.id to updated)
         }
 
-        current[activeTrack.id] = updated
-        _allNotes.value = current
-
-        updateActiveNotes()
-
-        viewModelScope.launch {
-
-            val note =
-                updated.firstOrNull { it.id == noteId }
-                    ?: return@launch
-
+        val note = updatedNote ?: return
+        viewModelScope.launch(Dispatchers.IO) {
             repository.saveNote(note)
         }
     }
+
     // ---------------------------------------------------------------------
     // NOTE SELECTION
     // ---------------------------------------------------------------------
@@ -593,7 +533,6 @@ class PianoRollViewModel @Inject constructor(
         noteId: String,
         addToSelection: Boolean = false
     ) {
-
         _selectedNoteIds.value =
             if (addToSelection) {
                 _selectedNoteIds.value + noteId
@@ -609,14 +548,13 @@ class PianoRollViewModel @Inject constructor(
     fun clearSelection() {
         _selectedNoteIds.value = emptySet()
     }
-// ---------------------------------------------------------------------
-// COPY / PASTE
-// ---------------------------------------------------------------------
+
+    // ---------------------------------------------------------------------
+    // COPY / PASTE
+    // ---------------------------------------------------------------------
 
     fun copySelectedNotes() {
-
         val ids = _selectedNoteIds.value
-
         if (ids.isEmpty()) return
 
         val activeTrack =
@@ -638,10 +576,7 @@ class PianoRollViewModel @Inject constructor(
         pasteAtBeat: Float,
         snapValue: Float
     ) {
-
         if (clipboard.isEmpty()) return
-
-        recordSnapshot()
 
         val activeTrack =
             tracks.value.getOrNull(_activeTrackIndex.value)
@@ -653,68 +588,54 @@ class PianoRollViewModel @Inject constructor(
         val offset =
             pasteAtBeat - earliestBeat
 
-        viewModelScope.launch {
-
-            val newNotes = clipboard.map { note ->
-
-                note.copy(
-                    id = UUID.randomUUID().toString(),
-                    trackId = activeTrack.id,
-                    beat = snapBeat(
-                        note.beat + offset,
-                        snapValue
-                    ).coerceAtLeast(0f)
-                )
-            }
-
-            newNotes.forEach {
-                repository.saveNote(it)
-            }
-
-            val current =
-                _allNotes.value.toMutableMap()
-
-            current[activeTrack.id] =
-                (current[activeTrack.id] ?: emptyList()) + newNotes
-
-            _allNotes.value = current
-
-            _selectedNoteIds.value =
-                newNotes.map { it.id }.toSet()
-
-            updateActiveNotes()
+        val newNotes = clipboard.map { note ->
+            note.copy(
+                id = UUID.randomUUID().toString(),
+                trackId = activeTrack.id,
+                beat = snapBeat(
+                    note.beat + offset,
+                    snapValue
+                ).coerceAtLeast(0f)
+            )
         }
-    }
-    fun deleteSelectedNotes() {
-
-        val ids = _selectedNoteIds.value
-
-        if (ids.isEmpty()) return
 
         recordSnapshot()
+
+        _allNotes.update { current ->
+            val trackNotes = (current[activeTrack.id] ?: emptyList()) + newNotes
+            current + (activeTrack.id to trackNotes)
+        }
+
+        _selectedNoteIds.value =
+            newNotes.map { it.id }.toSet()
+
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.saveNotes(newNotes)
+        }
+    }
+
+    fun deleteSelectedNotes() {
+        val ids = _selectedNoteIds.value
+        if (ids.isEmpty()) return
 
         val activeTrack =
             tracks.value.getOrNull(_activeTrackIndex.value)
                 ?: return
 
-        viewModelScope.launch {
+        recordSnapshot()
 
+        _allNotes.update { current ->
+            val trackNotes = (current[activeTrack.id] ?: emptyList())
+                .filter { it.id !in ids }
+            current + (activeTrack.id to trackNotes)
+        }
+
+        _selectedNoteIds.value = emptySet()
+
+        viewModelScope.launch(Dispatchers.IO) {
             ids.forEach {
                 repository.deleteNoteById(it)
             }
-
-            val current =
-                _allNotes.value.toMutableMap()
-
-            current[activeTrack.id] =
-                (current[activeTrack.id] ?: emptyList())
-                    .filter { it.id !in ids }
-
-            _allNotes.value = current
-
-            _selectedNoteIds.value = emptySet()
-
-            updateActiveNotes()
         }
     }
 
@@ -722,18 +643,25 @@ class PianoRollViewModel @Inject constructor(
         val ids = _selectedNoteIds.value
         if (ids.isEmpty()) return
         val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
+
         recordSnapshot()
-        viewModelScope.launch {
-            val notes = _allNotes.value[activeTrack.id] ?: emptyList()
+
+        var notesToSave: List<NoteEvent> = emptyList()
+
+        _allNotes.update { current ->
+            val notes = current[activeTrack.id] ?: emptyList()
             val updatedNotes = notes.map { note ->
                 if (note.id in ids) {
                     note.copy(pitch = (note.pitch + delta).coerceIn(0, 87))
                 } else note
             }
+            notesToSave = updatedNotes
+            current + (activeTrack.id to updatedNotes)
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
             repository.deleteNotesForTrack(activeTrack.id)
-            repository.saveNotes(updatedNotes)
-            _allNotes.value = _allNotes.value.toMutableMap().apply { put(activeTrack.id, updatedNotes) }
-            updateActiveNotes()
+            repository.saveNotes(notesToSave)
         }
     }
 
@@ -741,22 +669,31 @@ class PianoRollViewModel @Inject constructor(
         val ids = _selectedNoteIds.value
         if (ids.isEmpty()) return
         val activeTrack = tracks.value.getOrNull(_activeTrackIndex.value) ?: return
+
+        val notes = _allNotes.value[activeTrack.id] ?: emptyList()
+        val selectedNotes = notes.filter { it.id in ids }
+        if (selectedNotes.isEmpty()) return
+        val avgPitch = selectedNotes.map { it.pitch }.average().toInt()
+
         recordSnapshot()
-        viewModelScope.launch {
-            val notes = _allNotes.value[activeTrack.id] ?: emptyList()
-            val selectedNotes = notes.filter { it.id in ids }
-            if (selectedNotes.isEmpty()) return@launch
-            val avgPitch = selectedNotes.map { it.pitch }.average().toInt()
-            val updatedNotes = notes.map { note ->
+
+        var notesToSave: List<NoteEvent> = emptyList()
+
+        _allNotes.update { current ->
+            val currentNotes = current[activeTrack.id] ?: emptyList()
+            val updatedNotes = currentNotes.map { note ->
                 if (note.id in ids) {
                     val reflected = (2 * avgPitch - note.pitch).coerceIn(0, 87)
                     note.copy(pitch = reflected)
                 } else note
             }
+            notesToSave = updatedNotes
+            current + (activeTrack.id to updatedNotes)
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
             repository.deleteNotesForTrack(activeTrack.id)
-            repository.saveNotes(updatedNotes)
-            _allNotes.value = _allNotes.value.toMutableMap().apply { put(activeTrack.id, updatedNotes) }
-            updateActiveNotes()
+            repository.saveNotes(notesToSave)
         }
     }
 
@@ -898,14 +835,14 @@ class PianoRollViewModel @Inject constructor(
     // the repository rather than via the chords StateFlow, unchanged from
     // the original behavior.
 
-    suspend fun suggestNextPhrases(): List<GeneratedProgression> {
+    suspend fun suggestNextPhrases(): List<GeneratedProgression> = withContext(Dispatchers.Default) {
         val currentProgression = repository.getChordsForSessionOnce(sessionId)
-        return SuggestionWorkflow.suggestNextPhrases(currentProgression)
+        SuggestionWorkflow.suggestNextPhrases(currentProgression)
     }
 
-    suspend fun suggestNextSection(): PairingDecision {
+    suspend fun suggestNextSection(): PairingDecision = withContext(Dispatchers.Default) {
         val currentProgression = repository.getChordsForSessionOnce(sessionId)
-        return SuggestionWorkflow.suggestNextSection(currentProgression)
+        SuggestionWorkflow.suggestNextSection(currentProgression)
     }
 
     /**
@@ -913,14 +850,14 @@ class PianoRollViewModel @Inject constructor(
      * paired with its generated phrases, rather than collapsing to a single top pick.
      * See SuggestionWorkflow.suggestNextOptionsWithPhrases().
      */
-    suspend fun suggestNextOptions(): List<SuggestionWorkflow.SuggestionOption> {
+    suspend fun suggestNextOptions(): List<SuggestionWorkflow.SuggestionOption> = withContext(Dispatchers.Default) {
         val currentProgression = repository.getChordsForSessionOnce(sessionId)
-        return SuggestionWorkflow.suggestNextOptionsWithPhrases(currentProgression)
+        SuggestionWorkflow.suggestNextOptionsWithPhrases(currentProgression)
     }
 
     // NEW:
     fun addPhrase(generatedProgression: GeneratedProgression) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val currentProgression = repository.getChordsForSessionOnce(sessionId)
             if (currentProgression.isEmpty()) return@launch
 
@@ -963,13 +900,12 @@ class PianoRollViewModel @Inject constructor(
 
             if (newNotes.isNotEmpty()) {
                 repository.saveNotes(newNotes)
-                val current = _allNotes.value.toMutableMap()
                 if (chordTrack != null) {
-                    current[chordTrack.id] =
-                        (current[chordTrack.id] ?: emptyList()) + newNotes
+                    _allNotes.update { current ->
+                        val trackNotes = (current[chordTrack.id] ?: emptyList()) + newNotes
+                        current + (chordTrack.id to trackNotes)
+                    }
                 }
-                _allNotes.value = current
-                updateActiveNotes()
             }
 
             val updatedSession = session.value?.copy(
