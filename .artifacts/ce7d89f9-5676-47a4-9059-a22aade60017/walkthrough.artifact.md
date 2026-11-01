@@ -1,15 +1,15 @@
-# Walkthrough - Dynamic MIDI Track Rendering & Track-ID State Management
+# Walkthrough - Phase 2: GridSubdivision State in PianoRollViewModel
 
-Successfully updated dynamic MIDI track rendering and ViewModel state handling so that dynamically imported MIDI channels (e.g., Soft Karaoke, Organ, Vocal, Sax) behave identically to built-in tracks.
+Successfully implemented Phase 2 of the `GridSubdivision` refactor, exposing `gridSubdivision` state flow and mutation handler in `PianoRollViewModel`.
 
 ## Changes
 
 ### [feature-pianoroll]
 
-#### [PianoRollViewModel.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/PianoRollViewModel.kt), [NeoTrackCardRow.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/NeoTrackCardRow.kt), [PianoRollScreen.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/PianoRollScreen.kt)
-- Refactored `muteTrack`, `setTrackVolume`, and `setTrackGmProgram` in `PianoRollViewModel` to use `trackId: String` mapping.
-- Updated `NeoTrackCardRow` and `PianoRollScreen` to pass `track.id` for Mute toggle, volume fader adjustments, and GM patch selection.
-- Ensured all tracks (including dynamically imported channels) render full pill controls and correctly update audio playback state in the synthesizer engine.
+#### [PianoRollViewModel.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/PianoRollViewModel.kt)
+- Added private `_gridSubdivision` MutableStateFlow initialized to `GridSubdivision.STRAIGHT_16TH` (`stepsPerBeat = 4`).
+- Exposed public read-only `gridSubdivision` StateFlow.
+- Added public `setGridSubdivision(subdivision: GridSubdivision)` mutation handler function.
 
 ## Verification Results
 

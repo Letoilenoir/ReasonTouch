@@ -14,6 +14,7 @@ import com.reasontouch.core.data.SessionRepository
 import com.reasontouch.core.data.SessionSnapshot
 import com.reasontouch.core.data.UndoHistoryManager
 import com.reasontouch.core.playback.PlaybackController
+import com.reasontouch.core.playback.GridSubdivision
 import com.reasontouch.core.playback.TransportState
 import com.reasontouch.feature.chords.CompositionIntent
 import com.reasontouch.feature.chords.GeneratedProgression
@@ -116,6 +117,14 @@ class PianoRollViewModel @Inject constructor(
     private val _activeTrackIndex = MutableStateFlow(0)
     val activeTrackIndex: StateFlow<Int> =
         _activeTrackIndex.asStateFlow()
+
+    private val _gridSubdivision = MutableStateFlow(GridSubdivision.STRAIGHT_16TH)
+    val gridSubdivision: StateFlow<GridSubdivision> =
+        _gridSubdivision.asStateFlow()
+
+    fun setGridSubdivision(subdivision: GridSubdivision) {
+        _gridSubdivision.value = subdivision
+    }
 
     private val _allNotes =
         MutableStateFlow<Map<String, List<NoteEvent>>>(emptyMap())
