@@ -36,9 +36,9 @@ fun DrawScope.drawGridLines(state: PianoRollState, snapValue: Float) {
             val isBar  = abs(b % state.beatsPerBar) < 0.001f
             val isBeat = abs(b % 1f) < 0.001f
             val color  = when {
-                isBar  -> Color(0xFF404050)
-                isBeat -> Color(0xFF2E2E3E)
-                else   -> Color(0xFF252530)
+                isBar  -> Color(0xFF70708C)
+                isBeat -> Color(0xFF4A4A5E)
+                else   -> Color(0xFF353547)
             }
             drawRect(color = color, topLeft = Offset(x, state.headerHeight), size = Size(1f, size.height))
         }
