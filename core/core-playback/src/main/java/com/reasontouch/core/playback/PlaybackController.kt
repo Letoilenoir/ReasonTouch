@@ -47,6 +47,12 @@ class PlaybackController @Inject constructor(
     fun skipToStart()             = rewind()
     fun fastForward()             = _state.update { it.copy(playheadBeat = (it.playheadBeat + 4f)) }
     fun skipToEnd()               = _state.update { it.copy(playheadBeat = it.loopEnd) }
+
+    private val _gridSubdivision = MutableStateFlow(GridSubdivision.STRAIGHT_16TH)
+    val gridSubdivision: StateFlow<GridSubdivision> = _gridSubdivision.asStateFlow()
+    fun setGridSubdivision(subdivision: GridSubdivision) {
+        _gridSubdivision.value = subdivision
+    }
 }
 
 

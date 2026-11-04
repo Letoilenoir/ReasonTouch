@@ -1,15 +1,14 @@
-# Walkthrough - Phase 2: GridSubdivision State in PianoRollViewModel
+# Walkthrough - Unified Scrollable Bottom Control Row in ReasonTouchApp
 
-Successfully implemented Phase 2 of the `GridSubdivision` refactor, exposing `gridSubdivision` state flow and mutation handler in `PianoRollViewModel`.
+Successfully made the entire bottom control row horizontally scrollable for both the Drum Machine and Piano Roll screens in `ReasonTouchApp.kt`.
 
 ## Changes
 
-### [feature-pianoroll]
+### [app]
 
-#### [PianoRollViewModel.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/PianoRollViewModel.kt)
-- Added private `_gridSubdivision` MutableStateFlow initialized to `GridSubdivision.STRAIGHT_16TH` (`stepsPerBeat = 4`).
-- Exposed public read-only `gridSubdivision` StateFlow.
-- Added public `setGridSubdivision(subdivision: GridSubdivision)` mutation handler function.
+#### [ReasonTouchApp.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/app/src/main/kotlin/com/reasontouch/app/ReasonTouchApp.kt)
+- Wrapped the entire bottom control row container in `Modifier.horizontalScroll(bottomScrollState)` as a single unified strip.
+- Maintained screen-adaptive controls for Drum Machine (`16 Steps`, `32 Steps`, `16T`, `8T`) and Piano Roll (`16 Steps`, `32 Steps`, `16T`, `8T` + `1/64` through `2 BAR`).
 
 ## Verification Results
 

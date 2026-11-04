@@ -6,6 +6,10 @@ import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Arrangement
+import com.reasontouch.core.playback.GridSubdivision
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -166,20 +170,29 @@ fun ReasonTouchApp(repository: SessionRepository) {
             }
 
             if (showChrome) {
+                val playbackVm: PlaybackViewModel = hiltViewModel()
+                val transport = playbackVm.transport.collectAsState()
+                val gridSubdivision by playbackVm.gridSubdivision.collectAsState()
+                val isPianoRoll = currentRoute.startsWith("piano_roll/")
+                val isDrums = currentRoute.startsWith("drums/")
+                val bottomScrollState = rememberScrollState()
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(40.dp)
                         .background(RACK)
+                        .horizontalScroll(bottomScrollState)
                         .padding(horizontal = 12.dp),
 
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
 
                     // HOME BUTTON
                     Box(
                         modifier = Modifier
+                            .height(28.dp)
                             .clip(RoundedCornerShape(4.dp))
                             .background(PANEL)
                             .border(1.dp, BORDER, RoundedCornerShape(4.dp))
@@ -188,21 +201,22 @@ fun ReasonTouchApp(repository: SessionRepository) {
                                     popUpTo(Screen.SessionList.route) { inclusive = true }
                                 }
                             }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "HOME",
                             color = TEXT_DIM,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
                         )
                     }
-                    Spacer(modifier = Modifier.width(6.dp))
-                    // SESSION BUTTON
 
+                    // SESSION BUTTON
                     Box(
                         modifier = Modifier
+                            .height(28.dp)
                             .clip(RoundedCornerShape(4.dp))
                             .background(PANEL)
                             .border(
@@ -211,9 +225,7 @@ fun ReasonTouchApp(repository: SessionRepository) {
                                 RoundedCornerShape(4.dp)
                             )
                             .clickable {
-
                                 if (currentSessionId.isNotEmpty()) {
-
                                     navController.navigate(
                                         Screen.SessionSettings.createRoute(
                                             currentSessionId
@@ -221,16 +233,14 @@ fun ReasonTouchApp(repository: SessionRepository) {
                                     )
                                 }
                             }
-                            .padding(
-                                horizontal = 12.dp,
-                                vertical = 6.dp
-                            )
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
                     ) {
 
                         Text(
                             text = "\u2699 ${currentSession?.name?.uppercase() ?: "SESSION"}",
                             color = TEXT_DIM,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
                             maxLines = 1,
@@ -238,33 +248,30 @@ fun ReasonTouchApp(repository: SessionRepository) {
                             modifier = Modifier.widthIn(max = 90.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(6.dp))
 
                     // MIDI EXPORT BUTTON
                     if (currentSessionId.isNotEmpty()) {
                         Box(
                             modifier = Modifier
+                                .height(28.dp)
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(Color(0xFF1A3A2A))
                                 .border(1.dp, GREEN, RoundedCornerShape(4.dp))
                                 .clickable { showExport = true }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "↓ MIDI",
                                 color = GREEN,
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace
                             )
                         }
                     }
 
-                    // SPACE BETWEEN SESSION + TRANSPORT
-                    Spacer(modifier = Modifier.width(12.dp))
                     // GLOBAL TRANSPORT
-                    val playbackVm: PlaybackViewModel = hiltViewModel()
-                    val transport = playbackVm.transport.collectAsState()
                     TransportControls(
                         isPlaying = transport.value.isPlaying,
                         onPlay = { playbackVm.play(currentSessionId) },
@@ -274,70 +281,104 @@ fun ReasonTouchApp(repository: SessionRepository) {
                         onSkipToStart = playbackVm::skipToStart,
                         onSkipToEnd = playbackVm::skipToEnd
                     )
-                    // DURATION STEPPER (Arrange only)
-                    val isArrange = currentRoute.startsWith("piano_roll/")
-                    if (isArrange) {
-                        val drawDuration by playbackVm.drawDuration.collectAsState()
-                        val snapValue = 0.0625f // 1/64 minimum step
-                        val label = when (drawDuration) {
-                            0.0625f -> "1/64"
-                            0.125f -> "1/32"
-                            0.25f -> "1/16"
-                            0.5f -> "1/8"
-                            1f -> "1/4"
-                            2f -> "1/2"
-                            4f -> "1 BAR"
-                            8f -> "2 BAR"
-                            else -> "%.2f".format(drawDuration)
-                        }
-                        Spacer(modifier = Modifier.weight(1f))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
 
-                            androidx.compose.material3.IconButton(
-                                onClick = { playbackVm.stepStepper(-1) },
-                                modifier = Modifier.width(28.dp)
+                    // CONTEXTUAL CONTROLS (Drums or Piano Roll)
+                    if (isDrums) {
+                        val drumOptions = listOf(
+                            "16 Steps" to GridSubdivision(4, 4),
+                            "32 Steps" to GridSubdivision(4, 8),
+                            "16T" to GridSubdivision.TRIPLET_16TH,
+                            "8T" to GridSubdivision.TRIPLET_8TH
+                        )
+                        drumOptions.forEach { (label, sub) ->
+                            val isSelected = gridSubdivision.stepsPerBeat == sub.stepsPerBeat && gridSubdivision.totalBeats == sub.totalBeats
+                            Box(
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(if (isSelected) Color(0xFF38BDF8).copy(alpha = 0.2f) else PANEL)
+                                    .border(1.dp, if (isSelected) Color(0xFF38BDF8) else BORDER, RoundedCornerShape(4.dp))
+                                    .clickable { playbackVm.setGridSubdivision(sub) }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    "-",
-                                    color = Color(0xFFC8C8D4),
-                                    fontSize = 16.sp,
+                                    text = label,
+                                    color = if (isSelected) Color(0xFF38BDF8) else TEXT_DIM,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = FontFamily.Monospace
                                 )
                             }
-
-                            Text(
-                                text = label,
-                                color = Color(0xFFE84040),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                modifier = Modifier.width(36.dp),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-
-                            androidx.compose.material3.IconButton(
-                                onClick = { playbackVm.stepStepper(+1) },
-                                modifier = Modifier.width(28.dp)
+                        }
+                    } else if (isPianoRoll) {
+                        // 1. Grid Subdivisions group
+                        val gridOptions = listOf(
+                            "16 Steps" to GridSubdivision(4, 4),
+                            "32 Steps" to GridSubdivision(4, 8),
+                            "16T" to GridSubdivision.TRIPLET_16TH,
+                            "8T" to GridSubdivision.TRIPLET_8TH
+                        )
+                        gridOptions.forEach { (label, sub) ->
+                            val isSelected = gridSubdivision.stepsPerBeat == sub.stepsPerBeat && gridSubdivision.totalBeats == sub.totalBeats
+                            Box(
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(if (isSelected) Color(0xFF38BDF8).copy(alpha = 0.2f) else PANEL)
+                                    .border(1.dp, if (isSelected) Color(0xFF38BDF8) else BORDER, RoundedCornerShape(4.dp))
+                                    .clickable { playbackVm.setGridSubdivision(sub) }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    "+",
-                                    color = Color(0xFFC8C8D4),
-                                    fontSize = 16.sp,
+                                    text = label,
+                                    color = if (isSelected) Color(0xFF38BDF8) else TEXT_DIM,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+
+                        Box(modifier = Modifier.width(1.dp).height(20.dp).background(BORDER))
+
+                        // 2. Note Duration options group
+                        val drawDuration by playbackVm.drawDuration.collectAsState()
+                        val snapSteps = listOf(0.0625f, 0.125f, 0.25f, 0.5f, 1f, 2f, 4f, 8f)
+                        val labels = listOf("1/64", "1/32", "1/16", "1/8", "1/4", "1/2", "1 BAR", "2 BAR")
+                        snapSteps.forEachIndexed { idx, dur ->
+                            val isSelected = kotlin.math.abs(drawDuration - dur) < 0.001f
+                            Box(
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(if (isSelected) Color(0xFFE84040).copy(alpha = 0.2f) else PANEL)
+                                    .border(1.dp, if (isSelected) Color(0xFFE84040) else BORDER, RoundedCornerShape(4.dp))
+                                    .clickable { playbackVm.setDrawDuration(dur) }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = labels[idx],
+                                    color = if (isSelected) Color(0xFFE84040) else TEXT_DIM,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = FontFamily.Monospace
                                 )
                             }
                         }
                     }
+                    Spacer(modifier = Modifier.width(24.dp))
                 }
+            }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(BORDER)
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(BORDER)
+            )
 
                 BottomNav(
                     currentRoute = currentRoute,
@@ -388,7 +429,6 @@ fun ReasonTouchApp(repository: SessionRepository) {
                     }
                 )
             }
-        }
 
         if (showExport && currentSessionId.isNotEmpty()) {
 

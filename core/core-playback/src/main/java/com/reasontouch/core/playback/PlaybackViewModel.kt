@@ -50,6 +50,10 @@ class PlaybackViewModel @Inject constructor(
 
     val drawDuration: StateFlow<Float> = controller.drawDuration
     val snapValues   = controller.snapValues
+    fun setDrawDuration(duration: Float) = controller.setDrawDuration(duration)
+
+    val gridSubdivision = controller.gridSubdivision
+    fun setGridSubdivision(subdivision: GridSubdivision) = controller.setGridSubdivision(subdivision)
 
 }
 
