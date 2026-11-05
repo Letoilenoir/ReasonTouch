@@ -1,6 +1,6 @@
-# Task List - Phase 2: GridSubdivision State in PianoRollViewModel
+# Task List - Stage 2 Layout Refactoring: Context-Aware BottomNav
 
-- [ ] Add `_gridSubdivision` state and `gridSubdivision` StateFlow to `PianoRollViewModel.kt`
-- [ ] Add `setGridSubdivision` mutator function
-- [ ] Run gradle build and verify compilation (`gradle_build("app:assembleDebug")`)
-- [ ] Create walkthrough artifact summarizing changes
+- [x] Update `BottomNav.kt` to omit active tab and render `TransportControls` on the right
+- [x] Update `ReasonTouchApp.kt` to collect transport state and pass to `BottomNav`
+- [x] Run gradle build and verify compilation (`gradle_build("app:assembleDebug")`)
+- [x] Create walkthrough artifact summarizing changes

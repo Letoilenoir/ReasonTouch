@@ -47,7 +47,6 @@ import androidx.navigation.compose.rememberNavController
 import com.reasontouch.core.data.SessionRepository
 import com.reasontouch.feature.export.ExportDialog
 import com.reasontouch.feature.export.ExportViewModel
-import com.reasontouch.feature.pianoroll.TransportControls
 import com.reasontouch.core.playback.PlaybackViewModel
 import com.reasontouch.core.ui.theme.ReasonTouchTheme
 import com.reasontouch.feature.chords.ChordViewModel
@@ -171,7 +170,6 @@ fun ReasonTouchApp(repository: SessionRepository) {
 
             if (showChrome) {
                 val playbackVm: PlaybackViewModel = hiltViewModel()
-                val transport = playbackVm.transport.collectAsState()
                 val gridSubdivision by playbackVm.gridSubdivision.collectAsState()
                 val isPianoRoll = currentRoute.startsWith("piano_roll/")
                 val isDrums = currentRoute.startsWith("drums/")
@@ -271,17 +269,6 @@ fun ReasonTouchApp(repository: SessionRepository) {
                         }
                     }
 
-                    // GLOBAL TRANSPORT
-                    TransportControls(
-                        isPlaying = transport.value.isPlaying,
-                        onPlay = { playbackVm.play(currentSessionId) },
-                        onStop = playbackVm::stop,
-                        onRewind = playbackVm::rewind,
-                        onFastForward = playbackVm::fastForward,
-                        onSkipToStart = playbackVm::skipToStart,
-                        onSkipToEnd = playbackVm::skipToEnd
-                    )
-
                     // CONTEXTUAL CONTROLS (Drums or Piano Roll)
                     if (isDrums) {
                         val drumOptions = listOf(
@@ -380,46 +367,61 @@ fun ReasonTouchApp(repository: SessionRepository) {
                     .background(BORDER)
             )
 
-                BottomNav(
-                    currentRoute = currentRoute,
+            val playbackVmForNav: PlaybackViewModel = hiltViewModel()
+            val transportForNav = playbackVmForNav.transport.collectAsState()
 
-                    onChordsClick = {
+            BottomNav(
+                currentRoute = currentRoute,
+                isPlaying = transportForNav.value.isPlaying,
+                onPlay = { playbackVmForNav.play(currentSessionId) },
+                onStop = playbackVmForNav::stop,
+                onRewind = playbackVmForNav::rewind,
+                onFastForward = playbackVmForNav::fastForward,
+                onSkipToStart = playbackVmForNav::skipToStart,
+                onSkipToEnd = playbackVmForNav::skipToEnd,
 
-                        val sid =
-                            navBackStackEntry?.arguments
-                                ?.getString("sessionId")
-                                ?: return@BottomNav
+                onChordsClick = {
 
+                    val sid =
+                        navBackStackEntry?.arguments
+                            ?.getString("sessionId")
+                            ?: currentSessionId
+
+                    if (sid.isNotEmpty()) {
                         navController.navigate(
                             Screen.Chords.createRoute(sid)
                         ) {
                             launchSingleTop = true
                             restoreState = true
                         }
-                    },
+                    }
+                },
 
-                    onPianoRollClick = {
+                onPianoRollClick = {
 
-                        val sid =
-                            navBackStackEntry?.arguments
-                                ?.getString("sessionId")
-                                ?: return@BottomNav
+                    val sid =
+                        navBackStackEntry?.arguments
+                            ?.getString("sessionId")
+                            ?: currentSessionId
 
+                    if (sid.isNotEmpty()) {
                         navController.navigate(
                             Screen.PianoRoll.createRoute(sid)
                         ) {
                             launchSingleTop = true
                             restoreState = true
                         }
-                    },
+                    }
+                },
 
-                    onDrumsClick = {
+                onDrumsClick = {
 
-                        val sid =
-                            navBackStackEntry?.arguments
-                                ?.getString("sessionId")
-                                ?: return@BottomNav
+                    val sid =
+                        navBackStackEntry?.arguments
+                            ?.getString("sessionId")
+                            ?: currentSessionId
 
+                    if (sid.isNotEmpty()) {
                         navController.navigate(
                             Screen.Drums.createRoute(sid)
                         ) {
@@ -427,7 +429,8 @@ fun ReasonTouchApp(repository: SessionRepository) {
                             restoreState = true
                         }
                     }
-                )
+                }
+            )
             }
 
         if (showExport && currentSessionId.isNotEmpty()) {

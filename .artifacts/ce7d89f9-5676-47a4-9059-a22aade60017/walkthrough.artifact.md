@@ -1,16 +1,15 @@
-# Walkthrough - PianoRollDrawing Grid Line Contrast Increase
+# Walkthrough - Stage 2 Layout Refactoring: Context-Aware BottomNav
 
-Successfully increased the contrast of piano roll grid lines inside `drawGridLines` in `PianoRollDrawing.kt`.
+Successfully completed Stage 2 of the layout refactoring, reconfiguring `BottomNav` and `ReasonTouchApp.kt` to be context-aware.
 
 ## Changes
 
-### [feature-pianoroll]
+### [app]
 
-#### [PianoRollDrawing.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/PianoRollDrawing.kt)
-- Updated `drawGridLines` color constants:
-  - `isBar`: `Color(0xFF70708C)` (brighter bar marker)
-  - `isBeat`: `Color(0xFF4A4A5E)` (distinct beat marker)
-  - `else`: `Color(0xFF353547)` (clean subdivision/triplet visibility)
+#### [BottomNav.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/app/src/main/kotlin/com/reasontouch/app/BottomNav.kt), [ReasonTouchApp.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/app/src/main/kotlin/com/reasontouch/app/ReasonTouchApp.kt)
+- Updated `BottomNav` signature and layout to accept `currentRoute`, `isPlaying`, transport callbacks, and navigation callbacks.
+- Rendered only non-active workspace tabs on the left (omitting the tab matching `currentRoute`), and rendered `TransportControls` fixed on the right side of the bottom container.
+- Collected transport state in `ReasonTouchApp` and passed it into `BottomNav`.
 
 ## Verification Results
 
