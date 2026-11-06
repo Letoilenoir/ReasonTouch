@@ -243,6 +243,29 @@ class PianoRollViewModel @Inject constructor(
         }
     }
 
+    fun updateTrackGroove(trackId: String, gridSubdivision: String, paradiddleMode: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val track = tracks.value.firstOrNull { it.id == trackId } ?: return@launch
+            repository.updateTrack(
+                track.copy(
+                    grooveModifier = gridSubdivision,
+                    grooveType = paradiddleMode
+                )
+            )
+        }
+    }
+
+    fun updateTrackTranspose(trackId: String, transposeAmount: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val track = tracks.value.firstOrNull { it.id == trackId } ?: return@launch
+            repository.updateTrack(
+                track.copy(
+                    transpose = transposeAmount.coerceIn(-12, 12)
+                )
+            )
+        }
+    }
+
     fun setTrackGmProgram(trackId: String, gmProgram: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             val track = tracks.value.firstOrNull { it.id == trackId } ?: return@launch
@@ -260,6 +283,8 @@ class PianoRollViewModel @Inject constructor(
             )
         }
     }
+
+
 
     fun setTool(tool: Tool) {
 
@@ -284,6 +309,8 @@ class PianoRollViewModel @Inject constructor(
             (_snapIndex.value - 1)
                 .coerceAtLeast(0)
     }
+
+
 
     fun currentSnapValue(): Float =
         snapValues[_snapIndex.value]

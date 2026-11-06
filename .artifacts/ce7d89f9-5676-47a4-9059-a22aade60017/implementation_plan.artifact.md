@@ -1,39 +1,25 @@
-# Implementation Plan: Generalize Transpose & Groove Controls Across All Track Inspectors
+# Implementation Plan: Full Playback Handling for Rhythm Subdivisions & Paradiddle Modifiers in Sequencer
 
-Generalize the transpose facility and integrate `GrooveModifierState` controls (`InspectorControlPanel`) across all pitched track inspectors (BASS, LEAD, CHORD, PAD) while omitting transpose for DRUMS using `InspectorState.isPitched`.
+Implement full playback evaluation and note transformation handling for rhythm subdivisions and paradiddle/modifiers in `Sequencer.kt` for both drum and melodic tracks, ensuring the master playhead cursor remains fully linear and independent.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> **Architecture & Integration:**
-> 1. **`InspectorControlPanel` Integration:**
-   - Embed `InspectorControlPanel` into `ChordInspectorDialog`, `BassInspectorDialog`, `LeadInspectorDialog`, `PadInspectorDialog`, and `DrumInspectorDialog`.
-   - `InspectorState` manages `trackId`, `transposeSemitones`, and `grooveState`, automatically hiding transpose controls for DRUMS (`isPitched = false`).
-2. **ViewModel Wiring:**
-   - Wire `onTranspose` to `chordViewModel.transposeBar(barIndex, delta)`.
-   - Wire `onGrooveChange` to update groove settings in the ViewModel / repository.
+> **Playback Pipeline Enhancements (`Sequencer.kt`):**
+> 1. **Rhythm Subdivisions & Timing Scaling:**
+   - Process `STRAIGHT_16`, `TRIPLET_8T`, `TRIPLET_16T`, and swing/subdivision settings to compute `scheduledTick` via `stepScale`.
+2. **Paradiddle & Dynamic Modifiers:**
+   - **Drums (`isDrum = true`):** Apply sticking sequence velocity accents (e.g., accenting downbeats and alternating hits based on pattern index).
+   - **Melodic (`supportsPitch = true`):** Apply pattern modifiers (`ACCENT_VELOCITY`, `OCTAVE_BOUNCE`, `ROOT_FIFTH`) dynamically based on note indices.
+3. **Playhead Cursor Protection:**
+   - Ensure `playheadBeat` (playbackPositionTicks) updates strictly based on elapsed wall-clock time (`elapsed / beatDurMs`), remaining completely independent of note pitch/groove transformations.
 
 ## Proposed Changes
 
-### [feature-chords] & [feature-pianoroll]
+### [core-playback]
 
-#### [ChordInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-chords/src/main/kotlin/com/reasontouch/feature/chords/components/ChordInspectorDialog.kt)
-- Integrate `InspectorControlPanel`.
-
-#### [BassInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-chords/src/main/kotlin/com/reasontouch/feature/chords/components/BassInspectorDialog.kt)
-- Integrate `InspectorControlPanel`.
-
-#### [LeadInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-chords/src/main/kotlin/com/reasontouch/feature/chords/components/LeadInspectorDialog.kt)
-- Integrate `InspectorControlPanel`.
-
-#### [PadInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-chords/src/main/kotlin/com/reasontouch/feature/chords/components/PadInspectorDialog.kt)
-- Integrate `InspectorControlPanel`.
-
-#### [DrumInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/components/DrumInspectorDialog.kt)
-- Integrate `InspectorControlPanel` (unpitched / DRUMS track, omitting transpose).
-
-#### [PianoRollScreen.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/PianoRollScreen.kt)
-- Pass `InspectorState`, `onTranspose`, and `onGrooveChange` to all track inspector dialog invocations.
+#### [Sequencer.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-playback/src/main/java/com/reasontouch/core/playback/Sequencer.kt)
+- Enhance `schedulePass` with robust rhythm subdivision mapping, drum sticking/accent evaluation, and melodic pattern modifiers while keeping the tick clock independent.
 
 ## Verification Plan
 
@@ -41,4 +27,4 @@ Generalize the transpose facility and integrate `GrooveModifierState` controls (
 - Gradle build verification via `gradle_build("app:assembleDebug")`.
 
 ### Manual Verification
-- Deploy to app, open bar inspectors for BASS, LEAD, CHORD, PAD, and DRUMS, verifying that transpose controls appear for pitched tracks and are omitted for DRUMS, and that Grid Subdivision and Paradiddle/Modifier controls function correctly.
+- Deploy to app, play sessions with various rhythm subdivisions (`8T`, `16T`) and paradiddle modifiers (`Accent`, `Octave`, `Root/5th`) on both drum and melodic tracks, and verify smooth audio transformation and UI cursor tracking.

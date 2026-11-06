@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import com.reasontouch.core.playback.InspectorState
 import com.reasontouch.core.playback.GrooveModifierState
+import com.reasontouch.core.playback.GridSubdivisionEnum
+import com.reasontouch.core.playback.ParadiddleModeEnum
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -137,6 +139,7 @@ fun PianoRollScreen(
     val isPlaying    by viewModel.isPlaying.collectAsState()
     val hasClipboard by viewModel.hasClipboard.collectAsState()
     val drawDuration by viewModel.drawDuration.collectAsState()
+
     var showInstrumentPanel by remember { mutableStateOf(false) }
     var trayExpanded by remember { mutableStateOf(false) }
     var traySection by remember { mutableStateOf(TraySection.HOME) }
@@ -150,6 +153,15 @@ fun PianoRollScreen(
     val tracks       by viewModel.tracks.collectAsState()
     val chords       by viewModel.chords.collectAsState()
     val activeIndex  by viewModel.activeTrackIndex.collectAsState()
+    val activeTrackId = tracks.getOrNull(activeIndex)?.id ?: ""
+
+    val onGrooveChange: (GrooveModifierState) -> Unit = { newGrooveState ->
+        viewModel.updateTrackGroove(
+            trackId = activeTrackId,
+            gridSubdivision = newGrooveState.gridSubdivision.name,
+            paradiddleMode = newGrooveState.paradiddleMode.name
+        )
+    }
     val chordViewModel: ChordViewModel = hiltViewModel()
     val chordUiState by chordViewModel.ui.collectAsState()
     val drumViewModel: DrumViewModel = hiltViewModel()
@@ -388,14 +400,25 @@ fun PianoRollScreen(
                 val chordNames = chords.map { it.chordName.substringBefore(" ") }
                 val key = KeyDetector.detect(chordNames).firstOrNull()
 
-                val inspectorState = InspectorState(trackId = activeTrackName)
+                val activeTrack = tracks.getOrNull(activeIndex)
+                val inspectorState = InspectorState(
+                    trackId = activeTrackName,
+                    _transposeSemitones = activeTrack?.transpose ?: 0,
+                    grooveState = GrooveModifierState(
+                        gridSubdivision = runCatching { GridSubdivisionEnum.valueOf(activeTrack?.grooveModifier ?: "STRAIGHT_16") }.getOrDefault(GridSubdivisionEnum.STRAIGHT_16),
+                        paradiddleMode = runCatching { ParadiddleModeEnum.valueOf(activeTrack?.grooveType ?: "OFF") }.getOrDefault(ParadiddleModeEnum.OFF)
+                    )
+                )
                 val onTranspose: (Int) -> Unit = { delta ->
-                    viewModel.recordSnapshot()
-                    chordViewModel.transposeBar(barIdx, delta) { viewModel.refreshNotes() }
-                    activeBarToInspect = null
+                    val cur = activeTrack?.transpose ?: 0
+                    viewModel.updateTrackTranspose(activeTrackId, cur + delta)
                 }
-                val onGrooveChange: (GrooveModifierState) -> Unit = { grooveState ->
-                    // Handle groove modifier state updates
+                val onGrooveChange: (GrooveModifierState) -> Unit = { newGroove ->
+                    viewModel.updateTrackGroove(
+                        trackId = activeTrackId,
+                        gridSubdivision = newGroove.gridSubdivision.name,
+                        paradiddleMode = newGroove.paradiddleMode.name
+                    )
                 }
 
                 when (activeTrackName) {

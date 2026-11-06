@@ -95,21 +95,45 @@ class Sequencer @Inject constructor(
                         val groove = track.grooveModifier.uppercase()
                         val paradiddle = track.grooveType.uppercase()
 
-                        when {
-                            groove.contains("ACCENT") || paradiddle.contains("ACCENT") -> {
-                                if (abs(note.beat % 1f) < 0.001f) velocityFactor = 1.25f
+                        val activeModifier = when {
+                            groove.contains("ACCENT") || paradiddle.contains("ACCENT") -> "ACCENT"
+                            groove.contains("OCTAVE") || paradiddle.contains("OCTAVE") -> "OCTAVE"
+                            groove.contains("ROOT_FIFTH") || paradiddle.contains("ROOT_FIFTH") -> "ROOT_FIFTH"
+                            else -> "OFF"
+                        }
+
+                        if (isDrum) {
+                            when (activeModifier) {
+                                "ACCENT" -> {
+                                    if (abs(note.beat % 1f) < 0.001f) velocityFactor = 1.3f
+                                    else if (index % 2 == 1) velocityFactor = 0.85f
+                                }
+                                "OCTAVE" -> {
+                                    if (index % 4 in 2..3) velocityFactor = 1.2f
+                                }
+                                else -> {
+                                    if (abs(note.beat % 1f) < 0.001f) velocityFactor = 1.15f
+                                }
                             }
-                            groove.contains("OCTAVE") || paradiddle.contains("OCTAVE") -> {
-                                if (index % 2 == 1) finalPitch = (transposedPitch + 12).coerceIn(0, 127)
-                            }
-                            groove.contains("ROOT_FIFTH") || paradiddle.contains("ROOT_FIFTH") -> {
-                                if (index % 2 == 1) finalPitch = (transposedPitch + 7).coerceIn(0, 127)
+                        } else {
+                            when (activeModifier) {
+                                "ACCENT" -> {
+                                    if (abs(note.beat % 1f) < 0.001f) velocityFactor = 1.25f
+                                }
+                                "OCTAVE" -> {
+                                    if (index % 2 == 1) finalPitch = (transposedPitch + 12).coerceIn(0, 127)
+                                }
+                                "ROOT_FIFTH" -> {
+                                    if (index % 2 == 1) finalPitch = (transposedPitch + 7).coerceIn(0, 127)
+                                }
+                                "OFF" -> {}
                             }
                         }
 
                         val stepScale = when {
-                            groove.contains("TRIPLET_8T") || paradiddle.contains("TRIPLET_8T") -> 1.5f
-                            groove.contains("TRIPLET_16T") || paradiddle.contains("TRIPLET_16T") -> 0.75f
+                            groove.contains("TRIPLET_8") || paradiddle.contains("TRIPLET_8") -> 1.5f
+                            groove.contains("TRIPLET_16") || paradiddle.contains("TRIPLET_16") -> 0.75f
+                            groove.contains("SWING") || paradiddle.contains("SWING") -> 1.05f
                             else -> 1.0f
                         }
                         val scheduledTick = note.beat * stepScale
