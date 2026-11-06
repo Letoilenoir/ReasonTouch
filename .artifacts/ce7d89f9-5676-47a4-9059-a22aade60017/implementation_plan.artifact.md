@@ -1,37 +1,34 @@
-# Implementation Plan: Stage 2 Layout Refactoring — Context-Aware BottomNav & Transport Controls
+# Implementation Plan: Core State & Data Models for Inspector and Compose Features
 
-Reconfigure `BottomNav` and `ReasonTouchApp.kt` for Stage 2 so that the bottom navigation bar is context-aware: omitting the active workspace tab on the left and embedding fixed `TransportControls` on the right.
+Update core state and data models to support transposition and rhythmic groove modifications across inspectors and compose workflows.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> **Architecture & UI Design:**
-> 1. **`BottomNav.kt` Refactor:**
-   - Update `BottomNav` to accept:
-     - `currentRoute: String`
-     - `isPlaying: Boolean` (or `transportState: TransportState`)
-     - Transport callbacks (`onPlay`, `onStop`, `onRewind`, `onFastForward`, `onSkipToStart`, `onSkipToEnd`)
-     - Navigation callbacks (`onChordsClick`, `onPianoRollClick`, `onDrumsClick`)
-   - Render only non-active workspace tabs on the left (e.g. if on chords, show Piano Roll and Drums tabs; omit Chords).
-   - Render `TransportControls` fixed on the right side of the 56.dp bottom bar.
-2. **`ReasonTouchApp.kt` Integration:**
-   - Collect `val transport = playbackVm.transport.collectAsState()` inside `showChrome`.
-   - Pass transport state and callbacks into `BottomNav`.
+> **Data Model Specifications:**
+> 1. **`GrooveModifierState.kt` (in `core-playback`):**
+   - Enums:
+     - `GridSubdivisionEnum`: `STRAIGHT_16`, `TRIPLET_8T`, `TRIPLET_16T` (default `STRAIGHT_16`).
+     - `ParadiddleModeEnum`: `OFF`, `ACCENT_VELOCITY`, `OCTAVE_BOUNCE`, `ROOT_FIFTH` (default `OFF`).
+   - Data class `GrooveModifierState` with `gridSubdivision` and `paradiddleMode`.
+2. **`InspectorState.kt` (in `core-playback`):**
+   - Data class `InspectorState` with:
+     - `trackId: String`
+     - `transposeSemitones: Int` (coerced in `-12..12`, default `0`)
+     - `grooveState: GrooveModifierState`
+     - Computed property `val isPitched: Boolean get() = trackId.uppercase() != "DRUMS" && !trackId.uppercase().contains("DRUM")`.
 
 ## Proposed Changes
 
-### [app]
+### [core-playback]
 
-#### [BottomNav.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/app/src/main/kotlin/com/reasontouch/app/BottomNav.kt)
-- Update `BottomNav` to omit active tab and render `TransportControls` on the right.
+#### [GrooveModifierState.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-playback/src/main/java/com/reasontouch/core/playback/GrooveModifierState.kt) [NEW]
+- Define `GridSubdivisionEnum`, `ParadiddleModeEnum`, and `GrooveModifierState`.
 
-#### [ReasonTouchApp.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/app/src/main/kotlin/com/reasontouch/app/ReasonTouchApp.kt)
-- Collect transport state and pass to `BottomNav`.
+#### [InspectorState.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-playback/src/main/java/com/reasontouch/core/playback/InspectorState.kt) [NEW]
+- Define `InspectorState` data class with `transposeSemitones`, `grooveState`, and `isPitched`.
 
 ## Verification Plan
 
 ### Automated Tests
 - Gradle build verification via `gradle_build("app:assembleDebug")`.
-
-### Manual Verification
-- Deploy to app, navigate between Chords, Arrange (Piano Roll), and Drums, and verify `BottomNav` dynamically omits the active tab on the left while keeping `TransportControls` pinned on the right.

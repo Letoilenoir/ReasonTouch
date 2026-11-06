@@ -1,15 +1,16 @@
-# Walkthrough - Stage 2 Layout Refactoring: Context-Aware BottomNav
+# Walkthrough - Core State & Data Models for Inspector and Compose Features
 
-Successfully completed Stage 2 of the layout refactoring, reconfiguring `BottomNav` and `ReasonTouchApp.kt` to be context-aware.
+Successfully created core state and data models to support transposition and rhythmic groove modifications in `core-playback`.
 
 ## Changes
 
-### [app]
+### [core-playback]
 
-#### [BottomNav.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/app/src/main/kotlin/com/reasontouch/app/BottomNav.kt), [ReasonTouchApp.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/app/src/main/kotlin/com/reasontouch/app/ReasonTouchApp.kt)
-- Updated `BottomNav` signature and layout to accept `currentRoute`, `isPlaying`, transport callbacks, and navigation callbacks.
-- Rendered only non-active workspace tabs on the left (omitting the tab matching `currentRoute`), and rendered `TransportControls` fixed on the right side of the bottom container.
-- Collected transport state in `ReasonTouchApp` and passed it into `BottomNav`.
+#### [GrooveModifierState.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-playback/src/main/java/com/reasontouch/core/playback/GrooveModifierState.kt) [NEW]
+- Created `GrooveModifierState` data class with `GridSubdivisionEnum` (`STRAIGHT_16`, `TRIPLET_8T`, `TRIPLET_16T`) and `ParadiddleModeEnum` (`OFF`, `ACCENT_VELOCITY`, `OCTAVE_BOUNCE`, `ROOT_FIFTH`).
+
+#### [InspectorState.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-playback/src/main/java/com/reasontouch/core/playback/InspectorState.kt) [NEW]
+- Created `InspectorState` data class containing `trackId`, `transposeSemitones` (coerced in `-12..12`), `grooveState`, and computed property `isPitched` (evaluating to false if `trackId == "DRUMS"` or contains "DRUM", true otherwise).
 
 ## Verification Results
 
