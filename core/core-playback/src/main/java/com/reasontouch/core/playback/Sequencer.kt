@@ -9,6 +9,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.first
+import kotlin.math.abs
 import kotlin.math.ceil
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -82,10 +83,38 @@ class Sequencer @Inject constructor(
                 val clusters = buildClusters(notes)
                 val program = gmProgram(track)
                 val isDrum = isDrumTrack(track)
+                val supportsPitch = track.supportsPitchControls
 
                 notes.filter { it.beat >= fromBeat && it.beat < endBeat }
-                    .forEach { note ->
-                        val delayMs = ((note.beat - fromBeat) * beatDurMs).toLong()
+                    .forEachIndexed { index, note ->
+                        val rawTranspose = if (supportsPitch) track.transpose else 0
+                        val transposedPitch = (note.pitch + rawTranspose).coerceIn(0, 127)
+
+                        var finalPitch = transposedPitch
+                        var velocityFactor = 1.0f
+                        val groove = track.grooveModifier.uppercase()
+                        val paradiddle = track.grooveType.uppercase()
+
+                        when {
+                            groove.contains("ACCENT") || paradiddle.contains("ACCENT") -> {
+                                if (abs(note.beat % 1f) < 0.001f) velocityFactor = 1.25f
+                            }
+                            groove.contains("OCTAVE") || paradiddle.contains("OCTAVE") -> {
+                                if (index % 2 == 1) finalPitch = (transposedPitch + 12).coerceIn(0, 127)
+                            }
+                            groove.contains("ROOT_FIFTH") || paradiddle.contains("ROOT_FIFTH") -> {
+                                if (index % 2 == 1) finalPitch = (transposedPitch + 7).coerceIn(0, 127)
+                            }
+                        }
+
+                        val stepScale = when {
+                            groove.contains("TRIPLET_8T") || paradiddle.contains("TRIPLET_8T") -> 1.5f
+                            groove.contains("TRIPLET_16T") || paradiddle.contains("TRIPLET_16T") -> 0.75f
+                            else -> 1.0f
+                        }
+                        val scheduledTick = note.beat * stepScale
+
+                        val delayMs = ((scheduledTick - fromBeat) * beatDurMs).toLong()
                         val dur = ringDur(note, clusters)
                         val trackId = track.id
 
@@ -96,8 +125,8 @@ class Sequencer @Inject constructor(
 
                             val liveTracks = repository.getTracksForSession(sessionId).first()
                             val vol = liveTracks.firstOrNull { it.id == trackId }?.volume ?: 1f
-                            val vel = (note.velocity * vol).toInt().coerceIn(1, 127)
-                            val midi = (108 - note.pitch).coerceIn(0, 127)
+                            val vel = (note.velocity * vol * velocityFactor).toInt().coerceIn(1, 127)
+                            val midi = (108 - finalPitch).coerceIn(0, 127)
 
                             if (isDrum) drumPlayer.play(midi, vel, packId, track.name)
                             else sf2Player.playNote(midi, dur, vel, program, packId, track.name)
@@ -146,7 +175,7 @@ class Sequencer @Inject constructor(
         job = null
         passJob?.cancel()
         passJob = null
-        transport.update { it.copy(isPlaying = false) }
+        transport.update { it.copy(isPlaying = false, playheadBeat = 0f) }
     }
 
     fun rewind(transport: MutableStateFlow<TransportState>) {
@@ -155,29 +184,10 @@ class Sequencer @Inject constructor(
     }
 
     private fun computeEndBeat(allNotes: Map<String, List<NoteEvent>>): Float {
-        // Deliberately uses note START time only, not beat + duration. A note's stored
-        // duration represents its intended ring/sustain -- e.g. a strummed chord meant to
-        // ring past its nominal bar, which matters for MIDI export fidelity and is a real
-        // musical feature, not a bug. Actual playback ring is computed independently by
-        // ringDur() above via note-onset clustering, so it's unaffected by this. Using
-        // beat + duration here previously let a wide/slow strum's ring length silently
-        // inflate the whole session's playback length by an extra bar whenever it bled
-        // past a bar boundary, even though nothing about where notes trigger had changed.
-        val lastNoteBeat = allNotes.values.flatten()
-            .maxOfOrNull { it.beat } ?: 0f
-        if (lastNoteBeat <= 0f) return 4f
-
-        // Always round up: a note's start beat, even exactly on a bar boundary, means
-        // that bar is in use and must be counted. (The epsilon "already at boundary"
-        // special case below was correct when this used note END time -- a note ending
-        // exactly at a boundary really has finished -- but is invalid now that this is
-        // START time only. Removed rather than adjusted, since there's no remaining
-        // case where a start beat on a boundary should NOT round up.)
-        val barNumber = ((lastNoteBeat / 4f).toInt() + 1)
-            .coerceAtLeast(1)
-
-        return (barNumber * 4f).toFloat()
+        var maxB = 4f
+        allNotes.values.flatten().forEach { n ->
+            if (n.beat + n.duration > maxB) maxB = n.beat + n.duration
+        }
+        return ceil(maxB / 4f) * 4f
     }
 }
-
-

@@ -31,5 +31,11 @@ data class MidiTrack(
     val solo: Boolean = false,
     val volume: Float = 1.0f,
     val gmProgram: Int = 33,
-    val drumPack: String = "default"
-)
+    val drumPack: String = "default",
+    val transpose: Int = 0,
+    val grooveModifier: String = "STRAIGHT_16",
+    val grooveType: String = "OFF"
+) {
+    val supportsPitchControls: Boolean
+        get() = name.uppercase() != "DRUMS" && !name.uppercase().contains("DRUM") && midiChannel != 9
+}
