@@ -18,6 +18,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reasontouch.core.data.ChordEvent
+import com.reasontouch.core.playback.GrooveModifierState
+import com.reasontouch.core.playback.InspectorState
+import com.reasontouch.core.ui.components.InspectorControlPanel
 import com.reasontouch.core.ui.theme.ReasonTouchTheme
 import com.reasontouch.feature.chords.*
 
@@ -25,6 +28,9 @@ import com.reasontouch.feature.chords.*
 fun PadInspectorDialog(
     barIndex: Int,
     currentChord: ChordEvent?,
+    inspectorState: InspectorState,
+    onTranspose: (Int) -> Unit,
+    onGrooveChange: (GrooveModifierState) -> Unit,
     onApplyVoicing: (TheoryChord) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -66,12 +72,19 @@ fun PadInspectorDialog(
             )
             Spacer(Modifier.height(skin.paddingMedium))
 
+            InspectorControlPanel(
+                inspectorState = inspectorState,
+                onTransposeChange = { delta -> onTranspose(delta); onDismiss() },
+                onGrooveChange = onGrooveChange
+            )
+
+            Spacer(Modifier.height(skin.paddingMedium))
             Text(
                 text = "Current Chord: ${currentChord?.chordName ?: "None"}",
                 color = skin.textPrimary,
                 fontSize = 13.sp
             )
-            Spacer(Modifier.height(skin.paddingLarge))
+            Spacer(Modifier.height(skin.paddingMedium))
 
             Text(
                 text = "ALTERNATIVE TRIADS & TETRADS",
@@ -83,7 +96,7 @@ fun PadInspectorDialog(
             Spacer(Modifier.height(6.dp))
 
             LazyColumn(
-                modifier = Modifier.height(200.dp),
+                modifier = Modifier.height(160.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 items(alternatives) { voicing ->

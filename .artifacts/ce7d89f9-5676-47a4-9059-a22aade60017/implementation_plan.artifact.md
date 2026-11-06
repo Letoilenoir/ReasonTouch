@@ -1,34 +1,44 @@
-# Implementation Plan: Core State & Data Models for Inspector and Compose Features
+# Implementation Plan: Generalize Transpose & Groove Controls Across All Track Inspectors
 
-Update core state and data models to support transposition and rhythmic groove modifications across inspectors and compose workflows.
+Generalize the transpose facility and integrate `GrooveModifierState` controls (`InspectorControlPanel`) across all pitched track inspectors (BASS, LEAD, CHORD, PAD) while omitting transpose for DRUMS using `InspectorState.isPitched`.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> **Data Model Specifications:**
-> 1. **`GrooveModifierState.kt` (in `core-playback`):**
-   - Enums:
-     - `GridSubdivisionEnum`: `STRAIGHT_16`, `TRIPLET_8T`, `TRIPLET_16T` (default `STRAIGHT_16`).
-     - `ParadiddleModeEnum`: `OFF`, `ACCENT_VELOCITY`, `OCTAVE_BOUNCE`, `ROOT_FIFTH` (default `OFF`).
-   - Data class `GrooveModifierState` with `gridSubdivision` and `paradiddleMode`.
-2. **`InspectorState.kt` (in `core-playback`):**
-   - Data class `InspectorState` with:
-     - `trackId: String`
-     - `transposeSemitones: Int` (coerced in `-12..12`, default `0`)
-     - `grooveState: GrooveModifierState`
-     - Computed property `val isPitched: Boolean get() = trackId.uppercase() != "DRUMS" && !trackId.uppercase().contains("DRUM")`.
+> **Architecture & Integration:**
+> 1. **`InspectorControlPanel` Integration:**
+   - Embed `InspectorControlPanel` into `ChordInspectorDialog`, `BassInspectorDialog`, `LeadInspectorDialog`, `PadInspectorDialog`, and `DrumInspectorDialog`.
+   - `InspectorState` manages `trackId`, `transposeSemitones`, and `grooveState`, automatically hiding transpose controls for DRUMS (`isPitched = false`).
+2. **ViewModel Wiring:**
+   - Wire `onTranspose` to `chordViewModel.transposeBar(barIndex, delta)`.
+   - Wire `onGrooveChange` to update groove settings in the ViewModel / repository.
 
 ## Proposed Changes
 
-### [core-playback]
+### [feature-chords] & [feature-pianoroll]
 
-#### [GrooveModifierState.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-playback/src/main/java/com/reasontouch/core/playback/GrooveModifierState.kt) [NEW]
-- Define `GridSubdivisionEnum`, `ParadiddleModeEnum`, and `GrooveModifierState`.
+#### [ChordInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-chords/src/main/kotlin/com/reasontouch/feature/chords/components/ChordInspectorDialog.kt)
+- Integrate `InspectorControlPanel`.
 
-#### [InspectorState.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-playback/src/main/java/com/reasontouch/core/playback/InspectorState.kt) [NEW]
-- Define `InspectorState` data class with `transposeSemitones`, `grooveState`, and `isPitched`.
+#### [BassInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-chords/src/main/kotlin/com/reasontouch/feature/chords/components/BassInspectorDialog.kt)
+- Integrate `InspectorControlPanel`.
+
+#### [LeadInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-chords/src/main/kotlin/com/reasontouch/feature/chords/components/LeadInspectorDialog.kt)
+- Integrate `InspectorControlPanel`.
+
+#### [PadInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-chords/src/main/kotlin/com/reasontouch/feature/chords/components/PadInspectorDialog.kt)
+- Integrate `InspectorControlPanel`.
+
+#### [DrumInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/components/DrumInspectorDialog.kt)
+- Integrate `InspectorControlPanel` (unpitched / DRUMS track, omitting transpose).
+
+#### [PianoRollScreen.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/PianoRollScreen.kt)
+- Pass `InspectorState`, `onTranspose`, and `onGrooveChange` to all track inspector dialog invocations.
 
 ## Verification Plan
 
 ### Automated Tests
 - Gradle build verification via `gradle_build("app:assembleDebug")`.
+
+### Manual Verification
+- Deploy to app, open bar inspectors for BASS, LEAD, CHORD, PAD, and DRUMS, verifying that transpose controls appear for pitched tracks and are omitted for DRUMS, and that Grid Subdivision and Paradiddle/Modifier controls function correctly.

@@ -17,6 +17,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reasontouch.core.playback.GrooveModifierState
+import com.reasontouch.core.playback.InspectorState
+import com.reasontouch.core.ui.components.InspectorControlPanel
 import com.reasontouch.core.ui.theme.ReasonTouchTheme
 import com.reasontouch.feature.chords.BassStyle
 
@@ -24,6 +27,9 @@ import com.reasontouch.feature.chords.BassStyle
 fun BassInspectorDialog(
     barIndex: Int,
     currentStyle: BassStyle?,
+    inspectorState: InspectorState,
+    onTranspose: (Int) -> Unit,
+    onGrooveChange: (GrooveModifierState) -> Unit,
     onApply: (BassStyle, Boolean, Boolean, Boolean, Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -60,6 +66,13 @@ fun BassInspectorDialog(
             )
             Spacer(Modifier.height(skin.paddingMedium))
 
+            InspectorControlPanel(
+                inspectorState = inspectorState,
+                onTransposeChange = { delta -> onTranspose(delta); onDismiss() },
+                onGrooveChange = onGrooveChange
+            )
+
+            Spacer(Modifier.height(skin.paddingMedium))
             Text(text = "STYLIST MODIFIERS", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
             Spacer(Modifier.height(4.dp))
             StylistRadioRow("Motown Chromatic Walk", useMotown) { useMotown = it }

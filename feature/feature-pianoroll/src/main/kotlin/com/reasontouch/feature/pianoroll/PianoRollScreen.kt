@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import com.reasontouch.core.playback.InspectorState
+import com.reasontouch.core.playback.GrooveModifierState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -386,32 +388,43 @@ fun PianoRollScreen(
                 val chordNames = chords.map { it.chordName.substringBefore(" ") }
                 val key = KeyDetector.detect(chordNames).firstOrNull()
 
+                val inspectorState = InspectorState(trackId = activeTrackName)
+                val onTranspose: (Int) -> Unit = { delta ->
+                    viewModel.recordSnapshot()
+                    chordViewModel.transposeBar(barIdx, delta) { viewModel.refreshNotes() }
+                    activeBarToInspect = null
+                }
+                val onGrooveChange: (GrooveModifierState) -> Unit = { grooveState ->
+                    // Handle groove modifier state updates
+                }
+
                 when (activeTrackName) {
                     "CHORD" -> com.reasontouch.feature.chords.components.ChordInspectorDialog(
                         barIndex = barIdx,
                         currentChord = chordEvent,
                         key = key,
                         currentStrumPattern = chordEvent?.strumPatternId?.toStepPattern(),
+                        inspectorState = inspectorState,
                         onSubstitute = { newTheoryChord, strumPattern ->
                             viewModel.recordSnapshot()
                             chordViewModel.substituteChord(barIdx, newTheoryChord, strumPattern) { viewModel.refreshNotes() }
                             activeBarToInspect = null
                         },
-                        onTranspose = { delta ->
-                            viewModel.recordSnapshot()
-                            chordViewModel.transposeBar(barIdx, delta) { viewModel.refreshNotes() }
-                            activeBarToInspect = null
-                        },
+                        onTranspose = onTranspose,
                         onInvert = {
                             viewModel.recordSnapshot()
                             chordViewModel.invertBar(barIdx) { viewModel.refreshNotes() }
                             activeBarToInspect = null
                         },
+                        onGrooveChange = onGrooveChange,
                         onDismiss = { activeBarToInspect = null }
                     )
                     "BASS" -> com.reasontouch.feature.chords.components.BassInspectorDialog(
                         barIndex = barIdx,
                         currentStyle = null,
+                        inspectorState = inspectorState,
+                        onTranspose = onTranspose,
+                        onGrooveChange = onGrooveChange,
                         onApply = { style, motown, jaco, dart, variation ->
                             viewModel.recordSnapshot()
                             chordViewModel.substituteBass(barIdx, style, motown, jaco, dart, variation) { viewModel.refreshNotes() }
@@ -421,6 +434,8 @@ fun PianoRollScreen(
                     )
                     "DRUMS" -> com.reasontouch.feature.pianoroll.components.DrumInspectorDialog(
                         barIndex = barIdx,
+                        inspectorState = inspectorState,
+                        onGrooveChange = onGrooveChange,
                         onApplyFill = { fillType ->
                             viewModel.recordSnapshot()
                             drumViewModel.writeFillToPianoRoll(fillType, barIdx, appendMode = true) { viewModel.refreshNotes() }
@@ -435,6 +450,9 @@ fun PianoRollScreen(
                     )
                     "LEAD" -> com.reasontouch.feature.chords.components.LeadInspectorDialog(
                         barIndex = barIdx,
+                        inspectorState = inspectorState,
+                        onTranspose = onTranspose,
+                        onGrooveChange = onGrooveChange,
                         onApplyPreset = { presetName ->
                             viewModel.recordSnapshot()
                             chordViewModel.substituteLead(barIdx, presetName) { viewModel.refreshNotes() }
@@ -445,6 +463,9 @@ fun PianoRollScreen(
                     "PAD" -> com.reasontouch.feature.chords.components.PadInspectorDialog(
                         barIndex = barIdx,
                         currentChord = chordEvent,
+                        inspectorState = inspectorState,
+                        onTranspose = onTranspose,
+                        onGrooveChange = onGrooveChange,
                         onApplyVoicing = { voicing ->
                             viewModel.recordSnapshot()
                             chordViewModel.substitutePad(barIdx, voicing) { viewModel.refreshNotes() }

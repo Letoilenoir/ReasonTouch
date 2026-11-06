@@ -16,6 +16,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reasontouch.core.playback.GrooveModifierState
+import com.reasontouch.core.playback.InspectorState
+import com.reasontouch.core.ui.components.InspectorControlPanel
 import com.reasontouch.core.ui.theme.ReasonTouchTheme
 import com.reasontouch.feature.drums.DrumFillPatterns
 import com.reasontouch.feature.drums.DrumPresets
@@ -23,6 +26,8 @@ import com.reasontouch.feature.drums.DrumPresets
 @Composable
 fun DrumInspectorDialog(
     barIndex: Int,
+    inspectorState: InspectorState,
+    onGrooveChange: (GrooveModifierState) -> Unit,
     onApplyFill: (String) -> Unit,
     onApplyPreset: (String) -> Unit,
     onDismiss: () -> Unit
@@ -53,6 +58,14 @@ fun DrumInspectorDialog(
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace
             )
+            Spacer(Modifier.height(skin.paddingMedium))
+
+            InspectorControlPanel(
+                inspectorState = inspectorState,
+                onTransposeChange = {}, // no-op for drums
+                onGrooveChange = onGrooveChange
+            )
+
             Spacer(Modifier.height(skin.paddingMedium))
 
             // Tab Toggle: Fills vs Presets
@@ -94,7 +107,7 @@ fun DrumInspectorDialog(
                 Spacer(Modifier.height(4.dp))
                 val fillsList = DrumFillPatterns.FILLS.entries.toList()
                 LazyColumn(
-                    modifier = Modifier.height(200.dp),
+                    modifier = Modifier.height(140.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(count = fillsList.size) { index ->
@@ -108,11 +121,11 @@ fun DrumInspectorDialog(
                                 .background(skin.panelAlt)
                                 .border(1.dp, skin.border, RoundedCornerShape(skin.cornerRadiusSmall))
                                 .clickable { onApplyFill(key); onDismiss() }
-                                .padding(horizontal = skin.paddingMedium, vertical = 8.dp)
+                                .padding(horizontal = skin.paddingMedium, vertical = 6.dp)
                         ) {
                             Column {
-                                Text(text = fill.name, color = skin.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text(text = fill.description, color = skin.textSecondary, fontSize = 10.sp)
+                                Text(text = fill.name, color = skin.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(text = fill.description, color = skin.textSecondary, fontSize = 9.sp)
                             }
                         }
                     }
@@ -122,7 +135,7 @@ fun DrumInspectorDialog(
                 Spacer(Modifier.height(4.dp))
                 val presetsList = DrumPresets.all.keys.toList()
                 LazyColumn(
-                    modifier = Modifier.height(200.dp),
+                    modifier = Modifier.height(140.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(count = presetsList.size) { index ->
@@ -134,9 +147,9 @@ fun DrumInspectorDialog(
                                 .background(skin.panelAlt)
                                 .border(1.dp, skin.border, RoundedCornerShape(skin.cornerRadiusSmall))
                                 .clickable { onApplyPreset(presetName); onDismiss() }
-                                .padding(horizontal = skin.paddingMedium, vertical = 10.dp)
+                                .padding(horizontal = skin.paddingMedium, vertical = 8.dp)
                         ) {
-                            Text(text = presetName, color = skin.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(text = presetName, color = skin.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

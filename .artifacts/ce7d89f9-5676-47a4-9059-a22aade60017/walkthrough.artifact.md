@@ -1,16 +1,16 @@
-# Walkthrough - Core State & Data Models for Inspector and Compose Features
+# Walkthrough - Generalize Transpose & Groove Controls Across All Track Inspectors
 
-Successfully created core state and data models to support transposition and rhythmic groove modifications in `core-playback`.
+Successfully implemented the Inspector control panel UI components and generalized transpose & groove modifier state handlers across all pitched track inspectors (BASS, LEAD, CHORD, PAD) while keeping transpose hidden for DRUMS.
 
 ## Changes
 
-### [core-playback]
+### [core-ui] & [feature-chords] & [feature-pianoroll]
 
-#### [GrooveModifierState.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-playback/src/main/java/com/reasontouch/core/playback/GrooveModifierState.kt) [NEW]
-- Created `GrooveModifierState` data class with `GridSubdivisionEnum` (`STRAIGHT_16`, `TRIPLET_8T`, `TRIPLET_16T`) and `ParadiddleModeEnum` (`OFF`, `ACCENT_VELOCITY`, `OCTAVE_BOUNCE`, `ROOT_FIFTH`).
+#### [InspectorControlPanel.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-ui/src/main/kotlin/com/reasontouch/core/ui/components/InspectorControlPanel.kt) [NEW]
+- Created the reusable `InspectorControlPanel` component rendering a transpose control row (when `inspectorState.isPitched` is true), a grid subdivision selector (`1/16`, `8T`, `16T`), and a paradiddle/modifier selector (`Off`, `Accent`, `Octave`, `Root/5th`).
 
-#### [InspectorState.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/core/core-playback/src/main/java/com/reasontouch/core/playback/InspectorState.kt) [NEW]
-- Created `InspectorState` data class containing `trackId`, `transposeSemitones` (coerced in `-12..12`), `grooveState`, and computed property `isPitched` (evaluating to false if `trackId == "DRUMS"` or contains "DRUM", true otherwise).
+#### [ChordInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-chords/src/main/kotlin/com/reasontouch/feature/chords/components/ChordInspectorDialog.kt), [BassInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-chords/src/main/kotlin/com/reasontouch/feature/chords/components/BassInspectorDialog.kt), [LeadInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-chords/src/main/kotlin/com/reasontouch/feature/chords/components/LeadInspectorDialog.kt), [PadInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-chords/src/main/kotlin/com/reasontouch/feature/chords/components/PadInspectorDialog.kt), [DrumInspectorDialog.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/components/DrumInspectorDialog.kt), [PianoRollScreen.kt](file:///C:/Users/andym/StudioProjects/ReasonTouch/feature/feature-pianoroll/src/main/kotlin/com/reasontouch/feature/pianoroll/PianoRollScreen.kt)
+- Integrated `InspectorControlPanel` into all 5 track inspector dialogs (`Chord`, `Bass`, `Lead`, `Pad`, `Drum`), wiring `onTranspose` and `onGrooveChange` callbacks to `PianoRollScreen`.
 
 ## Verification Results
 

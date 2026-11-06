@@ -19,6 +19,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reasontouch.core.data.ChordEvent
+import com.reasontouch.core.playback.GrooveModifierState
+import com.reasontouch.core.playback.InspectorState
+import com.reasontouch.core.ui.components.InspectorControlPanel
 import com.reasontouch.core.ui.theme.ReasonTouchTheme
 import com.reasontouch.feature.chords.*
 
@@ -28,9 +31,11 @@ fun ChordInspectorDialog(
     currentChord: ChordEvent?,
     key: KeyCandidate?,
     currentStrumPattern: StepPattern?,
+    inspectorState: InspectorState,
     onSubstitute: (TheoryChord, StepPattern?) -> Unit,
     onTranspose: (Int) -> Unit,
     onInvert: () -> Unit,
+    onGrooveChange: (GrooveModifierState) -> Unit,
     onDismiss: () -> Unit
 ) {
     val skin = ReasonTouchTheme.skin
@@ -128,15 +133,13 @@ fun ChordInspectorDialog(
                         }
 
                         Spacer(Modifier.height(skin.paddingMedium))
-                        Text(text = "BAR TRANSPOSE & INVERT", color = skin.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+                        InspectorControlPanel(
+                            inspectorState = inspectorState,
+                            onTransposeChange = { delta -> onTranspose(delta); onDismiss() },
+                            onGrooveChange = onGrooveChange
+                        )
                         Spacer(Modifier.height(4.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Box(modifier = Modifier.weight(1f).background(skin.panelAlt, RoundedCornerShape(3.dp)).clickable { onTranspose(-12); onDismiss() }.padding(vertical = 6.dp), contentAlignment = Alignment.Center) { Text("-12", color = skin.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-                            Box(modifier = Modifier.weight(1f).background(skin.panelAlt, RoundedCornerShape(3.dp)).clickable { onTranspose(-1); onDismiss() }.padding(vertical = 6.dp), contentAlignment = Alignment.Center) { Text("-1", color = skin.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-                            Box(modifier = Modifier.weight(1f).background(skin.panelAlt, RoundedCornerShape(3.dp)).clickable { onTranspose(1); onDismiss() }.padding(vertical = 6.dp), contentAlignment = Alignment.Center) { Text("+1", color = skin.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-                            Box(modifier = Modifier.weight(1f).background(skin.panelAlt, RoundedCornerShape(3.dp)).clickable { onTranspose(12); onDismiss() }.padding(vertical = 6.dp), contentAlignment = Alignment.Center) { Text("+12", color = skin.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-                            Box(modifier = Modifier.weight(1.2f).background(skin.accent.copy(alpha = 0.2f), RoundedCornerShape(3.dp)).border(1.dp, skin.accent, RoundedCornerShape(3.dp)).clickable { onInvert(); onDismiss() }.padding(vertical = 6.dp), contentAlignment = Alignment.Center) { Text("INVERT", color = skin.accent, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
-                        }
+                        Box(modifier = Modifier.fillMaxWidth().background(skin.panelAlt, RoundedCornerShape(3.dp)).border(1.dp, skin.border, RoundedCornerShape(3.dp)).clickable { onInvert(); onDismiss() }.padding(vertical = 6.dp), contentAlignment = Alignment.Center) { Text("INVERT CHORD", color = skin.accent, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                     }
 
                     // RIGHT COLUMN: Strum Pattern Selection

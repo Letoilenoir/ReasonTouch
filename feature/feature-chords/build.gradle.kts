@@ -22,6 +22,7 @@ dependencies {
     implementation(project(":core:core-ui"))
     implementation(project(":core:core-audio"))
     implementation(project(":core:core-midi"))
+    implementation(project(":core:core-playback"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
